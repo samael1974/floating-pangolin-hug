@@ -1,17 +1,15 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+"use client";
 
-import { MadeWithDyad } from "@/components/made-with-dyad";
+import React from 'react';
+import Link from 'next/link';
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">
-          Start building your amazing project here!
-        </p>
-      </div>
-      <MadeWithDyad />
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
+      <h1 className="text-4xl font-bold mb-8">Welcome to My App</h1>
+      <Link href="/relief" className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+        Go to Bas-Relief Generator
+      </Link>
     </div>
   );
 };
