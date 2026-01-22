@@ -1,5 +1,4 @@
-"use client";
-
+import type { ReliefParams } from "@/components/relief/ReliefControls";
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
