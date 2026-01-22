@@ -64,3 +64,26 @@ export default function Relief() {
     </div>
   );
 }
+React.useEffect(() => {
+  setParams((p) => {
+    // Non sovrascrivere depth/base scelti dall'utente
+    const keepDepth = p.depthMm;
+    const keepBase = p.baseMm;
+
+    switch (p.projectType) {
+      case "logo_text":
+        return { ...p, depthMm: keepDepth, baseMm: keepBase, smooth: 0.15, detail: 0.55, edge: "sharp" };
+      case "human_face":
+        return { ...p, depthMm: keepDepth, baseMm: keepBase, smooth: 0.70, detail: 0.30, edge: "round" };
+      case "animal":
+        return { ...p, depthMm: keepDepth, baseMm: keepBase, smooth: 0.55, detail: 0.45, edge: "round" };
+      case "nature_landscape":
+        return { ...p, depthMm: keepDepth, baseMm: keepBase, smooth: 0.50, detail: 0.40, edge: "round" };
+      case "decorative_pattern":
+        return { ...p, depthMm: keepDepth, baseMm: keepBase, smooth: 0.25, detail: 0.60, edge: "sharp" };
+      default:
+        return p;
+    }
+  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [params.projectType]);
