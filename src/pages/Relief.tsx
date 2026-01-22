@@ -114,7 +114,7 @@ export default function Relief() {
 
         {/* ✅ STEP 4A: Heightmap preview */}
         <ReliefHeightmapPreview file={file} params={params} />
-        
+        <ReliefGenerate file={file} params={params} />
 
         {/* Debug panel (temporaneo) */}
         <div className="rounded-lg bg-white p-4 shadow text-xs text-gray-600">
