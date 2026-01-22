@@ -152,9 +152,11 @@ export default function ReliefHeightmapPreview({
       if (!offCtx) throw new Error("Canvas 2D non disponibile");
 
       offCtx.drawImage(img, 0, 0, w, h);
-      const hm = buildHeightmapFromImageData(imageData, params, {
+ const imgData = offCtx.getImageData(0, 0, w, h);
+
+const hm = buildHeightmapFromImageData(imgData, params, {
   normalize: true,
-  percentileClip: 0.02, // stabilizza il contrasto
+  percentileClip: 0.02,
 });
 
 drawHeightmapToCanvas(canvas, hm.grayU8, hm.width, hm.height);
