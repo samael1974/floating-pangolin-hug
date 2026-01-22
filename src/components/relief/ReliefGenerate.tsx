@@ -2,8 +2,13 @@
 
 import React from 'react';
 
-const ReliefGenerate = () => {
-  return <div>Relief Generate Placeholder</div>;
+const ReliefGenerate: React.FC = () => {
+  return (
+    <div>
+      {/* Add your relief generation logic here */}
+      <p>Relief Generation Component</p>
+    </div>
+  );
 };
 
 export default ReliefGenerate;
