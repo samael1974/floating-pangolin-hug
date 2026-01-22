@@ -29,6 +29,65 @@ export default function Relief() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  // ✅ Preset "furbi" quando cambia il tipo progetto
+  React.useEffect(() => {
+    setParams((p) => {
+      // Non sovrascrivere depth/base scelti dall'utente
+      const keepDepth = p.depthMm;
+      const keepBase = p.baseMm;
+
+      switch (p.projectType) {
+        case "logo_text":
+          return {
+            ...p,
+            depthMm: keepDepth,
+            baseMm: keepBase,
+            smooth: 0.15,
+            detail: 0.55,
+            edge: "sharp",
+          };
+        case "human_face":
+          return {
+            ...p,
+            depthMm: keepDepth,
+            baseMm: keepBase,
+            smooth: 0.7,
+            detail: 0.3,
+            edge: "round",
+          };
+        case "animal":
+          return {
+            ...p,
+            depthMm: keepDepth,
+            baseMm: keepBase,
+            smooth: 0.55,
+            detail: 0.45,
+            edge: "round",
+          };
+        case "nature_landscape":
+          return {
+            ...p,
+            depthMm: keepDepth,
+            baseMm: keepBase,
+            smooth: 0.5,
+            detail: 0.4,
+            edge: "round",
+          };
+        case "decorative_pattern":
+          return {
+            ...p,
+            depthMm: keepDepth,
+            baseMm: keepBase,
+            smooth: 0.25,
+            detail: 0.6,
+            edge: "sharp",
+          };
+        default:
+          return p;
+      }
+    });
+  }, [params.projectType]);
+
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-4xl mx-auto px-4 py-10 space-y-6">
@@ -64,26 +123,3 @@ export default function Relief() {
     </div>
   );
 }
-React.useEffect(() => {
-  setParams((p) => {
-    // Non sovrascrivere depth/base scelti dall'utente
-    const keepDepth = p.depthMm;
-    const keepBase = p.baseMm;
-
-    switch (p.projectType) {
-      case "logo_text":
-        return { ...p, depthMm: keepDepth, baseMm: keepBase, smooth: 0.15, detail: 0.55, edge: "sharp" };
-      case "human_face":
-        return { ...p, depthMm: keepDepth, baseMm: keepBase, smooth: 0.70, detail: 0.30, edge: "round" };
-      case "animal":
-        return { ...p, depthMm: keepDepth, baseMm: keepBase, smooth: 0.55, detail: 0.45, edge: "round" };
-      case "nature_landscape":
-        return { ...p, depthMm: keepDepth, baseMm: keepBase, smooth: 0.50, detail: 0.40, edge: "round" };
-      case "decorative_pattern":
-        return { ...p, depthMm: keepDepth, baseMm: keepBase, smooth: 0.25, detail: 0.60, edge: "sharp" };
-      default:
-        return p;
-    }
-  });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [params.projectType]);
