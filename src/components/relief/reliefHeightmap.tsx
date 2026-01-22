@@ -256,7 +256,7 @@ export function buildHeightmapFromImageData(
     min = lo;
     max = hi;
   } else {
-    const mm = minMaxU8(gray);
+    const { lo, hi } = minMaxU8(gray);
     min = mm.min;
     max = mm.max;
   }
