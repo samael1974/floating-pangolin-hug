@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import ReliefGenerate from "@/components/relief/ReliefGenerate";
 
 import ReliefUpload from "@/components/relief/ReliefUpload";
 import ReliefControls, { ReliefParams } from "@/components/relief/ReliefControls";
