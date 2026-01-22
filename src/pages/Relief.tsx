@@ -1,4 +1,4 @@
-import React from "react";
+import ReliefHeightmapPreview from "@/components/relief/ReliefHeightmapPreview";
 import { Link } from "react-router-dom";
 import ReliefUpload from "@/components/relief/ReliefUpload";
 import ReliefControls, {
