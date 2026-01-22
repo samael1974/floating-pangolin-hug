@@ -1,31 +1,29 @@
 import React from "react";
 import type { ReliefParams } from "@/components/relief/ReliefControls";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
-import { heightmapToAsciiStl, downloadTextFile } from "@/components/relief/reliefStl";
+import {
+  heightmapToAsciiStl,
+  downloadTextFile,
+} from "@/components/relief/reliefStl";
 
 type Props = {
   file: File | null;
   params: ReliefParams;
-  maxSize?: number;     // image processing size
-  widthMm?: number;     // final print width
-  decimateStep?: number; // 1..4
+  maxSize?: number; // image processing size
 };
 
-export default function ReliefGenerate({
-  file,
-  params,
-  maxSize = 512,
-  widthMm = 120,
-  decimateStep = 1,
-}: Props) {
+export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
   const [busy, setBusy] = React.useState(false);
+
+  // ✅ controlli UI
+  const [widthMm, setWidthMm] = React.useState<number>(120);
+  const [decimateStep, setDecimateStep] = React.useState<number>(1);
 
   async function handleGenerate() {
     if (!file || busy) return;
     setBusy(true);
 
     try {
-      // load image
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.decoding = "async";
@@ -53,13 +51,11 @@ export default function ReliefGenerate({
       offCtx.drawImage(img, 0, 0, w, h);
       const imgData = offCtx.getImageData(0, 0, w, h);
 
-      // build heightmap (same pipeline as preview)
       const hm = buildHeightmapFromImageData(imgData, params, {
         normalize: true,
         percentileClip: 0.02,
       });
 
-      // build STL
       const stl = heightmapToAsciiStl(hm.normF32, hm.width, hm.height, {
         widthMm,
         depthMm: params.depthMm,
@@ -67,7 +63,7 @@ export default function ReliefGenerate({
         decimateStep,
       });
 
-      const safeName = `relief_${params.projectType}_${widthMm}mm.stl`;
+      const safeName = `relief_${params.projectType}_${widthMm}mm_d${decimateStep}.stl`;
       downloadTextFile(safeName, stl);
 
       URL.revokeObjectURL(url);
@@ -77,14 +73,56 @@ export default function ReliefGenerate({
   }
 
   return (
-    <div className="rounded-lg bg-white p-6 shadow space-y-3">
+    <div className="rounded-lg bg-white p-6 shadow space-y-4">
       <div>
         <h2 className="text-lg font-semibold">4) Genera STL</h2>
         <p className="text-sm text-gray-600">
-          Genera un STL (heightfield) con base e pareti. Per immagini grandi, usa decimazione.
+          STL heightfield con base e pareti. Se lo STL è troppo pesante, aumenta la decimazione.
         </p>
       </div>
 
+      {/* Controls */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="space-y-1 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-700">Larghezza STL (mm)</span>
+            <span className="tabular-nums text-gray-700">{widthMm} mm</span>
+          </div>
+          <input
+            type="range"
+            min={40}
+            max={300}
+            step={5}
+            value={widthMm}
+            onChange={(e) => setWidthMm(Number(e.target.value))}
+            className="w-full"
+          />
+          <div className="text-xs text-gray-500">
+            Mantiene le proporzioni dell’immagine (altezza calcolata automaticamente).
+          </div>
+        </label>
+
+        <label className="space-y-1 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-700">Qualità (Decimazione)</span>
+            <span className="tabular-nums text-gray-700">x{decimateStep}</span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={4}
+            step={1}
+            value={decimateStep}
+            onChange={(e) => setDecimateStep(Number(e.target.value))}
+            className="w-full"
+          />
+          <div className="text-xs text-gray-500">
+            x1 = massimo dettaglio · x2/x3 = STL più leggero · x4 = molto leggero
+          </div>
+        </label>
+      </div>
+
+      {/* Action */}
       <div className="flex flex-wrap gap-2 items-center">
         <button
           onClick={handleGenerate}
@@ -95,12 +133,8 @@ export default function ReliefGenerate({
         </button>
 
         <div className="text-xs text-gray-500">
-          Width: {widthMm}mm · Decimate: {decimateStep} · Depth: {params.depthMm}mm · Base: {params.baseMm}mm
+          Depth: {params.depthMm}mm · Base: {params.baseMm}mm · MaxSize: {maxSize}px
         </div>
-      </div>
-
-      <div className="text-xs text-gray-500">
-        Suggerimento: se lo STL è troppo pesante, imposta decimateStep=2 o 3 (meno triangoli).
       </div>
     </div>
   );
