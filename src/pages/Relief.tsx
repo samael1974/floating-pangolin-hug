@@ -1,10 +1,22 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import ReliefUpload from "@/components/relief/ReliefUpload";
+import ReliefControls, {
+  ReliefParams,
+} from "@/components/relief/ReliefControls";
 
 export default function Relief() {
   const [file, setFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+
+  const [params, setParams] = React.useState<ReliefParams>({
+    projectType: "logo_text",
+    depthMm: 3.0,
+    baseMm: 2.0,
+    detail: 0.5,
+    smooth: 0.5,
+    edge: "round",
+  });
 
   // Create/revoke object URL safely
   React.useEffect(() => {
@@ -24,7 +36,7 @@ export default function Relief() {
           <div>
             <h1 className="text-3xl font-bold">Generatore Bassorilievi</h1>
             <p className="text-sm text-gray-600 mt-1">
-              MVP: upload + anteprima. Prossimo step: slider + generazione STL.
+              MVP: upload + parametri. Prossimo step: heightmap preview + STL.
             </p>
           </div>
 
@@ -42,13 +54,16 @@ export default function Relief() {
           onPickFile={setFile}
         />
 
-        {/* Placeholder per step successivi */}
-        <div className="rounded-lg bg-white p-6 shadow space-y-2">
-          <h2 className="text-lg font-semibold">2) Parametri (prossimo step)</h2>
-          <p className="text-sm text-gray-600">
-            Aggiungeremo: tipo progetto (logo/volto/animale…), depth mm, base mm,
-            detail, smooth, edge, preview heightmap.
-          </p>
+        <ReliefControls
+          value={params}
+          onChange={setParams}
+          disabled={false}
+        />
+
+        {/* Debug panel (puoi rimuoverlo dopo) */}
+        <div className="rounded-lg bg-white p-4 shadow text-xs text-gray-600">
+          <div className="font-medium mb-1">Debug params</div>
+          <pre className="overflow-auto">{JSON.stringify(params, null, 2)}</pre>
         </div>
       </div>
     </div>
