@@ -144,16 +144,17 @@ export function applyGammaU8(src: Uint8ClampedArray, gamma = 1): Uint8ClampedArr
 
 /**
  * Compute min/max of U8 grayscale buffer.
+ * Returns lo/hi to stay consistent with percentileClipU8.
  */
-export function minMaxU8(src: Uint8ClampedArray): { min: number; max: number } {
-  let min = 255;
-  let max = 0;
+export function minMaxU8(src: Uint8ClampedArray): { lo: number; hi: number } {
+  let lo = 255;
+  let hi = 0;
   for (let i = 0; i < src.length; i++) {
     const v = src[i];
-    if (v < min) min = v;
-    if (v > max) max = v;
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
   }
-  return { min, max };
+  return { lo, hi };
 }
 
 /**
