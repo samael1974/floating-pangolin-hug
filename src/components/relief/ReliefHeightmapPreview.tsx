@@ -1,5 +1,7 @@
 import React from "react";
 import type { ReliefParams } from "@/components/relief/ReliefControls";
+import { buildHeightmapFromImageData, drawHeightmapToCanvas } from "@/components/relief/reliefHeightmap";
+
 
 type Props = {
   file: File | null;
