@@ -1,9 +1,9 @@
-import ReliefHeightmapPreview from "@/components/relief/ReliefHeightmapPreview";
+import React from "react";
 import { Link } from "react-router-dom";
+
 import ReliefUpload from "@/components/relief/ReliefUpload";
-import ReliefControls, {
-  ReliefParams,
-} from "@/components/relief/ReliefControls";
+import ReliefControls, { ReliefParams } from "@/components/relief/ReliefControls";
+import ReliefHeightmapPreview from "@/components/relief/ReliefHeightmapPreview";
 
 export default function Relief() {
   const [file, setFile] = React.useState<File | null>(null);
@@ -36,7 +36,7 @@ export default function Relief() {
           <div>
             <h1 className="text-3xl font-bold">Generatore Bassorilievi</h1>
             <p className="text-sm text-gray-600 mt-1">
-              MVP: upload + parametri. Prossimo step: heightmap preview + STL.
+              MVP: upload + parametri + heightmap preview. Prossimo step: STL.
             </p>
           </div>
 
@@ -48,19 +48,14 @@ export default function Relief() {
           </Link>
         </div>
 
-        <ReliefUpload
-          file={file}
-          previewUrl={previewUrl}
-          onPickFile={setFile}
-        />
+        <ReliefUpload file={file} previewUrl={previewUrl} onPickFile={setFile} />
 
-        <ReliefControls
-          value={params}
-          onChange={setParams}
-          disabled={false}
-        />
+        <ReliefControls value={params} onChange={setParams} disabled={false} />
 
-        {/* Debug panel (puoi rimuoverlo dopo) */}
+        {/* ✅ STEP 4A: Heightmap preview */}
+        <ReliefHeightmapPreview file={file} params={params} />
+
+        {/* Debug panel (temporaneo) */}
         <div className="rounded-lg bg-white p-4 shadow text-xs text-gray-600">
           <div className="font-medium mb-1">Debug params</div>
           <pre className="overflow-auto">{JSON.stringify(params, null, 2)}</pre>
