@@ -84,3 +84,9 @@ export function downloadTextFile(filename: string, text: string) {
   URL.revokeObjectURL(url);
 }
 
+// Compat: ASCII STL (deprecato)
+export function heightmapToAsciiStl(..._args: any[]) {
+  throw new Error("Deprecated: usa downloadReliefStlBinary (STL binario).");
+}
+
+
