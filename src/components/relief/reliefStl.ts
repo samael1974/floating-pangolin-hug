@@ -72,11 +72,15 @@ export function downloadReliefStlBinary(args: {
 // --- COMPAT LAYER (per non rompere ReliefGenerate.tsx)
 // Se non ti serve più, lo rimuoviamo dopo aver aggiornato ReliefGenerate.
 
-export function heightmapToAsciiStl() {
-  throw new Error("Deprecated: usa downloadReliefStlBinary (STL binario).");
-}
-
-export function downloadTestStl() {
-  throw new Error("Deprecated: usa downloadReliefStlBinary.");
+export function downloadTextFile(filename: string, text: string) {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
