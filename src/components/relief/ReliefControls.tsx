@@ -22,7 +22,6 @@ export type EdgeMode = "round" | "sharp";
 
 import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
 
-
 export type ReliefParams = {
   projectType: ProjectType;
   depthMm: number;
