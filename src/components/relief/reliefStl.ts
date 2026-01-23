@@ -66,9 +66,15 @@ export function downloadReliefStlBinary(args: {
 
   const stl = geometryToBinaryStl(geom);
 
-  const tag = `${outputMode}_${baseStyle}`;
-  downloadArrayBuffer(stl, `reliefforge_${tag}_${stlWidthMm.toFixed(0)}mm.stl`);
+const expected =
+  84 +
+  50 * (geom.getAttribute("position")!.count / 3);
+
+if (stl.byteLength !== expected) {
+  console.error("STL byteLength mismatch", { expected, got: stl.byteLength });
+  throw new Error(`STL corrotto: expected ${expected} bytes, got ${stl.byteLength}`);
 }
+
 // --- COMPAT LAYER (per non rompere ReliefGenerate.tsx)
 // Se non ti serve più, lo rimuoviamo dopo aver aggiornato ReliefGenerate.
 
