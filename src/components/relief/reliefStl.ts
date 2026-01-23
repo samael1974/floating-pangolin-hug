@@ -150,8 +150,11 @@ export function heightmapToAsciiStl(
   }
 
   // --- SIDES ---
-  // Left (x=0)
+   // Left (x=0)
   for (let y = 0; y < dyCount - 1; y++) {
+    const y0 = y * dy;
+    const y1 = (y + 1) * dy;
+
     const zTop0 = topZ(0, y);
     const zTop1 = topZ(0, y + 1);
     const zBot0 = bottomZ(0, y);
