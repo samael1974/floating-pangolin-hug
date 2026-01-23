@@ -33,7 +33,6 @@ export type ReliefParams = {
 
   outputMode: OutputMode;
   baseStyle: BaseStyle;
-  invert: boolean;
 };
 
 type Props = {
@@ -46,7 +45,7 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function helperFor(t: ProjectType) {
+function helperFor(t: ProjectType): string {
   switch (t) {
     case "logo_text":
       return "Logo/Testo: meglio bordi netti, poco smoothing, depth moderato per leggibilità.";
@@ -55,9 +54,11 @@ function helperFor(t: ProjectType) {
     case "animal":
       return "Animali: detail medio e depth medio per evidenziare pelo/forme senza impastare.";
     case "nature_landscape":
-      return "Natura/Paesaggio: smoothing medio e depth più basso per evitare superfici troppo “rugose”.";
+      return "Natura/Paesaggio: smoothing medio e depth più basso per evitare superfici troppo rugose.";
     case "decorative_pattern":
       return "Decorativo/Pattern: depth e edge dipendono dal motivo; puoi spingere su precisione e ripetibilità.";
+    default:
+      return "";
   }
 }
 
@@ -83,7 +84,8 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
     onChange({ ...value, [key]: v });
   }
 
-  // Guardrail: se passi a "Stampo" e sei su base "flat", ti metto "recessed" (senza impedirti di cambiare dopo)
+  // Guardrail UX:
+  // se passi a "Stampo" e sei su base "flat", ti porto a "recessed"
   function setOutputMode(next: OutputMode) {
     if (next === "mold" && value.baseStyle === "flat") {
       onChange({ ...value, outputMode: next, baseStyle: "recessed" });
@@ -123,8 +125,12 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
             <SelectValue placeholder="Seleziona un tipo" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="logo_text">{labelProjectType("logo_text")}</SelectItem>
-            <SelectItem value="human_face">{labelProjectType("human_face")}</SelectItem>
+            <SelectItem value="logo_text">
+              {labelProjectType("logo_text")}
+            </SelectItem>
+            <SelectItem value="human_face">
+              {labelProjectType("human_face")}
+            </SelectItem>
             <SelectItem value="animal">{labelProjectType("animal")}</SelectItem>
             <SelectItem value="nature_landscape">
               {labelProjectType("nature_landscape")}
@@ -178,7 +184,8 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
             onValueChange={(v) => set("baseMm", clamp(v[0] ?? 2, 0, 8))}
           />
           <p className="text-xs text-gray-500">
-            0.0 mm = nessuna base (rilievo “appoggiato”). Consigliato: 1.5–2.5 mm.
+            0.0 mm = nessuna base (rilievo “appoggiato”). Consigliato: 1.5–2.5
+            mm.
           </p>
         </div>
 
@@ -282,24 +289,6 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           </Select>
           <p className="text-xs text-gray-500">{baseHint}</p>
         </div>
-      </div>
-
-      <Separator />
-
-      {/* Invert */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-1">
-          <Label>Invert Depth Map</Label>
-          <p className="text-xs text-gray-500">
-            Capovolge alti/bassi. Utile per stampi e casi particolari.
-          </p>
-        </div>
-
-        <Switch
-          disabled={disabled}
-          checked={value.invert}
-          onCheckedChange={(checked) => set("invert", checked)}
-        />
       </div>
     </div>
   );
