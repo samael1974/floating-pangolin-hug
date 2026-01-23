@@ -13,7 +13,7 @@ type BuildSolidArgs = {
 };
 
 export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeometry {
-  const { normF32, w, h, widthMm, depthMm, baseMm, outputMode } = args;
+  const { normF32, w, h, widthMm, depthMm, baseMm, outputMode, baseStyle } = args;
 
   if (w < 2 || h < 2) throw new Error("Solid build: w/h too small");
   if (normF32.length !== w * h) throw new Error("Solid build: normF32 size mismatch");
@@ -32,9 +32,27 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
 
   const idx = (ix: number, iy: number) => iy * w + ix;
 
+  // --- TOP surface Z ---
+  // relief + flat:     z = baseMm + depthMm * H
+  // mold + recessed:   z = baseMm - depthMm * H  (clamp >= 0)
+  // altri mix: comportamenti coerenti e non ambigui
   const topZ = (H: number) => {
-    if (outputMode === "relief") return baseMm + depthMm * H;
-    return Math.max(0, baseMm - depthMm * H);
+    const h01 = Math.max(0, Math.min(1, H));
+
+    if (outputMode === "relief") {
+      // rilievo positivo
+      return baseMm + depthMm * h01;
+    }
+
+    // outputMode === "mold"
+    if (baseStyle === "recessed") {
+      // cavità: scende dentro la base
+      return Math.max(0, baseMm - depthMm * h01);
+    }
+
+    // baseStyle === "flat": stampo "piatto" (in pratica inversione senza cavità)
+    // tiene la stessa "altezza totale" ma invertita
+    return baseMm + depthMm * (1 - h01);
   };
 
   const verts: number[] = [];
@@ -44,7 +62,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     cx: number, cy: number, cz: number
   ) => verts.push(ax, ay, az, bx, by, bz, cx, cy, cz);
 
-  // TOP
+  // TOP (due triangoli per cella)
   for (let iy = 0; iy < h - 1; iy++) {
     for (let ix = 0; ix < w - 1; ix++) {
       const xA = x0 + ix * dx;
@@ -66,24 +84,25 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     }
   }
 
-  // BOTTOM (z=0) – winding reversed (normals downward)
+  // BOTTOM (z=0) – winding for normals DOWN
   const xL = x0;
   const xR = x0 + widthMm;
   const yT = y0;
   const yB = y0 + heightMm;
 
-  pushTri(xL, yT, 0, xR, yB, 0, xR, yT, 0);
-  pushTri(xL, yT, 0, xL, yB, 0, xR, yB, 0);
+  // Triangles oriented clockwise when seen from +Z => normals -Z
+  pushTri(xL, yT, 0, xR, yT, 0, xR, yB, 0);
+  pushTri(xL, yT, 0, xR, yB, 0, xL, yB, 0);
 
-  // SIDES
+  // SIDES (collegano topZ al bottom z=0)
   // Left (-X)
   for (let iy = 0; iy < h - 1; iy++) {
     const y1 = y0 + iy * dy;
     const y2 = y0 + (iy + 1) * dy;
     const z1 = topZ(normF32[idx(0, iy)]);
     const z2 = topZ(normF32[idx(0, iy + 1)]);
-    pushTri(xL, y1, 0, xL, y2, z2, xL, y1, z1);
-    pushTri(xL, y1, 0, xL, y2, 0, xL, y2, z2);
+    pushTri(xL, y1, 0, xL, y1, z1, xL, y2, z2);
+    pushTri(xL, y1, 0, xL, y2, z2, xL, y2, 0);
   }
 
   // Right (+X)
@@ -92,28 +111,28 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     const y2 = y0 + (iy + 1) * dy;
     const z1 = topZ(normF32[idx(w - 1, iy)]);
     const z2 = topZ(normF32[idx(w - 1, iy + 1)]);
-    pushTri(xR, y1, 0, xR, y1, z1, xR, y2, z2);
-    pushTri(xR, y1, 0, xR, y2, z2, xR, y2, 0);
+    pushTri(xR, y1, 0, xR, y2, z2, xR, y1, z1);
+    pushTri(xR, y1, 0, xR, y2, 0, xR, y2, z2);
   }
 
-  // Top (-Y)
+  // Top edge (-Y)
   for (let ix = 0; ix < w - 1; ix++) {
     const x1 = x0 + ix * dx;
     const x2 = x0 + (ix + 1) * dx;
     const z1 = topZ(normF32[idx(ix, 0)]);
     const z2 = topZ(normF32[idx(ix + 1, 0)]);
-    pushTri(x1, yT, 0, x1, yT, z1, x2, yT, z2);
-    pushTri(x1, yT, 0, x2, yT, z2, x2, yT, 0);
+    pushTri(x1, yT, 0, x2, yT, z2, x1, yT, z1);
+    pushTri(x1, yT, 0, x2, yT, 0, x2, yT, z2);
   }
 
-  // Bottom (+Y)
+  // Bottom edge (+Y)
   for (let ix = 0; ix < w - 1; ix++) {
     const x1 = x0 + ix * dx;
     const x2 = x0 + (ix + 1) * dx;
     const z1 = topZ(normF32[idx(ix, h - 1)]);
     const z2 = topZ(normF32[idx(ix + 1, h - 1)]);
-    pushTri(x1, yB, 0, x2, yB, z2, x1, yB, z1);
-    pushTri(x1, yB, 0, x2, yB, 0, x2, yB, z2);
+    pushTri(x1, yB, 0, x1, yB, z1, x2, yB, z2);
+    pushTri(x1, yB, 0, x2, yB, z2, x2, yB, 0);
   }
 
   const geometry = new THREE.BufferGeometry();
