@@ -1,70 +1,51 @@
-// src/components/relief/reliefHeightmap.ts
 import type { ReliefParams } from "@/components/relief/ReliefControls";
 
 export type HeightmapResult = {
   width: number;
   height: number;
-  grayU8: Uint8ClampedArray; // 0..255 (len = w*h)
-  normF32: Float32Array; // 0..1 (len = w*h)
-  min: number; // min gray before normalization (0..255)
-  max: number; // max gray before normalization (0..255)
+  grayU8: Uint8ClampedArray; // preview 0..255
+  normF32: Float32Array; // heightmap vera 0..1
+  min: number;
+  max: number;
 };
 
 export type HeightmapOptions = {
-  /** If true, invert grayscale (useful when you want dark areas raised). */
   invert?: boolean;
-  /** Gamma correction for grayscale before normalization. 1 = none. Typical: 0.8..1.4 */
-  gamma?: number;
-  /**
-   * Normalize to use full 0..255 range based on min/max of image.
-   * Usually helps contrast for relief.
-   */
   normalize?: boolean;
-  /**
-   * If provided, clamps low/high percentiles to reduce outliers (0..0.49).
-   * Example: 0.02 clips 2% low and 2% high.
-   */
-  percentileClip?: number;
 };
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
-function clampByte(n: number) {
-  return clamp(n, 0, 255) | 0;
-}
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
-/**
- * Convert RGBA ImageData -> grayscale (0..255) using luminance.
- */
-export function rgbaToGrayU8(imageData: ImageData): Uint8ClampedArray {
+/* =========================================================
+   FLOAT PIPELINE (0..1) — BASE SERIA PER STL PULITO
+   ========================================================= */
+
+export function rgbaToGrayF32(imageData: ImageData): Float32Array {
   const { data } = imageData;
-  const out = new Uint8ClampedArray(data.length / 4);
+  const out = new Float32Array(data.length / 4);
   for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    out[j] = (0.2126 * r + 0.7152 * g + 0.0722 * b) | 0;
+    const r = data[i] / 255;
+    const g = data[i + 1] / 255;
+    const b = data[i + 2] / 255;
+    out[j] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   }
   return out;
 }
 
-/**
- * Simple box blur on grayscale buffer.
- * radius: 0..3 recommended for preview; for STL you might go a bit higher but watch cost.
- */
-export function boxBlurGrayU8(
-  src: Uint8ClampedArray,
+export function boxBlurF32(
+  src: Float32Array,
   w: number,
   h: number,
   radius: number
-): Uint8ClampedArray {
+): Float32Array {
   if (radius <= 0) return src;
   const r = Math.floor(radius);
-  const dst = new Uint8ClampedArray(src.length);
+  const dst = new Float32Array(src.length);
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -78,80 +59,52 @@ export function boxBlurGrayU8(
           cnt++;
         }
       }
-      dst[y * w + x] = (sum / cnt) | 0;
+      dst[y * w + x] = sum / cnt;
     }
   }
   return dst;
 }
 
-/**
- * Detail enhancement (local contrast): adds back (src - blurred) scaled by strength.
- * detail: 0..1 recommended.
- */
-export function enhanceDetailU8(
-  src: Uint8ClampedArray,
+export function enhanceDetailF32(
+  src: Float32Array,
   w: number,
   h: number,
   detail: number
-): Uint8ClampedArray {
+): Float32Array {
   if (detail <= 0) return src;
-  const blurred = boxBlurGrayU8(src, w, h, 1);
-  const dst = new Uint8ClampedArray(src.length);
+  const blurred = boxBlurF32(src, w, h, 1);
+  const dst = new Float32Array(src.length);
+  const k = detail * 1.2;
 
-  const k = lerp(0.0, 1.5, clamp(detail, 0, 1)); // strength
   for (let i = 0; i < src.length; i++) {
-    const hi = src[i] - blurred[i];
-    dst[i] = clampByte(src[i] + hi * k);
+    dst[i] = src[i] + (src[i] - blurred[i]) * k;
   }
   return dst;
 }
 
-/**
- * Edge mode: if sharp, apply an S-curve to increase contrast (good for logos).
- */
-export function applyEdgeModeU8(
-  src: Uint8ClampedArray,
+export function applyEdgeModeF32(
+  src: Float32Array,
   edge: "round" | "sharp"
-): Uint8ClampedArray {
+): Float32Array {
   if (edge !== "sharp") return src;
-  const dst = new Uint8ClampedArray(src.length);
+  const dst = new Float32Array(src.length);
 
   for (let i = 0; i < src.length; i++) {
-    const v = src[i] / 255;
-    // S-curve
-    const c = v < 0.5 ? 2 * v * v : 1 - Math.pow(-2 * v + 2, 2) / 2;
-    dst[i] = clampByte(Math.round(c * 255));
+    const v = src[i];
+    dst[i] = v < 0.5 ? 2 * v * v : 1 - Math.pow(-2 * v + 2, 2) / 2;
   }
   return dst;
 }
 
-/**
- * Optional gamma correction on grayscale.
- */
-export function applyGammaU8(
-  src: Uint8ClampedArray,
-  gamma = 1
-): Uint8ClampedArray {
-  const g = gamma ?? 1;
-  if (!isFinite(g) || g <= 0 || Math.abs(g - 1) < 1e-6) return src;
-
-  const dst = new Uint8ClampedArray(src.length);
-  const inv = 1 / g;
-  for (let i = 0; i < src.length; i++) {
-    const v = src[i] / 255;
-    const vg = Math.pow(v, inv);
-    dst[i] = clampByte(Math.round(vg * 255));
-  }
+export function invertF32(src: Float32Array): Float32Array {
+  const dst = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) dst[i] = 1 - src[i];
   return dst;
 }
 
-/**
- * Compute min/max of U8 grayscale buffer.
- * Returns lo/hi to stay consistent with percentileClipU8.
- */
-export function minMaxU8(src: Uint8ClampedArray): { lo: number; hi: number } {
-  let lo = 255;
-  let hi = 0;
+export function minMaxF32(src: Float32Array): { lo: number; hi: number } {
+  let lo = Infinity;
+  let hi = -Infinity;
   for (let i = 0; i < src.length; i++) {
     const v = src[i];
     if (v < lo) lo = v;
@@ -160,65 +113,31 @@ export function minMaxU8(src: Uint8ClampedArray): { lo: number; hi: number } {
   return { lo, hi };
 }
 
-/**
- * Percentile clip helper (simple: sort copy; ok for preview sizes).
- * For STL large sizes, consider histogram.
- */
-export function percentileClipU8(
-  src: Uint8ClampedArray,
-  p: number
-): { lo: number; hi: number } {
-  const pp = clamp(p, 0, 0.49);
-  if (pp <= 0) return minMaxU8(src);
-
-  const arr = Array.from(src);
-  arr.sort((a, b) => a - b);
-  const n = arr.length;
-  const lo = arr[Math.floor(n * pp)];
-  const hi = arr[Math.floor(n * (1 - pp)) - 1];
-  return { lo, hi };
-}
-
-/**
- * Normalize grayscale to full 0..255 range using min/max (or percentile clipped).
- */
-export function normalizeU8(
-  src: Uint8ClampedArray,
+export function normalizeF32(
+  src: Float32Array,
   lo: number,
   hi: number
-): Uint8ClampedArray {
-  const dst = new Uint8ClampedArray(src.length);
-  const denom = Math.max(1, hi - lo);
+): Float32Array {
+  const dst = new Float32Array(src.length);
+  const d = Math.max(1e-9, hi - lo);
   for (let i = 0; i < src.length; i++) {
-    const v = clamp(src[i], lo, hi);
-    const nv = ((v - lo) / denom) * 255;
-    dst[i] = clampByte(Math.round(nv));
+    dst[i] = clamp((src[i] - lo) / d, 0, 1);
   }
   return dst;
 }
 
-/**
- * Invert grayscale (0..255 -> 255..0)
- */
-export function invertU8(src: Uint8ClampedArray): Uint8ClampedArray {
-  const dst = new Uint8ClampedArray(src.length);
-  for (let i = 0; i < src.length; i++) dst[i] = 255 - src[i];
-  return dst;
-}
-
-/**
- * Convert grayscale U8 -> normalized Float32 0..1
- */
-export function toNormF32(src: Uint8ClampedArray): Float32Array {
-  const out = new Float32Array(src.length);
-  for (let i = 0; i < src.length; i++) out[i] = src[i] / 255;
+export function floatToGrayU8(src: Float32Array): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(src.length);
+  for (let i = 0; i < src.length; i++) {
+    out[i] = Math.round(clamp(src[i], 0, 1) * 255);
+  }
   return out;
 }
 
-/**
- * Main pipeline: ImageData -> HeightmapResult
- * Applies params.smooth, params.detail, params.edge + optional options.
- */
+/* =========================================================
+   MAIN PIPELINE
+   ========================================================= */
+
 export function buildHeightmapFromImageData(
   imageData: ImageData,
   params: Pick<ReliefParams, "smooth" | "detail" | "edge">,
@@ -227,53 +146,35 @@ export function buildHeightmapFromImageData(
   const w = imageData.width;
   const h = imageData.height;
 
-  // 1) grayscale
-  let gray = rgbaToGrayU8(imageData);
+  let f = rgbaToGrayF32(imageData);
 
-  // 2) smoothing: 0..1 -> radius 0..3
   const blurRadius = Math.round(lerp(0, 3, clamp(params.smooth, 0, 1)));
-  if (blurRadius > 0) gray = boxBlurGrayU8(gray, w, h, blurRadius);
+  if (blurRadius > 0) f = boxBlurF32(f, w, h, blurRadius);
 
-  // 3) detail enhancement
-  gray = enhanceDetailU8(gray, w, h, clamp(params.detail, 0, 1));
+  f = enhanceDetailF32(f, w, h, clamp(params.detail, 0, 1));
+  f = applyEdgeModeF32(f, params.edge);
 
-  // 4) edge mode
-  gray = applyEdgeModeU8(gray, params.edge);
+  if (options.invert) f = invertF32(f);
 
-  // 5) optional gamma
-  if (options.gamma && Math.abs(options.gamma - 1) > 1e-6) {
-    gray = applyGammaU8(gray, options.gamma);
-  }
+  const mm = minMaxF32(f);
+  const fn = options.normalize ? normalizeF32(f, mm.lo, mm.hi) : f;
 
-  // 6) optional invert
-  if (options.invert) {
-    gray = invertU8(gray);
-  }
+  const grayU8 = floatToGrayU8(fn);
 
-  // 7) optional normalize
-  let min = 0,
-    max = 255;
-  if (options.normalize) {
-    const p = options.percentileClip ?? 0;
-    const { lo, hi } = p > 0 ? percentileClipU8(gray, p) : minMaxU8(gray);
-    gray = normalizeU8(gray, lo, hi);
-    min = lo;
-    max = hi;
-  } else {
-    const { lo, hi } = minMaxU8(gray);
-    min = lo;
-    max = hi;
-  }
-
-  // 8) normalized float 0..1
-  const normF32 = toNormF32(gray);
-
-  return { width: w, height: h, grayU8: gray, normF32, min, max };
+  return {
+    width: w,
+    height: h,
+    grayU8,
+    normF32: fn,
+    min: mm.lo,
+    max: mm.hi,
+  };
 }
 
-/**
- * Utility: draw grayU8 heightmap to a canvas.
- */
+/* =========================================================
+   PREVIEW CANVAS
+   ========================================================= */
+
 export function drawHeightmapToCanvas(
   canvas: HTMLCanvasElement,
   grayU8: Uint8ClampedArray,
