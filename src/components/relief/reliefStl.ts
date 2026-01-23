@@ -169,7 +169,7 @@ export function heightmapToAsciiStl(
     out += triFacet(bot0, bot1, top1);
   }
 
-  // Right (x=widthMm)
+   // Right (x=widthMm)
   for (let y = 0; y < dyCount - 1; y++) {
     const y0 = y * dy;
     const y1 = (y + 1) * dy;
