@@ -112,23 +112,7 @@ async function decodeDepthMapToHmState(
   return imageDataToNormF32(imgData, invert);
 }
 
-    const data: any = png.data;
-
-     const gray = new Uint16Array(w * h);
-      for (let i = 0, p = 0; p < gray.length; p++, i += channels) gray[p] = data[i];
-      return { normF32: depthU16ToNormF32(gray, invert), w, h };
-    }
-
-    // 8-bit
-    if (data instanceof Uint8Array) {
-      if (channels === 1) {
-        return { normF32: depthU8ToNormF32(data, invert), w, h };
-      }
-      const gray = new Uint8Array(w * h);
-      for (let i = 0, p = 0; p < gray.length; p++, i += channels) gray[p] = data[i];
-      return { normF32: depthU8ToNormF32(gray, invert), w, h };
-    }
-    // se tipo sconosciuto → fallback
+  
   }
 
   // ✅ JPG/WEBP (o fallback): canvas
