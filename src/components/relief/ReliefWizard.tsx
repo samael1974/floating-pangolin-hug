@@ -108,10 +108,10 @@ async function decodeDepthMapToHmState(
 
   ctx.drawImage(img, 0, 0, w, h);
   const imgData = ctx.getImageData(0, 0, w, h);
+
+  // Converte in normF32 (grayscale 0..1) + invert
   return imageDataToNormF32(imgData, invert);
 }
-
-
     const data: any = png.data;
 
     // 16-bit
