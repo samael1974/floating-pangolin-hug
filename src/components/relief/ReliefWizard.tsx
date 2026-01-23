@@ -1,291 +1,104 @@
-import React from "react";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
+import * as React from "react";
+import ReliefUpload from "@/components/relief/ReliefUpload";
+import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefControls";
+import ReliefHeightmapPreview from "@/components/relief/ReliefHeightmapPreview";
+import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 
-export type ProjectType =
-  | "logo_text"
-  | "human_face"
-  | "animal"
-  | "nature_landscape"
-  | "decorative_pattern";
+// Se hai già un generatore STL, importalo qui (nome indicativo)
+// import { buildReliefSTL } from "@/components/relief/reliefStl";
 
-export type EdgeMode = "round" | "sharp";
+const DEFAULT_PARAMS: ReliefParams = {
+  projectType: "logo_text",
+  depthMm: 3,
+  baseMm: 2,
+  detail: 0.55,
+  smooth: 0.15,
+  edge: "sharp",
 
-/** ✅ NEW */
-export type OutputMode = "relief" | "mold";
-/** ✅ NEW */
-export type BaseStyle = "flat" | "recessed";
-
-export type ReliefParams = {
-  projectType: ProjectType;
-  depthMm: number;
-  baseMm: number; // can be 0
-  detail: number; // 0..1
-  smooth: number; // 0..1
-  edge: EdgeMode;
-
-  /** ✅ NEW: output type */
-  outputMode: OutputMode;
-  /** ✅ NEW: base behavior */
-  baseStyle: BaseStyle;
-  /** ✅ NEW: invert heightmap */
-  invert: boolean;
+  outputMode: "relief",   // NEW
+  baseStyle: "flat",      // NEW
+  invert: false,          // NEW
 };
 
-type Props = {
-  value: ReliefParams;
-  onChange: (next: ReliefParams) => void;
-  disabled?: boolean;
-};
+export default function ReliefWizard() {
+  const [file, setFile] = React.useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+  const [params, setParams] = React.useState<ReliefParams>(DEFAULT_PARAMS);
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function helperFor(t: ProjectType) {
-  switch (t) {
-    case "logo_text":
-      return "Logo/Testo: meglio bordi netti, poco smoothing, depth moderato per leggibilità.";
-    case "human_face":
-      return "Volto: smoothing medio-alto e detail controllato per evitare rumore sulla pelle.";
-    case "animal":
-      return "Animali: detail medio e depth medio per evidenziare pelo/forme senza impastare.";
-    case "nature_landscape":
-      return "Natura/Paesaggio: smoothing medio e depth più basso per evitare superfici troppo “rugose”.";
-    case "decorative_pattern":
-      return "Decorativo/Pattern: depth e edge dipendono dal motivo; puoi spingere su precisione e ripetibilità.";
-    default:
-      return "";
-  }
-}
-
-function labelProjectType(t: ProjectType) {
-  switch (t) {
-    case "logo_text":
-      return "Logo / Testo";
-    case "human_face":
-      return "Volto umano";
-    case "animal":
-      return "Animali";
-    case "nature_landscape":
-      return "Natura / Paesaggio";
-    case "decorative_pattern":
-      return "Decorativo / Pattern";
-  }
-}
-
-export default function ReliefControls({ value, onChange, disabled }: Props) {
-  const helper = helperFor(value.projectType);
-
-  function set<K extends keyof ReliefParams>(key: K, v: ReliefParams[K]) {
-    onChange({ ...value, [key]: v });
-  }
-
-  // ✅ guardrail UX: se scegli "Stampo", default baseStyle diventa "recessed" (senza bloccare l’utente)
-  function setOutputMode(next: OutputMode) {
-    if (next === "mold" && value.baseStyle === "flat") {
-      onChange({ ...value, outputMode: next, baseStyle: "recessed" });
+  // Preview URL (cleanup corretto)
+  React.useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
       return;
     }
-    onChange({ ...value, outputMode: next });
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  // Props 3D: il tuo ReliefPreview3D renderizza solo se normF32/w/h esistono.
+  // Quindi per ora lo montiamo “safe”.
+  const preview3DProps = React.useMemo(
+    () => ({
+      widthMm: 120,
+      depthMm: params.depthMm,
+      baseMm: params.baseMm,
+      invert: params.invert,
+      previewDecimateStep: 3,
+      // normF32/w/h arriveranno quando colleghi la pipeline heightmap->mesh
+    }),
+    [params.depthMm, params.baseMm, params.invert]
+  );
+
+  // Download STL: placeholder (non rompe nulla). Lo colleghiamo dopo.
+  async function handleDownloadStl() {
+    // Qui ci agganciamo quando hai la funzione vera che produce STL.
+    // Per ora non facciamo nulla (evita casini).
+    alert("Colleghiamo lo STL generator nel prossimo step 🙂");
   }
 
-  const modeHint =
-    value.outputMode === "mold"
-      ? "Stampo: genera una cavità/negativo (utile per pressare o colate)."
-      : "Bassorilievo: genera un rilievo positivo stampabile.";
-
-  const baseHint =
-    value.baseStyle === "recessed"
-      ? "Base scavata: crea una cavità (più utile in modalità Stampo)."
-      : "Base piana: fondo piatto (standard per stampe 3D).";
-
   return (
-    <div className="rounded-lg bg-white p-6 shadow space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold">2) Parametri bassorilievo</h2>
-        <p className="text-sm text-gray-600">{helper}</p>
-      </div>
+    <div className="space-y-6">
+      <ReliefUpload
+        file={file}
+        previewUrl={previewUrl}
+        onPickFile={setFile}
+      />
 
-      <Separator />
+      <ReliefControls
+        value={params}
+        onChange={setParams}
+        disabled={!file}
+      />
 
-      {/* Project type */}
-      <div className="space-y-2">
-        <Label>Tipo progetto</Label>
-        <Select
-          disabled={disabled}
-          value={value.projectType}
-          onValueChange={(v) => set("projectType", v as ProjectType)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Seleziona un tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="logo_text">
-              {labelProjectType("logo_text")}
-            </SelectItem>
-            <SelectItem value="human_face">
-              {labelProjectType("human_face")}
-            </SelectItem>
-            <SelectItem value="animal">{labelProjectType("animal")}</SelectItem>
-            <SelectItem value="nature_landscape">
-              {labelProjectType("nature_landscape")}
-            </SelectItem>
-            <SelectItem value="decorative_pattern">
-              {labelProjectType("decorative_pattern")}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <ReliefHeightmapPreview
+        file={file}
+        params={params}
+        maxSize={512}
+      />
 
-      <Separator />
-
-      {/* Sliders grid */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Depth */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Depth massimo (mm)</Label>
-            <div className="text-sm tabular-nums text-gray-700">
-              {value.depthMm.toFixed(1)}
-            </div>
+      {/* Sezione STL + Preview 3D */}
+      <div className="rounded-lg bg-white p-6 shadow space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">4) Genera STL</h2>
+            <p className="text-sm text-gray-600">
+              STL chiuso e stampabile. In base a Modalità/Base/Invert generiamo positivo o stampo.
+            </p>
           </div>
-          <Slider
-            disabled={disabled}
-            value={[value.depthMm]}
-            min={0.5}
-            max={8}
-            step={0.1}
-            onValueChange={(v) => set("depthMm", clamp(v[0] ?? 3, 0.5, 8))}
-          />
-          <p className="text-xs text-gray-500">
-            Consiglio stampa: 2.0–4.0 mm per la maggior parte dei bassorilievi.
-          </p>
-        </div>
 
-        {/* Base thickness (✅ allows 0) */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Spessore base (mm)</Label>
-            <div className="text-sm tabular-nums text-gray-700">
-              {value.baseMm.toFixed(1)}
-            </div>
-          </div>
-          <Slider
-            disabled={disabled}
-            value={[value.baseMm]}
-            min={0}
-            max={8}
-            step={0.1}
-            onValueChange={(v) => set("baseMm", clamp(v[0] ?? 2, 0, 8))}
-          />
-          <p className="text-xs text-gray-500">
-            0.0 mm = nessuna base (rilievo “appoggiato”). Consigliato: 1.5–2.5
-            mm per stampe robuste.
-          </p>
-        </div>
-
-        {/* Detail */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Dettaglio</Label>
-            <div className="text-sm tabular-nums text-gray-700">
-              {value.detail.toFixed(2)}
-            </div>
-          </div>
-          <Slider
-            disabled={disabled}
-            value={[value.detail]}
-            min={0}
-            max={1}
-            step={0.01}
-            onValueChange={(v) => set("detail", clamp(v[0] ?? 0.5, 0, 1))}
-          />
-          <p className="text-xs text-gray-500">
-            Aumenta micro-contrasto. Troppo alto può creare rumore e STL pesante.
-          </p>
-        </div>
-
-        {/* Smooth */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Smoothing</Label>
-            <div className="text-sm tabular-nums text-gray-700">
-              {value.smooth.toFixed(2)}
-            </div>
-          </div>
-          <Slider
-            disabled={disabled}
-            value={[value.smooth]}
-            min={0}
-            max={1}
-            step={0.01}
-            onValueChange={(v) => set("smooth", clamp(v[0] ?? 0.5, 0, 1))}
-          />
-          <p className="text-xs text-gray-500">
-            Riduce rugosità. Per volti spesso 0.5–0.8 funziona bene.
-          </p>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Edge mode */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-1">
-          <Label>Bordi netti</Label>
-          <p className="text-xs text-gray-500">
-            Attiva per loghi/testi. Disattiva per soggetti organici.
-          </p>
-        </div>
-
-        <Switch
-          disabled={disabled}
-          checked={value.edge === "sharp"}
-          onCheckedChange={(checked) => set("edge", checked ? "sharp" : "round")}
-        />
-      </div>
-
-      <Separator />
-
-      {/* ✅ NEW: Output + Base style */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label>Modalità output</Label>
-          <Select
-            disabled={disabled}
-            value={value.outputMode}
-            onValueChange={(v) => setOutputMode(v as OutputMode)}
+          <button
+            type="button"
+            onClick={handleDownloadStl}
+            className="inline-flex items-center justify-center rounded-md bg-[#E46A52] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            disabled={!file}
           >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="relief">Bassorilievo (positivo)</SelectItem>
-              <SelectItem value="mold">Stampo (negativo)</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-gray-500">{modeHint}</p>
+            Scarica STL
+          </button>
         </div>
 
-        <div className="space-y-2">
-          <Label>Base</Label>
-          <Select
-            disabled={disabled}
-            value={value.baseStyle}
-            onValueChange={(v) => set("baseStyle", v as BaseStyle)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="flat">Piana (standard)</SelectItem>
+        <ReliefPreview3D {...preview3DProps} />
+      </div>
+    </div>
+  );
+}
