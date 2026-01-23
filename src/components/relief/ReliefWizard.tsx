@@ -338,8 +338,11 @@ export default function ReliefWizard() {
       <ReliefUpload file={file} previewUrl={previewUrl} onPickFile={setFile} />
 
       {/* Step 2: Controls */}
-      <ReliefControls value={params} onChange={setParams} disabled={!file || sourceMode === "depthmap"} />
-
+     <ReliefControls
+  value={params}
+  onChange={setParams}
+  disabled={!file}
+/>
       {/* Step 3: Preview 2D */}
       {sourceMode === "image" ? (
         <ReliefHeightmapPreview file={file} params={params} maxSize={512} />
