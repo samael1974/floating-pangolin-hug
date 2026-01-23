@@ -20,13 +20,25 @@ export type ProjectType =
 
 export type EdgeMode = "round" | "sharp";
 
+/** ✅ NEW */
+export type OutputMode = "relief" | "mold";
+/** ✅ NEW */
+export type BaseStyle = "flat" | "recessed";
+
 export type ReliefParams = {
   projectType: ProjectType;
   depthMm: number;
-  baseMm: number; // ✅ ora supporta 0
+  baseMm: number; // can be 0
   detail: number; // 0..1
   smooth: number; // 0..1
   edge: EdgeMode;
+
+  /** ✅ NEW: output type */
+  outputMode: OutputMode;
+  /** ✅ NEW: base behavior */
+  baseStyle: BaseStyle;
+  /** ✅ NEW: invert heightmap */
+  invert: boolean;
 };
 
 type Props = {
@@ -77,6 +89,25 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
   function set<K extends keyof ReliefParams>(key: K, v: ReliefParams[K]) {
     onChange({ ...value, [key]: v });
   }
+
+  // ✅ guardrail UX: se scegli "Stampo", default baseStyle diventa "recessed" (senza bloccare l’utente)
+  function setOutputMode(next: OutputMode) {
+    if (next === "mold" && value.baseStyle === "flat") {
+      onChange({ ...value, outputMode: next, baseStyle: "recessed" });
+      return;
+    }
+    onChange({ ...value, outputMode: next });
+  }
+
+  const modeHint =
+    value.outputMode === "mold"
+      ? "Stampo: genera una cavità/negativo (utile per pressare o colate)."
+      : "Bassorilievo: genera un rilievo positivo stampabile.";
+
+  const baseHint =
+    value.baseStyle === "recessed"
+      ? "Base scavata: crea una cavità (più utile in modalità Stampo)."
+      : "Base piana: fondo piatto (standard per stampe 3D).";
 
   return (
     <div className="rounded-lg bg-white p-6 shadow space-y-6">
@@ -141,7 +172,7 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           </p>
         </div>
 
-        {/* Base thickness */}
+        {/* Base thickness (✅ allows 0) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>Spessore base (mm)</Label>
@@ -158,8 +189,8 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
             onValueChange={(v) => set("baseMm", clamp(v[0] ?? 2, 0, 8))}
           />
           <p className="text-xs text-gray-500">
-            0.0 mm = nessuna base (solo rilievo). Consigliato: 1.5–2.5 mm per
-            stampe robuste.
+            0.0 mm = nessuna base (rilievo “appoggiato”). Consigliato: 1.5–2.5
+            mm per stampe robuste.
           </p>
         </div>
 
@@ -216,67 +247,6 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
             Attiva per loghi/testi. Disattiva per soggetti organici.
           </p>
         </div>
-<Separator />
-
-<div className="grid gap-6 md:grid-cols-2">
-  {/* Output mode */}
-  <div className="space-y-2">
-    <Label>Modalità output</Label>
-    <Select
-      disabled={disabled}
-      value={value.outputMode}
-      onValueChange={(v) => set("outputMode", v as any)}
-    >
-      <SelectTrigger className="w-full">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="relief">Bassorilievo (positivo)</SelectItem>
-        <SelectItem value="mold">Stampo (negativo)</SelectItem>
-      </SelectContent>
-    </Select>
-    <p className="text-xs text-gray-500">
-      “Stampo” genera una cavità: utile per pressare/colate.
-    </p>
-  </div>
-
-  {/* Base style */}
-  <div className="space-y-2">
-    <Label>Base</Label>
-    <Select
-      disabled={disabled}
-      value={value.baseStyle}
-      onValueChange={(v) => set("baseStyle", v as any)}
-    >
-      <SelectTrigger className="w-full">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="flat">Piana (standard)</SelectItem>
-        <SelectItem value="recessed">Scavata (cavità)</SelectItem>
-      </SelectContent>
-    </Select>
-    <p className="text-xs text-gray-500">
-      “Scavata” ha senso soprattutto in modalità Stampo.
-    </p>
-  </div>
-</div>
-
-<Separator />
-
-<div className="flex items-center justify-between gap-4">
-  <div className="space-y-1">
-    <Label>Invert Depth Map</Label>
-    <p className="text-xs text-gray-500">
-      Capovolge alti/bassi. Utile per stampi e casi particolari.
-    </p>
-  </div>
-  <Switch
-    disabled={disabled}
-    checked={value.invert}
-    onCheckedChange={(checked) => set("invert", checked)}
-  />
-</div>
 
         <Switch
           disabled={disabled}
@@ -284,6 +254,38 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           onCheckedChange={(checked) => set("edge", checked ? "sharp" : "round")}
         />
       </div>
-    </div>
-  );
-}
+
+      <Separator />
+
+      {/* ✅ NEW: Output + Base style */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Modalità output</Label>
+          <Select
+            disabled={disabled}
+            value={value.outputMode}
+            onValueChange={(v) => setOutputMode(v as OutputMode)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="relief">Bassorilievo (positivo)</SelectItem>
+              <SelectItem value="mold">Stampo (negativo)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">{modeHint}</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Base</Label>
+          <Select
+            disabled={disabled}
+            value={value.baseStyle}
+            onValueChange={(v) => set("baseStyle", v as BaseStyle)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="flat">Piana (standard)</SelectItem>
