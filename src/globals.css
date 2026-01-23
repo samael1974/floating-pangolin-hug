@@ -95,7 +95,10 @@
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
-  }
+ body {
+  font-family: "Lato", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
+h1, h2, h3, button {
+  font-family: "Raleway", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
