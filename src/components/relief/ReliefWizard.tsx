@@ -11,7 +11,6 @@ import { Slider } from "@/components/ui/slider";
 import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
 
 // ✅ fast-png (16-bit)
-import { decode as decodePng } from "fast-png";
 
 type HeightmapState = {
   normF32: Float32Array;
