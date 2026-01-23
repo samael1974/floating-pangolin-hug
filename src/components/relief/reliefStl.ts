@@ -200,6 +200,8 @@ export function heightmapToAsciiStl(
     const top1 = [x1, 0, zTop1];
     const bot0 = [x0, 0, zBot0];
     const bot1 = [x1, 0, zBot1];
+        out += triFacet(bot0, top0, top1);
+    out += triFacet(bot0, top1, bot1);
   }
 
   // Back (y=heightMm)
