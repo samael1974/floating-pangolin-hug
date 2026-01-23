@@ -10,8 +10,25 @@ export type HeightmapResult = {
 };
 
 export type HeightmapOptions = {
+  /** If true, invert grayscale (useful when you want dark areas raised). */
   invert?: boolean;
+
+  /**
+   * Normalize to use full range (0..1) based on min/max.
+   * Helps contrast for relief.
+   */
   normalize?: boolean;
+
+  /**
+   * (Compat) Keep for callers. If present, you can later implement
+   * percentile clipping in float. For now it's accepted to avoid TS errors.
+   */
+  percentileClip?: number;
+
+  /**
+   * (Compat) Keep for callers. For now it's accepted to avoid TS errors.
+   */
+  gamma?: number;
 };
 
 function clamp(n: number, min: number, max: number) {
