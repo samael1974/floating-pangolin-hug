@@ -2,7 +2,7 @@ import * as React from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
-import { buildReliefGeometry } from "./reliefGeometry";
+import { buildReliefGeometry } from "@/components/relief/reliefGeometry";
 
 type Props = {
   normF32?: Float32Array;
@@ -12,7 +12,7 @@ type Props = {
   depthMm: number;
   baseMm: number;
   invert?: boolean;
-  previewDecimateStep?: number; // default 2 o 3
+  previewDecimateStep?: number; // default 2-4
 };
 
 function SceneMesh({
@@ -32,7 +32,7 @@ function SceneMesh({
       depthMm,
       baseMm,
       invert,
-      decimateStep: previewDecimateStep ?? 2,
+      decimateStep: previewDecimateStep ?? 3,
     });
   }, [normF32, w, h, widthMm, depthMm, baseMm, invert, previewDecimateStep]);
 
@@ -47,7 +47,6 @@ function SceneMesh({
 
   if (!geometry) return null;
 
-  // centra la mesh
   geometry.computeBoundingBox();
   const bb = geometry.boundingBox!;
   const center = new THREE.Vector3();
@@ -57,7 +56,7 @@ function SceneMesh({
     <mesh
       geometry={geometry}
       material={material}
-      rotation={[-Math.PI / 2, 0, 0]} // mette Y su "verticale" per orbit più naturale
+      rotation={[-Math.PI / 2, 0, 0]}
       position={[-center.x, 0, center.y]}
       castShadow
       receiveShadow
@@ -66,17 +65,23 @@ function SceneMesh({
 }
 
 export default function ReliefPreview3D(props: Props) {
+  const wrapRef = React.useRef<HTMLDivElement>(null);
+
   return (
-    <div className="w-full overflow-hidden rounded-xl bg-white shadow">
+    <div ref={wrapRef} className="w-full overflow-hidden rounded-xl bg-white shadow">
       <div className="border-b px-4 py-2">
         <h3 className="text-sm font-semibold text-[#1F4E5F]">Preview 3D</h3>
         <p className="text-xs text-slate-500">
-          Ruota con drag • Zoom con rotellina/pinch • Preview ottimizzata
+          Ruota con drag • Zoom con rotellina/pinch
         </p>
       </div>
 
       <div className="h-[360px] w-full">
         <Canvas
+          // ✅ FIX: aggancia gli eventi a un contenitore reale e stabile
+          eventSource={wrapRef}
+          eventPrefix="client"
+          style={{ touchAction: "none" }}
           shadows
           camera={{ position: [0, 120, 220], fov: 35, near: 0.1, far: 2000 }}
         >
