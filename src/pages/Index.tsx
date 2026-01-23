@@ -80,4 +80,91 @@ export default function Index() {
                 1) Carica un’immagine
               </h3>
               <p className="mt-2 text-sm text-slate-600">
-                JPG/PNG/WEBP
+                JPG/PNG/WEBP. Se l’immagine arriva dai social, di solito è già ok.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-0 shadow-sm">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold text-[#1F4E5F]">
+                2) Regola il rilievo
+              </h3>
+              <p className="mt-2 text-sm text-slate-600">
+                Depth, dettaglio, smoothing e bordi netti. Preview 2D immediata.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-0 shadow-sm">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold text-[#1F4E5F]">
+                3) Scarica lo STL
+              </h3>
+              <p className="mt-2 text-sm text-slate-600">
+                STL chiuso e stampabile. Se è pesante, aumenta la decimazione.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* DONAZIONE (non invasiva) */}
+      <section className="mx-auto max-w-6xl px-4 pb-14">
+        <div className="rounded-2xl bg-white p-6 shadow-sm md:p-8">
+          <div className="flex flex-col items-start gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-2xl">
+              <h2 className="text-xl font-semibold text-[#1F4E5F]">
+                Supporta lo sviluppo (facoltativo)
+              </h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Questo progetto resta gratuito. Se lo usi spesso o ti ha tolto un
+                problema (Blender, booleane, mesh rotte…), puoi offrire un caffè.
+                Nessuna pressione: davvero.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                asChild
+                className="bg-[#E26D5C] text-white hover:bg-[#d85f50]"
+              >
+                <a
+                  href="https://www.paypal.me/federicocordioli72"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Dona su PayPal
+                </a>
+              </Button>
+
+              <div className="flex items-center gap-2 rounded-xl bg-[#ECECEC] px-3 py-2">
+                <img
+                  src="/home/paypal.webp"
+                  alt="PayPal"
+                  className="h-6 w-6"
+                  loading="lazy"
+                />
+                <span className="text-xs text-slate-600">
+                  Anche 1–2€ fanno la differenza
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* micro-psicologia (senza manipolare) */}
+          <p className="mt-4 text-xs text-slate-500">
+            Tip: se non puoi donare, il modo migliore per supportare è condividere il link con
+            un maker o un amico che stampa in 3D.
+          </p>
+        </div>
+      </section>
+
+      <footer className="border-t border-black/5 bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-6 text-xs text-slate-500">
+          Floating Pangolin Hug • Generatore Bassorilievi STL
+        </div>
+      </footer>
+    </div>
+  );
+}
