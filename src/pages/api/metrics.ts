@@ -1,47 +1,49 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-
-const URL_ = process.env.UPSTASH_REDIS_REST_URL!;
-const TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN!;
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
 async function redis(path: string, init?: RequestInit) {
-  const res = await fetch(`${URL_}${path}`, {
+  if (!UPSTASH_URL || !UPSTASH_TOKEN) {
+    throw new Error("Missing UPSTASH env vars");
+  }
+
+  const res = await fetch(`${UPSTASH_URL}${path}`, {
     ...init,
     headers: {
-      Authorization: `Bearer ${TOKEN}`,
+      Authorization: `Bearer ${UPSTASH_TOKEN}`,
       "Content-Type": "application/json",
       ...(init?.headers || {}),
     },
   });
-  if (!res.ok) throw new Error(`Upstash error ${res.status}`);
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Upstash error ${res.status}: ${txt}`);
+  }
+
   return res.json();
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default async function handler(req: any, res: any) {
   try {
-    // /api/metrics?action=stl_download
-    const action = String(req.query.action || "");
+    const action = String(req.query?.action || "").trim();
+    if (!action) return res.status(400).json({ ok: false, error: "Missing action" });
+
+    const key = `rf:${action}`;
 
     if (req.method === "POST") {
-      if (!action) return res.status(400).json({ error: "Missing action" });
-
-      const key = `rf:${action}`;
       await redis(`/incr/${encodeURIComponent(key)}`, { method: "POST" });
       const r = await redis(`/get/${encodeURIComponent(key)}`, { method: "GET" });
-
       return res.status(200).json({ ok: true, action, value: Number(r?.result ?? 0) });
     }
 
     if (req.method === "GET") {
-      if (!action) return res.status(400).json({ error: "Missing action" });
-
-      const key = `rf:${action}`;
       const r = await redis(`/get/${encodeURIComponent(key)}`, { method: "GET" });
-
       return res.status(200).json({ ok: true, action, value: Number(r?.result ?? 0) });
     }
 
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
   } catch (e: any) {
-    return res.status(500).json({ error: e?.message ?? "Server error" });
+    return res.status(500).json({ ok: false, error: e?.message ?? "Server error" });
   }
 }
