@@ -173,20 +173,78 @@ function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState
 }
 
 export default function ReliefWizard() {
-  // 0) Source mode
-  const [sourceMode, setSourceMode] = React.useState<SourceMode>("image");
+  // -----------------------------
+  // STATE
+  // -----------------------------
+  const [file, setFile] = React.useState<File | null>(null);
+  const [params, setParams] = React.useState<ReliefParams>(...);
+  const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
+  const [sourceMode, setSourceMode] = React.useState<"image" | "depthmap">("image");
   const [invertDepthMap, setInvertDepthMap] = React.useState(false);
+
+  // ✅ REF del canvas (QUESTO DEVE ESISTERE)
   const dmCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
-  // 1) Upload
-  const [file, setFile] = React.useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
-
+  // -----------------------------
+  // useEffect: genera heightmap
+  // -----------------------------
   React.useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return;
+    // tua pipeline (image o depthmap)
+  }, [file, params, sourceMode, invertDepthMap]);
+
+  // -----------------------------
+  // ✅ useEffect: DISEGNA PREVIEW DEPTH MAP
+  // -----------------------------
+  React.useEffect(() => {
+    if (sourceMode !== "depthmap") return;
+    if (!hmState) return;
+
+    const c = dmCanvasRef.current;
+    if (!c) return;
+
+    c.width = hmState.w;
+    c.height = hmState.h;
+
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+
+    const img = ctx.createImageData(hmState.w, hmState.h);
+    const d = img.data;
+
+    for (let i = 0; i < hmState.normF32.length; i++) {
+      const v = Math.round(Math.max(0, Math.min(1, hmState.normF32[i])) * 255);
+      const j = i * 4;
+      d[j] = v;
+      d[j + 1] = v;
+      d[j + 2] = v;
+      d[j + 3] = 255;
     }
+
+    ctx.putImageData(img, 0, 0);
+  }, [sourceMode, hmState]);
+
+  // -----------------------------
+  // JSX
+  // -----------------------------
+  return (
+    <div className="space-y-6">
+      {/* altri step */}
+
+      {sourceMode === "depthmap" && (
+        <div className="rounded-lg border p-4">
+          <div className="text-sm font-semibold mb-2">
+            Anteprima Depth Map (16-bit)
+          </div>
+          <canvas
+            ref={dmCanvasRef}
+            className="block max-h-[320px] w-auto border"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
