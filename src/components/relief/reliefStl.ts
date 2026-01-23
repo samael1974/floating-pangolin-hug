@@ -96,10 +96,11 @@ export function heightmapToAsciiStl(
       const x1 = (x + 1) * dx;
       const y1 = (y + 1) * dy;
 
-      const z00 = sample(x, y);
-      const z10 = sample(x + 1, y);
-      const z01 = sample(x, y + 1);
-      const z11 = sample(x + 1, y + 1);
+        const z00 = topZ(x, y);
+      const z10 = topZ(x + 1, y);
+      const z01 = topZ(x, y + 1);
+      const z11 = topZ(x + 1, y + 1);
+
 
       const p00 = [x0, y0, z00];
       const p10 = [x1, y0, z10];
