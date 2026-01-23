@@ -45,7 +45,15 @@ export function downloadReliefStlBinary(args: {
   outputMode: OutputMode;
   baseStyle: BaseStyle;
 }) {
-  const { hm, stlWidthMm, decimateStep, depthMm, baseMm, outputMode, baseStyle } = args;
+  const {
+    hm,
+    stlWidthMm,
+    decimateStep,
+    depthMm,
+    baseMm,
+    outputMode,
+    baseStyle,
+  } = args;
 
   if (hm.normF32.length !== hm.w * hm.h) {
     throw new Error("Heightmap mismatch: normF32 length != w*h");
@@ -66,18 +74,22 @@ export function downloadReliefStlBinary(args: {
 
   const stl = geometryToBinaryStl(geom);
 
-const expected =
-  84 +
-  50 * (geom.getAttribute("position")!.count / 3);
+  // Sanity check: STL binary size must be 84 + 50*triangles
+  const pos = geom.getAttribute("position");
+  if (!pos) throw new Error("STL: geometry has no position attribute");
+  const triCount = pos.count / 3;
+  const expected = 84 + 50 * triCount;
 
-if (stl.byteLength !== expected) {
-  console.error("STL byteLength mismatch", { expected, got: stl.byteLength });
-  throw new Error(`STL corrotto: expected ${expected} bytes, got ${stl.byteLength}`);
+  if (stl.byteLength !== expected) {
+    console.error("STL byteLength mismatch", { expected, got: stl.byteLength, triCount });
+    throw new Error(`STL corrotto: expected ${expected} bytes, got ${stl.byteLength}`);
+  }
+
+  const tag = `${outputMode}_${baseStyle}`;
+  downloadArrayBuffer(stl, `reliefforge_${tag}_${stlWidthMm.toFixed(0)}mm.stl`);
 }
 
-// --- COMPAT LAYER (per non rompere ReliefGenerate.tsx)
-// Se non ti serve più, lo rimuoviamo dopo aver aggiornato ReliefGenerate.
-
+// --- COMPAT LAYER (se qualche file vecchio lo importa)
 export function downloadTextFile(filename: string, text: string) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -87,12 +99,10 @@ export function downloadTextFile(filename: string, text: string) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // Compat: ASCII STL (deprecato)
 export function heightmapToAsciiStl(..._args: any[]) {
   throw new Error("Deprecated: usa downloadReliefStlBinary (STL binario).");
 }
-
-
