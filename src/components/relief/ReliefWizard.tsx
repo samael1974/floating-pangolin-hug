@@ -4,6 +4,7 @@ import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefCon
 import ReliefHeightmapPreview from "@/components/relief/ReliefHeightmapPreview";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
+import { decode as decodePng } from "fast-png";
 
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
