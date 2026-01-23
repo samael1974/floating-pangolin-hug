@@ -77,9 +77,9 @@ export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
     <div className="rounded-lg bg-white p-6 shadow space-y-4">
       <div>
         <h2 className="text-lg font-semibold">4) Genera STL</h2>
-        <p className="text-sm text-gray-600">
-          STL heightfield con base e pareti. Se lo STL è troppo pesante, aumenta la decimazione.
-        </p>
+       <p className="text-sm text-gray-600">
+  STL heightfield chiuso (stampabile). Puoi usare la modalità senza piastra piatta. Se lo STL è troppo pesante, aumenta la decimazione.
+</p>
       </div>
 
       {/* Controls */}
