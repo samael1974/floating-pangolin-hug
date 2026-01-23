@@ -216,6 +216,67 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
             Attiva per loghi/testi. Disattiva per soggetti organici.
           </p>
         </div>
+<Separator />
+
+<div className="grid gap-6 md:grid-cols-2">
+  {/* Output mode */}
+  <div className="space-y-2">
+    <Label>Modalità output</Label>
+    <Select
+      disabled={disabled}
+      value={value.outputMode}
+      onValueChange={(v) => set("outputMode", v as any)}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="relief">Bassorilievo (positivo)</SelectItem>
+        <SelectItem value="mold">Stampo (negativo)</SelectItem>
+      </SelectContent>
+    </Select>
+    <p className="text-xs text-gray-500">
+      “Stampo” genera una cavità: utile per pressare/colate.
+    </p>
+  </div>
+
+  {/* Base style */}
+  <div className="space-y-2">
+    <Label>Base</Label>
+    <Select
+      disabled={disabled}
+      value={value.baseStyle}
+      onValueChange={(v) => set("baseStyle", v as any)}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="flat">Piana (standard)</SelectItem>
+        <SelectItem value="recessed">Scavata (cavità)</SelectItem>
+      </SelectContent>
+    </Select>
+    <p className="text-xs text-gray-500">
+      “Scavata” ha senso soprattutto in modalità Stampo.
+    </p>
+  </div>
+</div>
+
+<Separator />
+
+<div className="flex items-center justify-between gap-4">
+  <div className="space-y-1">
+    <Label>Invert Depth Map</Label>
+    <p className="text-xs text-gray-500">
+      Capovolge alti/bassi. Utile per stampi e casi particolari.
+    </p>
+  </div>
+  <Switch
+    disabled={disabled}
+    checked={value.invert}
+    onCheckedChange={(checked) => set("invert", checked)}
+  />
+</div>
 
         <Switch
           disabled={disabled}
