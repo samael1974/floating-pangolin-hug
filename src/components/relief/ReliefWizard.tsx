@@ -113,17 +113,21 @@ async function decodeDepthMapToHmState(
 }
   
 export default function ReliefWizard() {
-  // source
+  // ✅ Preview TAB (colonna destra)
+  const [previewTab, setPreviewTab] = React.useState<"image" | "depth" | "stl">("stl");
+
+  // ✅ Source
   const [sourceMode, setSourceMode] = React.useState<SourceMode>("image");
   const [invertDepthMap, setInvertDepthMap] = React.useState(false);
 
-  // upload
+  // ✅ Upload
   const [file, setFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
 
-  // canvas preview per depthmap
+  // ✅ Canvas preview per depthmap
   const dmCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
+  // ✅ Preview URL (immagine)
   React.useEffect(() => {
     if (!file) {
       setPreviewUrl(null);
@@ -134,7 +138,7 @@ export default function ReliefWizard() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  // params
+  // ✅ Params (sempre modificabili, anche in depthmap)
   const [params, setParams] = React.useState<ReliefParams>(() => ({
     projectType: "logo_text",
     depthMm: 3,
@@ -146,10 +150,21 @@ export default function ReliefWizard() {
     baseStyle: "flat",
   }));
 
-  // heightmap
+  // ✅ Heightmap state/status
   const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
   const [hmStatus, setHmStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
 
+  // ✅ UX: quando carichi un file vai su "Immagine"
+  React.useEffect(() => {
+    if (file) setPreviewTab("image");
+  }, [file]);
+
+  // ✅ UX: quando hm pronta vai su "STL"
+  React.useEffect(() => {
+    if (hmStatus === "ready") setPreviewTab("stl");
+  }, [hmStatus]);
+
+  // ✅ Pipeline heightmap (image OR depthmap)
   React.useEffect(() => {
     let cancelled = false;
 
@@ -163,71 +178,73 @@ export default function ReliefWizard() {
       setHmStatus("loading");
       const maxSize = 512;
 
-      // ✅ depthmap (8/16-bit)
-      if (sourceMode === "depthmap") {
-        const hm = await decodeDepthMapToHmState(file, invertDepthMap, maxSize);
+      try {
+        // 1) DEPTHMAP -> hmState
+        if (sourceMode === "depthmap") {
+          const hm = await decodeDepthMapToHmState(file, invertDepthMap, maxSize);
+          if (!cancelled) {
+            setHmState(hm);
+            setHmStatus("ready");
+          }
+          return;
+        }
+
+        // 2) IMAGE -> tua pipeline
+        const img = await loadImageFromFile(file);
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
+
+        const scale = Math.min(1, maxSize / Math.max(iw, ih));
+        const w = Math.max(2, Math.round(iw * scale));
+        const h = Math.max(2, Math.round(ih * scale));
+
+        const off = document.createElement("canvas");
+        off.width = w;
+        off.height = h;
+
+        const ctx = off.getContext("2d", { willReadFrequently: true });
+        if (!ctx) throw new Error("Canvas 2D non disponibile");
+
+        ctx.drawImage(img, 0, 0, w, h);
+        const imgData = ctx.getImageData(0, 0, w, h);
+
+        const hmAny: any = buildHeightmapFromImageData(imgData, params, {
+          normalize: true,
+          percentileClip: 0.02,
+        });
+
+        const outW = Number(hmAny?.w ?? hmAny?.width ?? w);
+        const outH = Number(hmAny?.h ?? hmAny?.height ?? h);
+
+        let normF32: Float32Array;
+        if (hmAny?.normF32 instanceof Float32Array) {
+          normF32 = hmAny.normF32;
+        } else if (hmAny?.grayU8 instanceof Uint8Array) {
+          const g = hmAny.grayU8 as Uint8Array;
+          normF32 = new Float32Array(g.length);
+          for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
+        } else {
+          throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
+        }
+
+        if (normF32.length !== outW * outH) {
+          throw new Error(`Heightmap mismatch: normF32(${normF32.length}) != ${outW}*${outH}`);
+        }
+
         if (!cancelled) {
-          setHmState(hm);
+          setHmState({ normF32, w: outW, h: outH });
           setHmStatus("ready");
         }
-        return;
-      }
-
-      // ✅ image -> pipeline tua
-      const img = await loadImageFromFile(file);
-      const iw = img.naturalWidth || img.width;
-      const ih = img.naturalHeight || img.height;
-
-      const scale = Math.min(1, maxSize / Math.max(iw, ih));
-      const w = Math.max(2, Math.round(iw * scale));
-      const h = Math.max(2, Math.round(ih * scale));
-
-      const off = document.createElement("canvas");
-      off.width = w;
-      off.height = h;
-
-      const ctx = off.getContext("2d", { willReadFrequently: true });
-      if (!ctx) throw new Error("Canvas 2D non disponibile");
-
-      ctx.drawImage(img, 0, 0, w, h);
-      const imgData = ctx.getImageData(0, 0, w, h);
-
-      const hmAny: any = buildHeightmapFromImageData(imgData, params, {
-        normalize: true,
-        percentileClip: 0.02,
-      });
-
-      const outW = Number(hmAny?.w ?? hmAny?.width ?? w);
-      const outH = Number(hmAny?.h ?? hmAny?.height ?? h);
-
-      let normF32: Float32Array;
-      if (hmAny?.normF32 instanceof Float32Array) {
-        normF32 = hmAny.normF32;
-      } else if (hmAny?.grayU8 instanceof Uint8Array) {
-        const g = hmAny.grayU8 as Uint8Array;
-        normF32 = new Float32Array(g.length);
-        for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
-      } else {
-        throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
-      }
-
-      if (normF32.length !== outW * outH) {
-        throw new Error(`Heightmap mismatch: normF32(${normF32.length}) != ${outW}*${outH}`);
-      }
-
-      if (!cancelled) {
-        setHmState({ normF32, w: outW, h: outH });
-        setHmStatus("ready");
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          setHmState(null);
+          setHmStatus("error");
+        }
       }
     }
 
-    run().catch((e) => {
-      console.error(e);
-      if (!cancelled) {
-        setHmState(null);
-        setHmStatus("error");
-      }
-    });
+    run();
 
     return () => {
       cancelled = true;
