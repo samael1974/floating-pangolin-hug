@@ -1,6 +1,6 @@
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
 import { geometryToBinaryStl } from "@/lib/stl/binaryStl";
-import type { OutputMode, BaseStyle } from "@/components/relief/ReliefControls";
+import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
 
 type Heightmap = { normF32: Float32Array; w: number; h: number };
 
