@@ -1,12 +1,14 @@
+// src/lib/reliefTypes.ts
+// Tipi condivisi tra UI e core (NO dipendenze da THREE o React)
+
 export type ReliefType = {
   id: string;
   name: string;
   description: string;
 };
 
-export type OutputMode = "solid" | "wireframe";
+// Modalità di output per la mesh/STL
+export type OutputMode = "relief" | "mold";
 
-export type BaseStyle = {
-  color: THREE.Color;
-  opacity: number;
-};
+// Stile base (piatta o incassata)
+export type BaseStyle = "flat" | "recessed";
