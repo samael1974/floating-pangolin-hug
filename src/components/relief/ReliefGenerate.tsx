@@ -61,6 +61,7 @@ export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
         depthMm: params.depthMm,
         baseMm: params.baseMm,
         decimateStep,
+        noBasePlate: true,
       });
 
       const safeName = `relief_${params.projectType}_${widthMm}mm_d${decimateStep}.stl`;
