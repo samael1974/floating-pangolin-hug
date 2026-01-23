@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+<OrbitControls enableDamping dampingFactor={0.08} />
 import * as THREE from "three";
 import { buildReliefGeometry } from "@/components/relief/reliefGeometry";
 
