@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 
 export default function Relief() {
   return (
