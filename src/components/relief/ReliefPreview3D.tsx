@@ -4,20 +4,6 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { buildReliefGeometry } from "@/components/relief/reliefGeometry";
 
-// ✅ EventManager stub: evita che R3F inizializzi la pipeline eventi (che ti sta crashando)
-const noEvents = () =>
-  ({
-    enabled: false,
-    priority: 0,
-    connected: undefined,
-    handlers: {},
-    connect: () => {},
-    disconnect: () => {},
-    update: () => {},
-    // compute viene chiamata dal sistema eventi: restituiamo null
-    compute: () => null,
-  } as any);
-
 type Props = {
   normF32?: Float32Array;
   w?: number;
@@ -26,7 +12,7 @@ type Props = {
   depthMm: number;
   baseMm: number;
   invert?: boolean;
-  previewDecimateStep?: number; // default 2-4
+  previewDecimateStep?: number;
 };
 
 function SceneMesh({
@@ -55,6 +41,7 @@ function SceneMesh({
       new THREE.MeshStandardMaterial({
         roughness: 0.85,
         metalness: 0.0,
+        color: new THREE.Color("#ECECEC"),
       }),
     []
   );
@@ -88,15 +75,9 @@ export default function ReliefPreview3D(props: Props) {
 
       <div className="h-[360px] w-full">
         <Canvas
-          // ✅ qui disattiviamo del tutto gli eventi di R3F (addio crash .S)
-          events={noEvents}
           style={{ touchAction: "none" }}
           shadows
           camera={{ position: [0, 120, 220], fov: 35, near: 0.1, far: 2000 }}
-          onCreated={({ gl }) => {
-            // utile su touch/trackpad
-            gl.domElement.style.touchAction = "none";
-          }}
         >
           <ambientLight intensity={0.6} />
           <directionalLight position={[200, 300, 150]} intensity={1.0} castShadow />
@@ -104,7 +85,6 @@ export default function ReliefPreview3D(props: Props) {
 
           <SceneMesh {...props} />
 
-          {/* OrbitControls si attacca al canvas (gl.domElement), non agli eventi R3F */}
           <OrbitControls enableDamping dampingFactor={0.08} />
         </Canvas>
       </div>
