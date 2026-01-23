@@ -67,35 +67,41 @@ function SceneMesh({
 export default function ReliefPreview3D(props: Props) {
   const wrapRef = React.useRef<HTMLDivElement>(null);
 
-return (
-  <div ref={wrapRef} className="w-full overflow-hidden rounded-xl bg-white shadow">
-    <div className="border-b px-4 py-2">
-      <h3 className="text-sm font-semibold text-[#1F4E5F]">Preview 3D</h3>
-      <p className="text-xs text-slate-500">
-        Ruota con drag • Zoom con rotellina/pinch
-      </p>
+  // ✅ stato: DOM element reale (non ref object)
+  const [eventTarget, setEventTarget] = React.useState<HTMLDivElement | null>(null);
+
+  // ✅ quando il div esiste, lo salviamo
+  React.useEffect(() => {
+    setEventTarget(wrapRef.current);
+  }, []);
+
+  return (
+    <div ref={wrapRef} className="w-full overflow-hidden rounded-xl bg-white shadow">
+      <div className="border-b px-4 py-2">
+        <h3 className="text-sm font-semibold text-[#1F4E5F]">Preview 3D</h3>
+        <p className="text-xs text-slate-500">
+          Ruota con drag • Zoom con rotellina/pinch
+        </p>
+      </div>
+
+      <div className="h-[360px] w-full">
+        {eventTarget && (
+          <Canvas
+            eventSource={eventTarget}
+            style={{ touchAction: "none" }}
+            shadows
+            camera={{ position: [0, 120, 220], fov: 35, near: 0.1, far: 2000 }}
+          >
+            <ambientLight intensity={0.6} />
+            <directionalLight position={[200, 300, 150]} intensity={1.0} castShadow />
+            <directionalLight position={[-200, 200, -150]} intensity={0.4} />
+
+            <SceneMesh {...props} />
+
+            <OrbitControls enableDamping dampingFactor={0.08} />
+          </Canvas>
+        )}
+      </div>
     </div>
-
-    <div className="h-[360px] w-full">
-      {eventTarget && (
-        <Canvas
-          // ✅ PASSIAMO L'HTML ELEMENT REALE, NON IL REF OGGETTO
-          eventSource={eventTarget}
-          style={{ touchAction: "none" }}
-          shadows
-          camera={{ position: [0, 120, 220], fov: 35, near: 0.1, far: 2000 }}
-        >
-          <ambientLight intensity={0.6} />
-          <directionalLight position={[200, 300, 150]} intensity={1.0} castShadow />
-          <directionalLight position={[-200, 200, -150]} intensity={0.4} />
-
-          <SceneMesh {...props} />
-
-          <OrbitControls enableDamping dampingFactor={0.08} />
-        </Canvas>
-      )}
-    </div>
-  </div>
-);
-
+  );
 }
