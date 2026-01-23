@@ -194,16 +194,15 @@ export function heightmapToAsciiStl(
   for (let x = 0; x < dxCount - 1; x++) {
     const x0 = x * dx;
     const x1 = (x + 1) * dx;
-    const z0 = sample(x, 0);
-    const z1 = sample(x + 1, 0);
+       const zTop0 = topZ(x, 0);
+    const zTop1 = topZ(x + 1, 0);
+    const zBot0 = bottomZ(x, 0);
+    const zBot1 = bottomZ(x + 1, 0);
 
-    const top0 = [x0, 0, z0];
-    const top1 = [x1, 0, z1];
-    const bot0 = [x0, 0, zBase];
-    const bot1 = [x1, 0, zBase];
-
-    out += triFacet(bot0, top0, top1);
-    out += triFacet(bot0, top1, bot1);
+    const top0 = [x0, 0, zTop0];
+    const top1 = [x1, 0, zTop1];
+    const bot0 = [x0, 0, zBot0];
+    const bot1 = [x1, 0, zBot1];
   }
 
   // Back (y=heightMm)
