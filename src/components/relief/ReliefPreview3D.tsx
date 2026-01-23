@@ -66,31 +66,31 @@ function SceneMesh({
 }
 
 export default function ReliefPreview3D(props: Props) {
-  const wrapRef = React.useRef<HTMLDivElement>(null);
-  const [eventSource, setEventSource] = React.useState<HTMLElement | null>(null);
+  const wrapRef = React.useRef<HTMLDivElement | null>(null);
+  const [eventEl, setEventEl] = React.useState<HTMLDivElement | null>(null);
 
-  // ✅ l’eventSource deve essere un ELEMENTO reale, non il ref object
   React.useEffect(() => {
-    setEventSource(wrapRef.current);
+    setEventEl(wrapRef.current);
   }, []);
 
+  const hasData = !!props.normF32 && !!props.w && !!props.h;
+
   return (
-    <div
-      ref={wrapRef}
-      className="w-full overflow-hidden rounded-xl bg-white shadow"
-      style={{ position: "relative" }}
-    >
+    <div ref={wrapRef} className="w-full overflow-hidden rounded-xl bg-white shadow">
       <div className="border-b px-4 py-2">
         <h3 className="text-sm font-semibold text-[#1F4E5F]">Preview 3D</h3>
         <p className="text-xs text-slate-500">Ruota con drag • Zoom con rotellina/pinch</p>
       </div>
 
-      <div className="h-[360px] w-full" style={{ touchAction: "none" }}>
-        {eventSource && (
+      <div className="h-[360px] w-full">
+        {!hasData ? (
+          <div className="h-full w-full flex items-center justify-center text-sm text-slate-500 bg-slate-50">
+            La preview 3D appare dopo la generazione della heightmap (normF32/w/h).
+          </div>
+        ) : eventEl ? (
           <Canvas
-            // ✅ eventi agganciati a wrapper stabile
-            eventSource={eventSource}
-            eventPrefix="client"
+            // ✅ fondamentale con fiber8: HTMLElement reale
+            eventSource={eventEl}
             style={{ touchAction: "none" }}
             shadows
             camera={{ position: [0, 120, 220], fov: 35, near: 0.1, far: 2000 }}
@@ -101,17 +101,10 @@ export default function ReliefPreview3D(props: Props) {
 
             <SceneMesh {...props} />
 
-            {/* ✅ controlli orbit/zoom */}
-            <OrbitControls
-              makeDefault
-              enableDamping
-              dampingFactor={0.08}
-              rotateSpeed={0.7}
-              zoomSpeed={0.9}
-              panSpeed={0.6}
-            />
+            {/* ✅ orbit ok con drei@9 */}
+            <OrbitControls enableDamping dampingFactor={0.08} />
           </Canvas>
-        )}
+        ) : null}
       </div>
     </div>
   );
