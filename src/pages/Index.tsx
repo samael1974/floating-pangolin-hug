@@ -14,7 +14,7 @@ export default function Index() {
             </div>
 
             <h1 className="text-4xl font-bold tracking-tight text-[#1F4E5F] md:text-5xl">
-              Trasforma immagini in bassorilievi STL
+              ReliefForge — a Floating Pangolin Hug project
             </h1>
 
             <p className="text-base text-slate-700 md:text-lg">
