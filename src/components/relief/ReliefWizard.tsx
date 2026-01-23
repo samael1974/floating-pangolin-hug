@@ -112,26 +112,6 @@ async function decodeDepthMapToHmState(
   return imageDataToNormF32(imgData, invert);
 }
   
-  }
-
-  // ✅ JPG/WEBP (o fallback): canvas
-  const img = await loadImageFromFile(file);
-  const iw = img.naturalWidth || img.width;
-  const ih = img.naturalHeight || img.height;
-  const scale = Math.min(1, maxSize / Math.max(iw, ih));
-  const w = Math.max(2, Math.round(iw * scale));
-  const h = Math.max(2, Math.round(ih * scale));
-
-  const off = document.createElement("canvas");
-  off.width = w;
-  off.height = h;
-  const ctx = off.getContext("2d", { willReadFrequently: true });
-  if (!ctx) throw new Error("Canvas 2D non disponibile");
-  ctx.drawImage(img, 0, 0, w, h);
-  const imgData = ctx.getImageData(0, 0, w, h);
-  return imageDataToNormF32(imgData, invert);
-}
-
 export default function ReliefWizard() {
   // source
   const [sourceMode, setSourceMode] = React.useState<SourceMode>("image");
