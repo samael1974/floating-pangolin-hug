@@ -11,6 +11,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 
+import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
+
+// (Compat: se qualche file importava i tipi da qui)
+export type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
+
 export type ProjectType =
   | "logo_text"
   | "human_face"
@@ -19,9 +24,6 @@ export type ProjectType =
   | "decorative_pattern";
 
 export type EdgeMode = "round" | "sharp";
-
-import type { OutputMode, BaseStyle } from "@/lib/reliefModeTypes";
-export type { OutputMode, BaseStyle } from "@/lib/reliefModeTypes";
 
 export type ReliefParams = {
   projectType: ProjectType;
@@ -33,6 +35,9 @@ export type ReliefParams = {
 
   outputMode: OutputMode;
   baseStyle: BaseStyle;
+
+  // opzionali (se li usi altrove, non danno fastidio)
+  invertDepthMap?: boolean;
 };
 
 type Props = {
@@ -45,250 +50,151 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function helperFor(t: ProjectType): string {
-  switch (t) {
-    case "logo_text":
-      return "Logo/Testo: meglio bordi netti, poco smoothing, depth moderato per leggibilità.";
-    case "human_face":
-      return "Volto: smoothing medio-alto e detail controllato per evitare rumore sulla pelle.";
-    case "animal":
-      return "Animali: detail medio e depth medio per evidenziare pelo/forme senza impastare.";
-    case "nature_landscape":
-      return "Natura/Paesaggio: smoothing medio e depth più basso per evitare superfici troppo rugose.";
-    case "decorative_pattern":
-      return "Decorativo/Pattern: depth e edge dipendono dal motivo; puoi spingere su precisione e ripetibilità.";
-    default:
-      return "";
-  }
-}
-
-function labelProjectType(t: ProjectType) {
-  switch (t) {
-    case "logo_text":
-      return "Logo / Testo";
-    case "human_face":
-      return "Volto umano";
-    case "animal":
-      return "Animali";
-    case "nature_landscape":
-      return "Natura / Paesaggio";
-    case "decorative_pattern":
-      return "Decorativo / Pattern";
-  }
-}
+const DEFAULTS: ReliefParams = {
+  projectType: "logo_text",
+  depthMm: 2,
+  baseMm: 1,
+  detail: 0.5,
+  smooth: 0.5,
+  edge: "round",
+  outputMode: "relief",
+  baseStyle: "flat",
+  invertDepthMap: false,
+};
 
 export default function ReliefControls({ value, onChange, disabled }: Props) {
-  const helper = helperFor(value.projectType);
+  const v = { ...DEFAULTS, ...value };
 
-  function set<K extends keyof ReliefParams>(key: K, v: ReliefParams[K]) {
-    onChange({ ...value, [key]: v });
-  }
-
-  // Guardrail UX:
-  // se passi a "Stampo" e sei su base "flat", ti porto a "recessed"
-  function setOutputMode(next: OutputMode) {
-    if (next === "mold" && value.baseStyle === "flat") {
-      onChange({ ...value, outputMode: next, baseStyle: "recessed" });
-      return;
-    }
-    onChange({ ...value, outputMode: next });
-  }
-
-  const modeHint =
-    value.outputMode === "mold"
-      ? "Stampo: genera un negativo/cavità (utile per pressare o colate)."
-      : "Bassorilievo: genera un rilievo positivo stampabile.";
-
-  const baseHint =
-    value.baseStyle === "recessed"
-      ? "Base scavata: crea una cavità (più utile in modalità Stampo)."
-      : "Base piana: fondo piatto (standard per stampe 3D).";
+  const set = (patch: Partial<ReliefParams>) => onChange({ ...v, ...patch });
 
   return (
-    <div className="rounded-lg bg-white p-6 shadow space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold">2) Parametri bassorilievo</h2>
-        <p className="text-sm text-gray-600">{helper}</p>
-      </div>
-
-      <Separator />
-
-      {/* Project type */}
+    <div className="space-y-4">
       <div className="space-y-2">
         <Label>Tipo progetto</Label>
         <Select
           disabled={disabled}
-          value={value.projectType}
-          onValueChange={(v) => set("projectType", v as ProjectType)}
+          value={v.projectType}
+          onValueChange={(x) => set({ projectType: x as ProjectType })}
         >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Seleziona un tipo" />
+          <SelectTrigger>
+            <SelectValue placeholder="Scegli..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="logo_text">
-              {labelProjectType("logo_text")}
-            </SelectItem>
-            <SelectItem value="human_face">
-              {labelProjectType("human_face")}
-            </SelectItem>
-            <SelectItem value="animal">{labelProjectType("animal")}</SelectItem>
-            <SelectItem value="nature_landscape">
-              {labelProjectType("nature_landscape")}
-            </SelectItem>
-            <SelectItem value="decorative_pattern">
-              {labelProjectType("decorative_pattern")}
-            </SelectItem>
+            <SelectItem value="logo_text">Logo / Testo</SelectItem>
+            <SelectItem value="human_face">Volto umano</SelectItem>
+            <SelectItem value="animal">Animale</SelectItem>
+            <SelectItem value="nature_landscape">Natura / Paesaggio</SelectItem>
+            <SelectItem value="decorative_pattern">Pattern decorativo</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       <Separator />
 
-      {/* Sliders grid */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Depth */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Depth massimo (mm)</Label>
-            <div className="text-sm tabular-nums text-gray-700">
-              {value.depthMm.toFixed(1)}
-            </div>
-          </div>
-          <Slider
-            disabled={disabled}
-            value={[value.depthMm]}
-            min={0.5}
-            max={8}
-            step={0.1}
-            onValueChange={(v) => set("depthMm", clamp(v[0] ?? 3, 0.5, 8))}
-          />
-          <p className="text-xs text-gray-500">
-            Consiglio stampa: 2.0–4.0 mm per la maggior parte dei bassorilievi.
-          </p>
-        </div>
+      <div className="space-y-2">
+        <Label>Output</Label>
+        <Select
+          disabled={disabled}
+          value={v.outputMode}
+          onValueChange={(x) => set({ outputMode: x as OutputMode })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Scegli..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="relief">Rilievo (positivo)</SelectItem>
+            <SelectItem value="mold">Stampo (negativo)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-        {/* Base thickness (allows 0) */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Spessore base (mm)</Label>
-            <div className="text-sm tabular-nums text-gray-700">
-              {value.baseMm.toFixed(1)}
-            </div>
-          </div>
-          <Slider
-            disabled={disabled}
-            value={[value.baseMm]}
-            min={0}
-            max={8}
-            step={0.1}
-            onValueChange={(v) => set("baseMm", clamp(v[0] ?? 2, 0, 8))}
-          />
-          <p className="text-xs text-gray-500">
-            0.0 mm = nessuna base (rilievo “appoggiato”). Consigliato: 1.5–2.5
-            mm.
-          </p>
-        </div>
-
-        {/* Detail */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Dettaglio</Label>
-            <div className="text-sm tabular-nums text-gray-700">
-              {value.detail.toFixed(2)}
-            </div>
-          </div>
-          <Slider
-            disabled={disabled}
-            value={[value.detail]}
-            min={0}
-            max={1}
-            step={0.01}
-            onValueChange={(v) => set("detail", clamp(v[0] ?? 0.5, 0, 1))}
-          />
-          <p className="text-xs text-gray-500">
-            Aumenta micro-contrasto. Troppo alto può creare rumore e STL pesante.
-          </p>
-        </div>
-
-        {/* Smooth */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Smoothing</Label>
-            <div className="text-sm tabular-nums text-gray-700">
-              {value.smooth.toFixed(2)}
-            </div>
-          </div>
-          <Slider
-            disabled={disabled}
-            value={[value.smooth]}
-            min={0}
-            max={1}
-            step={0.01}
-            onValueChange={(v) => set("smooth", clamp(v[0] ?? 0.5, 0, 1))}
-          />
-          <p className="text-xs text-gray-500">
-            Riduce rugosità. Per volti spesso 0.5–0.8 funziona bene.
-          </p>
-        </div>
+      <div className="space-y-2">
+        <Label>Base</Label>
+        <Select
+          disabled={disabled}
+          value={v.baseStyle}
+          onValueChange={(x) => set({ baseStyle: x as BaseStyle })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Scegli..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="flat">Piatta</SelectItem>
+            <SelectItem value="recessed">Incassata</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <Separator />
 
-      {/* Edge mode */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-1">
-          <Label>Bordi netti</Label>
-          <p className="text-xs text-gray-500">
-            Attiva per loghi/testi. Disattiva per soggetti organici.
-          </p>
-        </div>
-
-        <Switch
+      <div className="space-y-2">
+        <Label>Profondità rilievo (mm): {v.depthMm.toFixed(1)}</Label>
+        <Slider
           disabled={disabled}
-          checked={value.edge === "sharp"}
-          onCheckedChange={(checked) => set("edge", checked ? "sharp" : "round")}
+          value={[v.depthMm]}
+          min={0}
+          max={20}
+          step={0.1}
+          onValueChange={(arr) => set({ depthMm: clamp(arr[0] ?? 0, 0, 20) })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Spessore base (mm): {v.baseMm.toFixed(1)}</Label>
+        <Slider
+          disabled={disabled}
+          value={[v.baseMm]}
+          min={0}
+          max={20}
+          step={0.1}
+          onValueChange={(arr) => set({ baseMm: clamp(arr[0] ?? 0, 0, 20) })}
         />
       </div>
 
       <Separator />
 
-      {/* Output + Base style */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label>Modalità output</Label>
-          <Select
-            disabled={disabled}
-            value={value.outputMode}
-            onValueChange={(v) => setOutputMode(v as OutputMode)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="relief">Bassorilievo (positivo)</SelectItem>
-              <SelectItem value="mold">Stampo (negativo)</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-gray-500">{modeHint}</p>
-        </div>
+      <div className="space-y-2">
+        <Label>Dettaglio: {v.detail.toFixed(2)}</Label>
+        <Slider
+          disabled={disabled}
+          value={[v.detail]}
+          min={0}
+          max={1}
+          step={0.01}
+          onValueChange={(arr) => set({ detail: clamp(arr[0] ?? 0, 0, 1) })}
+        />
+      </div>
 
-        <div className="space-y-2">
-          <Label>Base</Label>
-          <Select
-            disabled={disabled}
-            value={value.baseStyle}
-            onValueChange={(v) => set("baseStyle", v as BaseStyle)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="flat">Piana (standard)</SelectItem>
-              <SelectItem value="recessed">Scavata (cavità)</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-gray-500">{baseHint}</p>
-        </div>
+      <div className="space-y-2">
+        <Label>Smussatura: {v.smooth.toFixed(2)}</Label>
+        <Slider
+          disabled={disabled}
+          value={[v.smooth]}
+          min={0}
+          max={1}
+          step={0.01}
+          onValueChange={(arr) => set({ smooth: clamp(arr[0] ?? 0, 0, 1) })}
+        />
+      </div>
+
+      <Separator />
+
+      <div className="flex items-center justify-between">
+        <Label>Bordi arrotondati</Label>
+        <Switch
+          disabled={disabled}
+          checked={v.edge === "round"}
+          onCheckedChange={(checked) => set({ edge: checked ? "round" : "sharp" })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Label>Inverti depthmap</Label>
+        <Switch
+          disabled={disabled}
+          checked={!!v.invertDepthMap}
+          onCheckedChange={(checked) => set({ invertDepthMap: checked })}
+        />
       </div>
     </div>
   );
