@@ -1,8 +1,6 @@
 import * as React from "react";
 import ReliefUpload from "@/components/relief/ReliefUpload";
-import ReliefControls, {
-  type ReliefParams,
-} from "@/components/relief/ReliefControls";
+import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefControls";
 import ReliefHeightmapPreview from "@/components/relief/ReliefHeightmapPreview";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
@@ -17,6 +15,8 @@ type HeightmapState = {
   w: number;
   h: number;
 };
+
+type SourceMode = "image" | "depthmap";
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -42,7 +42,27 @@ async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
   return img;
 }
 
+function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState {
+  const { data, width: w, height: h } = imgData;
+  const out = new Float32Array(w * h);
+
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    const r = data[i] ?? 0;
+    const g = data[i + 1] ?? 0;
+    const b = data[i + 2] ?? 0;
+    let v = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; // 0..1
+    if (invert) v = 1 - v;
+    out[p] = v;
+  }
+
+  return { normF32: out, w, h };
+}
+
 export default function ReliefWizard() {
+  // 0) Source mode
+  const [sourceMode, setSourceMode] = React.useState<SourceMode>("image");
+  const [invertDepthMap, setInvertDepthMap] = React.useState(false);
+
   // 1) Upload
   const [file, setFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
@@ -57,7 +77,7 @@ export default function ReliefWizard() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  // 2) Params (✅ NO invert)
+  // 2) Params (NO invert)
   const [params, setParams] = React.useState<ReliefParams>(() => ({
     projectType: "logo_text",
     depthMm: 3,
@@ -71,9 +91,7 @@ export default function ReliefWizard() {
 
   // 3) Heightmap pipeline -> normF32/w/h
   const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
-  const [hmStatus, setHmStatus] = React.useState<
-    "idle" | "loading" | "ready" | "error"
-  >("idle");
+  const [hmStatus, setHmStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
 
   React.useEffect(() => {
     let cancelled = false;
@@ -106,29 +124,37 @@ export default function ReliefWizard() {
       ctx.drawImage(img, 0, 0, w, h);
       const imgData = ctx.getImageData(0, 0, w, h);
 
-      const hm: any = buildHeightmapFromImageData(imgData, params, {
-        normalize: true,
-        percentileClip: 0.02,
-      });
-
       let normF32: Float32Array;
-      const outW = Number(hm?.w ?? hm?.width ?? w);
-      const outH = Number(hm?.h ?? hm?.height ?? h);
+      let outW = w;
+      let outH = h;
 
-      if (hm?.normF32 instanceof Float32Array) {
-        normF32 = hm.normF32;
-      } else if (hm?.grayU8 instanceof Uint8Array) {
-        const g = hm.grayU8 as Uint8Array;
-        normF32 = new Float32Array(g.length);
-        for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
+      if (sourceMode === "depthmap") {
+        const hm2 = imageDataToNormF32(imgData, invertDepthMap);
+        normF32 = hm2.normF32;
+        outW = hm2.w;
+        outH = hm2.h;
       } else {
-        throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
+        const hm: any = buildHeightmapFromImageData(imgData, params, {
+          normalize: true,
+          percentileClip: 0.02,
+        });
+
+        outW = Number(hm?.w ?? hm?.width ?? w);
+        outH = Number(hm?.h ?? hm?.height ?? h);
+
+        if (hm?.normF32 instanceof Float32Array) {
+          normF32 = hm.normF32;
+        } else if (hm?.grayU8 instanceof Uint8Array) {
+          const g = hm.grayU8 as Uint8Array;
+          normF32 = new Float32Array(g.length);
+          for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
+        } else {
+          throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
+        }
       }
 
       if (normF32.length !== outW * outH) {
-        throw new Error(
-          `Heightmap mismatch: normF32(${normF32.length}) != ${outW}*${outH}`
-        );
+        throw new Error(`Heightmap mismatch: normF32(${normF32.length}) != ${outW}*${outH}`);
       }
 
       if (!cancelled) {
@@ -150,6 +176,8 @@ export default function ReliefWizard() {
     };
   }, [
     file,
+    sourceMode,
+    invertDepthMap,
     params.projectType,
     params.depthMm,
     params.baseMm,
@@ -185,14 +213,75 @@ export default function ReliefWizard() {
 
   return (
     <div className="space-y-6">
+      {/* Source Mode */}
+      <div className="rounded-lg bg-white p-4 shadow flex flex-wrap items-center gap-3">
+        <div className="text-sm font-semibold">Sorgente</div>
+
+        <div className="inline-flex rounded-md border overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setSourceMode("image")}
+            className={`px-3 py-1.5 text-sm ${
+              sourceMode === "image" ? "bg-gray-900 text-white" : "bg-white text-gray-800"
+            }`}
+          >
+            Immagine
+          </button>
+          <button
+            type="button"
+            onClick={() => setSourceMode("depthmap")}
+            className={`px-3 py-1.5 text-sm ${
+              sourceMode === "depthmap" ? "bg-gray-900 text-white" : "bg-white text-gray-800"
+            }`}
+          >
+            Depth map
+          </button>
+        </div>
+
+        {sourceMode === "depthmap" && (
+          <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={invertDepthMap}
+              onChange={(e) => setInvertDepthMap(e.target.checked)}
+            />
+            Inverti depth map
+          </label>
+        )}
+      </div>
+
       {/* Step 1: Upload */}
       <ReliefUpload file={file} previewUrl={previewUrl} onPickFile={setFile} />
 
-      {/* Step 2: Controls */}
-      <ReliefControls value={params} onChange={setParams} disabled={!file} />
+      {/* Step 2: Controls (disabilitati se usi depthmap esterna) */}
+      <ReliefControls
+        value={params}
+        onChange={setParams}
+        disabled={!file || sourceMode === "depthmap"}
+      />
 
-      {/* Step 3: Heightmap preview (2D) */}
-      <ReliefHeightmapPreview file={file} params={params} maxSize={512} />
+      {/* Step 3: Preview 2D */}
+      {sourceMode === "image" ? (
+        <ReliefHeightmapPreview file={file} params={params} maxSize={512} />
+      ) : (
+        <div className="rounded-lg bg-white p-4 shadow">
+          <div className="text-sm font-semibold mb-2">Anteprima Depth Map</div>
+          <p className="text-xs text-gray-500 mb-3">
+            Carica una depth map in scala di grigi (PNG/JPG/WebP). Se il rilievo è al contrario,
+            abilita “Inverti depth map”.
+          </p>
+
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt="Depth map preview"
+              className="max-h-[320px] w-auto rounded border"
+            />
+          ) : (
+            <div className="text-sm text-gray-500">Carica una depth map.</div>
+          )}
+        </div>
+      )}
 
       {/* Step 4: STL + Preview 3D */}
       <div className="rounded-lg bg-white p-6 shadow space-y-4">
@@ -229,9 +318,7 @@ export default function ReliefWizard() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Larghezza STL (mm)</Label>
-              <div className="text-sm tabular-nums text-gray-700">
-                {stlWidthMm.toFixed(0)} mm
-              </div>
+              <div className="text-sm tabular-nums text-gray-700">{stlWidthMm.toFixed(0)} mm</div>
             </div>
             <Slider
               value={[stlWidthMm]}
@@ -266,9 +353,7 @@ export default function ReliefWizard() {
         <div className="rounded-lg border bg-white overflow-hidden">
           <div className="border-b px-4 py-3">
             <div className="text-sm font-semibold">Preview 3D</div>
-            <div className="text-xs text-gray-500">
-              (Orbit/zoom lo riabilitiamo dopo: ora preview stabile)
-            </div>
+            <div className="text-xs text-gray-500">(Orbit/zoom lo riabilitiamo dopo: ora preview stabile)</div>
           </div>
 
           <div className="p-4">
