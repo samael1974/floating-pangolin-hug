@@ -86,37 +86,31 @@ function depthU8ToNormF32(u8: Uint8Array, invert: boolean) {
   return out;
 }
 
-async function decodeDepthMapToHmState(file: File, invert: boolean, maxSize = 512): Promise<HeightmapState> {
-  const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+async function decodeDepthMapToHmState(
+  file: File,
+  invert: boolean,
+  maxSize = 512
+): Promise<HeightmapState> {
+  const img = await loadImageFromFile(file);
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
 
-  // ✅ PNG: prova decode reale (supporta 16-bit)
-  if (isPng) {
-    const buf = await file.arrayBuffer();
-    const png: any = decodePng(new Uint8Array(buf));
+  const scale = Math.min(1, maxSize / Math.max(iw, ih));
+  const w = Math.max(2, Math.round(iw * scale));
+  const h = Math.max(2, Math.round(ih * scale));
 
-    const w = Number(png.width);
-    const h = Number(png.height);
-    const channels = Number(png.channels ?? 4);
-    const depth = Number(png.depth ?? png.bitDepth ?? 8);
+  const off = document.createElement("canvas");
+  off.width = w;
+  off.height = h;
 
-    // Se enorme → fallback canvas (MVP rapido). (Rescale 16-bit puro si può fare dopo)
-    if (Math.max(w, h) > maxSize) {
-      const img = await loadImageFromFile(file);
-      const iw = img.naturalWidth || img.width;
-      const ih = img.naturalHeight || img.height;
-      const scale = Math.min(1, maxSize / Math.max(iw, ih));
-      const w2 = Math.max(2, Math.round(iw * scale));
-      const h2 = Math.max(2, Math.round(ih * scale));
+  const ctx = off.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Canvas 2D non disponibile");
 
-      const off = document.createElement("canvas");
-      off.width = w2;
-      off.height = h2;
-      const ctx = off.getContext("2d", { willReadFrequently: true });
-      if (!ctx) throw new Error("Canvas 2D non disponibile");
-      ctx.drawImage(img, 0, 0, w2, h2);
-      const imgData = ctx.getImageData(0, 0, w2, h2);
-      return imageDataToNormF32(imgData, invert);
-    }
+  ctx.drawImage(img, 0, 0, w, h);
+  const imgData = ctx.getImageData(0, 0, w, h);
+  return imageDataToNormF32(imgData, invert);
+}
+
 
     const data: any = png.data;
 
