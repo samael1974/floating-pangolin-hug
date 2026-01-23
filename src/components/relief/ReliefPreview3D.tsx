@@ -4,6 +4,20 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { buildReliefGeometry } from "@/components/relief/reliefGeometry";
 
+// ✅ EventManager stub: evita che R3F inizializzi la pipeline eventi (che ti sta crashando)
+const noEvents = () =>
+  ({
+    enabled: false,
+    priority: 0,
+    connected: undefined,
+    handlers: {},
+    connect: () => {},
+    disconnect: () => {},
+    update: () => {},
+    // compute viene chiamata dal sistema eventi: restituiamo null
+    compute: () => null,
+  } as any);
+
 type Props = {
   normF32?: Float32Array;
   w?: number;
@@ -65,42 +79,34 @@ function SceneMesh({
 }
 
 export default function ReliefPreview3D(props: Props) {
-  const wrapRef = React.useRef<HTMLDivElement>(null);
-
-  // ✅ stato: DOM element reale (non ref object)
-  const [eventTarget, setEventTarget] = React.useState<HTMLDivElement | null>(null);
-
-  // ✅ quando il div esiste, lo salviamo
-  React.useEffect(() => {
-    setEventTarget(wrapRef.current);
-  }, []);
-
   return (
-    <div ref={wrapRef} className="w-full overflow-hidden rounded-xl bg-white shadow">
+    <div className="w-full overflow-hidden rounded-xl bg-white shadow">
       <div className="border-b px-4 py-2">
         <h3 className="text-sm font-semibold text-[#1F4E5F]">Preview 3D</h3>
-        <p className="text-xs text-slate-500">
-          Ruota con drag • Zoom con rotellina/pinch
-        </p>
+        <p className="text-xs text-slate-500">Ruota con drag • Zoom con rotellina/pinch</p>
       </div>
 
       <div className="h-[360px] w-full">
-        {eventTarget && (
-          <Canvas
-            eventSource={eventTarget}
-            style={{ touchAction: "none" }}
-            shadows
-            camera={{ position: [0, 120, 220], fov: 35, near: 0.1, far: 2000 }}
-          >
-            <ambientLight intensity={0.6} />
-            <directionalLight position={[200, 300, 150]} intensity={1.0} castShadow />
-            <directionalLight position={[-200, 200, -150]} intensity={0.4} />
+        <Canvas
+          // ✅ qui disattiviamo del tutto gli eventi di R3F (addio crash .S)
+          events={noEvents}
+          style={{ touchAction: "none" }}
+          shadows
+          camera={{ position: [0, 120, 220], fov: 35, near: 0.1, far: 2000 }}
+          onCreated={({ gl }) => {
+            // utile su touch/trackpad
+            gl.domElement.style.touchAction = "none";
+          }}
+        >
+          <ambientLight intensity={0.6} />
+          <directionalLight position={[200, 300, 150]} intensity={1.0} castShadow />
+          <directionalLight position={[-200, 200, -150]} intensity={0.4} />
 
-            <SceneMesh {...props} />
+          <SceneMesh {...props} />
 
-            <OrbitControls enableDamping dampingFactor={0.08} />
-          </Canvas>
-        )}
+          {/* OrbitControls si attacca al canvas (gl.domElement), non agli eventi R3F */}
+          <OrbitControls enableDamping dampingFactor={0.08} />
+        </Canvas>
       </div>
     </div>
   );
