@@ -114,12 +114,7 @@ async function decodeDepthMapToHmState(
 
     const data: any = png.data;
 
-    // 16-bit
-    if (depth === 16 && data instanceof Uint16Array) {
-      if (channels === 1) {
-        return { normF32: depthU16ToNormF32(data, invert), w, h };
-      }
-      const gray = new Uint16Array(w * h);
+     const gray = new Uint16Array(w * h);
       for (let i = 0, p = 0; p < gray.length; p++, i += channels) gray[p] = data[i];
       return { normF32: depthU16ToNormF32(gray, invert), w, h };
     }
