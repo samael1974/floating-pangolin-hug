@@ -111,7 +111,6 @@ async function decodeDepthMapToHmState(
 
   return imageDataToNormF32(imgData, invert);
 }
-
   
   }
 
