@@ -23,22 +23,135 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
-  const url = URL.createObjectURL(file);
-  const img = new Image();
-  img.decoding = "async";
-  img.src = url;
+async function readAsArrayBuffer(file: File): Promise<ArrayBuffer> {
+  return await file.arrayBuffer();
+}
 
-  try {
-    await img.decode();
-  } catch {
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Impossibile caricare immagine"));
-    });
-  } finally {
-    URL.revokeObjectURL(url);
+function clamp01(x: number) {
+  return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+
+function depthU16ToNormF32(u16: Uint16Array, invert: boolean) {
+  const out = new Float32Array(u16.length);
+  const denom = 65535;
+  for (let i = 0; i < u16.length; i++) {
+    let v = u16[i] / denom;
+    if (invert) v = 1 - v;
+    out[i] = clamp01(v);
   }
+  return out;
+}
+
+function depthU8ToNormF32(u8: Uint8Array, invert: boolean) {
+  const out = new Float32Array(u8.length);
+  const denom = 255;
+  for (let i = 0; i < u8.length; i++) {
+    let v = u8[i] / denom;
+    if (invert) v = 1 - v;
+    out[i] = clamp01(v);
+  }
+  return out;
+}
+
+// fallback per JPG/WEBP/PNG (8bit via canvas): luminanza -> Float32
+function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState {
+  const { data, width: w, height: h } = imgData;
+  const out = new Float32Array(w * h);
+
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    const r = data[i] ?? 0;
+    const g = data[i + 1] ?? 0;
+    const b = data[i + 2] ?? 0;
+    let v = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    if (invert) v = 1 - v;
+    out[p] = clamp01(v);
+  }
+
+  return { normF32: out, w, h };
+}
+
+async function decodeDepthMapToHmState(file: File, invert: boolean, maxSize = 512): Promise<HeightmapState> {
+  const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+
+  // ✅ PNG: tenta decode “vero” (supporta 16-bit)
+  if (isPng) {
+    const buf = await readAsArrayBuffer(file);
+    const png = decodePng(new Uint8Array(buf));
+
+    const w = png.width;
+    const h = png.height;
+    const channels = png.channels;
+    const depth = (png as any).depth ?? (png as any).bitDepth ?? 8; // compat
+
+    // Se è troppo grande, per ora facciamo fallback canvas (rescale rapido).
+    // (Rescale 16bit “pro” si può fare dopo, ma non è indispensabile per MVP.)
+    if (Math.max(w, h) > maxSize) {
+      const img = await loadImageFromFile(file);
+      const iw = img.naturalWidth || img.width;
+      const ih = img.naturalHeight || img.height;
+      const scale = Math.min(1, maxSize / Math.max(iw, ih));
+      const w2 = Math.max(2, Math.round(iw * scale));
+      const h2 = Math.max(2, Math.round(ih * scale));
+
+      const off = document.createElement("canvas");
+      off.width = w2;
+      off.height = h2;
+      const ctx = off.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("Canvas 2D non disponibile");
+      ctx.drawImage(img, 0, 0, w2, h2);
+      const imgData = ctx.getImageData(0, 0, w2, h2);
+      return imageDataToNormF32(imgData, invert);
+    }
+
+    // ✅ 16-bit: data spesso è Uint16Array (dipende dalla lib); gestiamo entrambi i casi
+    // png.data può essere Uint8Array o Uint16Array
+    const data: any = (png as any).data;
+
+    if (depth === 16 && data instanceof Uint16Array) {
+      // grayscale: channels==1 (ideale), ma se RGBA prendiamo R
+      if (channels === 1) {
+        return { normF32: depthU16ToNormF32(data, invert), w, h };
+      }
+      const gray = new Uint16Array(w * h);
+      for (let i = 0, p = 0; p < gray.length; p++, i += channels) {
+        gray[p] = data[i]; // prendo il canale R
+      }
+      return { normF32: depthU16ToNormF32(gray, invert), w, h };
+    }
+
+    // ✅ 8-bit PNG (o 16-bit ma la lib ti ha già “flattenato”): usa Uint8
+    if (data instanceof Uint8Array) {
+      if (channels === 1) {
+        return { normF32: depthU8ToNormF32(data, invert), w, h };
+      }
+      const gray = new Uint8Array(w * h);
+      for (let i = 0, p = 0; p < gray.length; p++, i += channels) {
+        gray[p] = data[i];
+      }
+      return { normF32: depthU8ToNormF32(gray, invert), w, h };
+    }
+
+    // fallback finale
+    // (non dovrebbe succedere)
+  }
+
+  // ✅ Non-PNG (JPG/WEBP): canvas fallback
+  const img = await loadImageFromFile(file);
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  const scale = Math.min(1, maxSize / Math.max(iw, ih));
+  const w = Math.max(2, Math.round(iw * scale));
+  const h = Math.max(2, Math.round(ih * scale));
+
+  const off = document.createElement("canvas");
+  off.width = w;
+  off.height = h;
+  const ctx = off.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Canvas 2D non disponibile");
+  ctx.drawImage(img, 0, 0, w, h);
+  const imgData = ctx.getImageData(0, 0, w, h);
+  return imageDataToNormF32(imgData, invert);
+}
 
   return img;
 }
