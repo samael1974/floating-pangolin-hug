@@ -176,6 +176,7 @@ export default function ReliefWizard() {
   // 0) Source mode
   const [sourceMode, setSourceMode] = React.useState<SourceMode>("image");
   const [invertDepthMap, setInvertDepthMap] = React.useState(false);
+  const dmCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
   // 1) Upload
   const [file, setFile] = React.useState<File | null>(null);
