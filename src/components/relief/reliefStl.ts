@@ -169,16 +169,12 @@ export function heightmapToAsciiStl(
     out += triFacet(bot0, bot1, top1);
   }
 
-   // Right (x=widthMm)
+    // Right (x=widthMm)
   for (let y = 0; y < dyCount - 1; y++) {
     const y0 = y * dy;
     const y1 = (y + 1) * dy;
-    
-    const z1 = sample(dxCount - 1, y + 1);
 
-    const top0 = [widthMm, y0, z0];
-    const top1 = [widthMm, y1, z1];
-        const zTop0 = topZ(dxCount - 1, y);
+    const zTop0 = topZ(dxCount - 1, y);
     const zTop1 = topZ(dxCount - 1, y + 1);
     const zBot0 = bottomZ(dxCount - 1, y);
     const zBot1 = bottomZ(dxCount - 1, y + 1);
@@ -188,11 +184,9 @@ export function heightmapToAsciiStl(
     const bot0 = [widthMm, y0, zBot0];
     const bot1 = [widthMm, y1, zBot1];
 
-
     out += triFacet(bot0, top0, top1);
     out += triFacet(bot0, top1, bot1);
   }
-
   // Front (y=0)
   for (let x = 0; x < dxCount - 1; x++) {
     const x0 = x * dx;
