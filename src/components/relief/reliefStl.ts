@@ -6,6 +6,7 @@ export type HeightfieldToStlOptions = {
   baseMm: number;           // spessore base in mm (params.baseMm)
   invert?: boolean;         // default false
   decimateStep?: number;    // 1=full, 2=mezzo, 3=terzo...
+    noBasePlate?: boolean;    // true = niente piastra piatta sotto (modello chiuso)
 };
 
 function clamp(n: number, min: number, max: number) {
