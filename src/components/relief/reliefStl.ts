@@ -156,7 +156,7 @@ export function heightmapToAsciiStl(
     const zTop1 = topZ(0, y + 1);
     const zBot0 = bottomZ(0, y);
     const zBot1 = bottomZ(0, y + 1);
-
+    
     const top0 = [0, y0, zTop0];
     const top1 = [0, y1, zTop1];
     const bot0 = [0, y0, zBot0];
