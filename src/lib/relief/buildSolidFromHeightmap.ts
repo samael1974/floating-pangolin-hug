@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { OutputMode, BaseStyle } from "@/lib/reliefModeTypes";
+import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
 
 type BuildSolidArgs = {
   normF32: Float32Array;
