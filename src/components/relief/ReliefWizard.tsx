@@ -1,110 +1,131 @@
-import * as React from "react";
-import { Link } from "react-router-dom";
-
+import React from "react";
 import type { ReliefParams } from "@/components/relief/ReliefControls";
-import ReliefUpload from "@/components/relief/ReliefUpload";
-import ReliefControls from "@/components/relief/ReliefControls";
-import ReliefHeightmapPreview from "@/components/relief/ReliefHeightmapPreview";
-import ReliefGenerate from "@/components/relief/ReliefGenerate";
-import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
+import {
+  buildHeightmapFromImageData,
+  drawHeightmapToCanvas,
+} from "@/components/relief/reliefHeightmap";
 
-export default function Relief() {
-  const [file, setFile] = React.useState<File | null>(null);
+type Props = {
+  file: File | null;
+  params: ReliefParams;
+  maxSize?: number; // px
+};
 
-  // ✅ default sensati
-  const [params, setParams] = React.useState<ReliefParams>({
-    projectType: "logo_text",
-    depthMm: 3,
-    baseMm: 2,
-    detail: 0.55,
-    smooth: 0.15,
-    edge: "sharp",
-  });
+export default function ReliefHeightmapPreview({
+  file,
+  params,
+  maxSize = 512,
+}: Props) {
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const [status, setStatus] = React.useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
 
-  // ✅ valori calcolati dalla heightmap (servono per preview 3D)
-  const [hm, setHm] = React.useState<{
-    normF32: Float32Array;
-    width: number;
-    height: number;
-  } | null>(null);
+  React.useEffect(() => {
+    let revokedUrl: string | null = null;
+    let cancelled = false;
 
-  // se rimuovo file, resetto anche hm
-  const handleSetFile = React.useCallback((f: File | null) => {
-    setFile(f);
-    setHm(null);
-  }, []);
+    async function run() {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("Canvas 2D non disponibile");
+
+      // Placeholder
+      if (!file) {
+        canvas.width = 640;
+        canvas.height = 360;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#f3f4f6";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#6b7280";
+        ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto";
+        ctx.fillText("Carica un’immagine per vedere la heightmap.", 20, 40);
+        setStatus("idle");
+        return;
+      }
+
+      setStatus("loading");
+
+      // Load image safely
+      const url = URL.createObjectURL(file);
+      revokedUrl = url;
+
+      const img = new Image();
+      img.decoding = "async";
+      img.src = url;
+
+      await img.decode().catch(() => {
+        return new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("Impossibile caricare immagine"));
+        });
+      });
+
+      if (cancelled) return;
+
+      // Scale to maxSize
+      const iw = img.naturalWidth || img.width;
+      const ih = img.naturalHeight || img.height;
+      const scale = Math.min(1, maxSize / Math.max(iw, ih));
+      const w = Math.max(1, Math.round(iw * scale));
+      const h = Math.max(1, Math.round(ih * scale));
+
+      // Draw to offscreen and read pixels
+      const off = document.createElement("canvas");
+      off.width = w;
+      off.height = h;
+      const offCtx = off.getContext("2d", { willReadFrequently: true });
+      if (!offCtx) throw new Error("Canvas 2D non disponibile");
+
+      offCtx.drawImage(img, 0, 0, w, h);
+      const imgData = offCtx.getImageData(0, 0, w, h);
+
+      // ✅ Use shared pipeline (same one you'll use for STL)
+      const hm = buildHeightmapFromImageData(imgData, params, {
+        normalize: true,
+        percentileClip: 0.02,
+      });
+
+      drawHeightmapToCanvas(canvas, hm.grayU8, hm.width, hm.height);
+
+      setStatus("ready");
+    }
+
+    run().catch((e) => {
+      console.error(e);
+      setStatus("error");
+    });
+
+    return () => {
+      cancelled = true;
+      if (revokedUrl) URL.revokeObjectURL(revokedUrl);
+    };
+  }, [file, params.projectType, params.detail, params.smooth, params.edge, maxSize]);
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="max-w-5xl mx-auto px-4 py-10 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">
-              Generatore Bassorilievi
-            </h1>
-            <p className="text-sm text-slate-600 mt-1">
-              Upload → parametri → preview 2D → STL
-            </p>
-          </div>
-
-          <Link
-            to="/"
-            className="text-sm underline underline-offset-4 hover:opacity-80"
-          >
-            Torna alla Home
-          </Link>
+    <div className="rounded-lg bg-white p-6 shadow space-y-3">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold">3) Heightmap preview (2D)</h2>
+          <p className="text-sm text-gray-600">
+            Anteprima in scala di grigi del rilievo (bianco = alto, nero = basso).
+          </p>
         </div>
-
-        {/* Main layout */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Wizard */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* 1) Upload */}
-            <ReliefUpload file={file} onChange={handleSetFile} />
-
-            {/* 2) Controls */}
-            <ReliefControls params={params} onChange={setParams} />
-
-            {/* 3) Heightmap */}
-            <ReliefHeightmapPreview
-              file={file}
-              params={params}
-              // ✅ questo callback deve esistere nel componente: se non c’è, te lo aggiungo io
-              onHeightmap={(next) =>
-                setHm({
-                  normF32: next.normF32,
-                  width: next.width,
-                  height: next.height,
-                })
-              }
-            />
-
-            {/* 4) STL */}
-            <ReliefGenerate file={file} params={params} />
-          </div>
-
-          {/* Preview column */}
-          <div className="lg:col-span-1 space-y-4">
-            <ReliefPreview3D
-              normF32={hm?.normF32}
-              w={hm?.width}
-              h={hm?.height}
-              widthMm={120}
-              depthMm={params.depthMm}
-              baseMm={params.baseMm}
-              previewDecimateStep={3}
-            />
-
-            <div className="rounded-lg bg-white p-4 shadow">
-              <h3 className="text-sm font-semibold text-slate-900">Tip</h3>
-              <p className="text-xs text-slate-600 mt-1">
-                Se la preview 3D è lenta: aumenta <b>previewDecimateStep</b> (3→4) oppure
-                riduci <b>maxSize</b> nell’heightmap.
-              </p>
-            </div>
-          </div>
+        <div className="text-xs text-gray-500">
+          {status === "loading"
+            ? "Elaborazione…"
+            : status === "error"
+            ? "Errore preview"
+            : status === "ready"
+            ? "Pronto"
+            : "In attesa"}
         </div>
+      </div>
+
+      <div className="w-full rounded border bg-gray-50 overflow-auto">
+        <canvas ref={canvasRef} className="block max-w-full" />
       </div>
     </div>
   );
