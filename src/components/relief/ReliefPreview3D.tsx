@@ -67,20 +67,20 @@ function SceneMesh({
 export default function ReliefPreview3D(props: Props) {
   const wrapRef = React.useRef<HTMLDivElement>(null);
 
-  return (
-    <div ref={wrapRef} className="w-full overflow-hidden rounded-xl bg-white shadow">
-      <div className="border-b px-4 py-2">
-        <h3 className="text-sm font-semibold text-[#1F4E5F]">Preview 3D</h3>
-        <p className="text-xs text-slate-500">
-          Ruota con drag • Zoom con rotellina/pinch
-        </p>
-      </div>
+return (
+  <div ref={wrapRef} className="w-full overflow-hidden rounded-xl bg-white shadow">
+    <div className="border-b px-4 py-2">
+      <h3 className="text-sm font-semibold text-[#1F4E5F]">Preview 3D</h3>
+      <p className="text-xs text-slate-500">
+        Ruota con drag • Zoom con rotellina/pinch
+      </p>
+    </div>
 
-      <div className="h-[360px] w-full">
+    <div className="h-[360px] w-full">
+      {eventTarget && (
         <Canvas
-          // ✅ FIX: aggancia gli eventi a un contenitore reale e stabile
-          eventSource={wrapRef}
-          eventPrefix="client"
+          // ✅ PASSIAMO L'HTML ELEMENT REALE, NON IL REF OGGETTO
+          eventSource={eventTarget}
           style={{ touchAction: "none" }}
           shadows
           camera={{ position: [0, 120, 220], fov: 35, near: 0.1, far: 2000 }}
@@ -93,7 +93,9 @@ export default function ReliefPreview3D(props: Props) {
 
           <OrbitControls enableDamping dampingFactor={0.08} />
         </Canvas>
-      </div>
+      )}
     </div>
-  );
+  </div>
+);
+
 }
