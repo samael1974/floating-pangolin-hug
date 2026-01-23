@@ -69,3 +69,14 @@ export function downloadReliefStlBinary(args: {
   const tag = `${outputMode}_${baseStyle}`;
   downloadArrayBuffer(stl, `reliefforge_${tag}_${stlWidthMm.toFixed(0)}mm.stl`);
 }
+// --- COMPAT LAYER (per non rompere ReliefGenerate.tsx)
+// Se non ti serve più, lo rimuoviamo dopo aver aggiornato ReliefGenerate.
+
+export function heightmapToAsciiStl() {
+  throw new Error("Deprecated: usa downloadReliefStlBinary (STL binario).");
+}
+
+export function downloadTestStl() {
+  throw new Error("Deprecated: usa downloadReliefStlBinary.");
+}
+
