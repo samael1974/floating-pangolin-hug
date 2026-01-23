@@ -13,7 +13,7 @@ function downloadArrayBuffer(buffer: ArrayBuffer, filename: string) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function decimateHeightmap(hm: Heightmap, step: number): Heightmap {
