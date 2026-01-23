@@ -12,21 +12,60 @@ type Props = {
 
 type HeightmapData = {
   normF32: Float32Array;
-  width: number;
-  height: number;
+  w: number;
+  h: number;
 };
+
+async function loadImage(file: File): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.decoding = "async";
+  img.src = url;
+
+  try {
+    await img.decode();
+  } catch {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Impossibile caricare immagine"));
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+
+  return img;
+}
+
+function ensureHeightmapShape(hm: any): HeightmapData {
+  // accettiamo sia {w,h} sia {width,height} (per robustezza)
+  const w = Number(hm?.w ?? hm?.width);
+  const h = Number(hm?.h ?? hm?.height);
+  const normF32 = hm?.normF32;
+
+  if (!(normF32 instanceof Float32Array)) {
+    throw new Error("Heightmap non valida: manca normF32 (Float32Array)");
+  }
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w < 2 || h < 2) {
+    throw new Error("Heightmap non valida: w/h non coerenti");
+  }
+  if (normF32.length !== w * h) {
+    throw new Error(`Heightmap mismatch: normF32(${normF32.length}) != ${w}*${h}`);
+  }
+
+  return { normF32, w, h };
+}
 
 export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
   const [busy, setBusy] = React.useState(false);
 
-  // ✅ controlli UI
+  // controlli UI
   const [widthMm, setWidthMm] = React.useState<number>(120);
   const [decimateStep, setDecimateStep] = React.useState<number>(1);
 
-  // ✅ heightmap in state per preview 3D live
+  // heightmap in state per preview 3D live
   const [hm, setHm] = React.useState<HeightmapData | null>(null);
 
-  // ✅ ogni volta che cambiano file o parametri, rigenera heightmap (solo per preview)
+  // rigenera heightmap per preview quando cambia file o parametri
   React.useEffect(() => {
     let cancelled = false;
 
@@ -37,17 +76,7 @@ export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
       }
 
       try {
-        const url = URL.createObjectURL(file);
-        const img = new Image();
-        img.decoding = "async";
-        img.src = url;
-
-        await img.decode().catch(() => {
-          return new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = () => reject(new Error("Impossibile caricare immagine"));
-          });
-        });
+        const img = await loadImage(file);
 
         const iw = img.naturalWidth || img.width;
         const ih = img.naturalHeight || img.height;
@@ -59,21 +88,22 @@ export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
         off.width = w;
         off.height = h;
 
-        const offCtx = off.getContext("2d", { willReadFrequently: true });
-        if (!offCtx) throw new Error("Canvas 2D non disponibile");
+        const ctx = off.getContext("2d", { willReadFrequently: true });
+        if (!ctx) throw new Error("Canvas 2D non disponibile");
 
-        offCtx.drawImage(img, 0, 0, w, h);
-        const imgData = offCtx.getImageData(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        const imgData = ctx.getImageData(0, 0, w, h);
 
-        const hmLocal = buildHeightmapFromImageData(imgData, params, {
+        const raw = buildHeightmapFromImageData(imgData, params, {
           normalize: true,
           percentileClip: 0.02,
         });
 
-        if (!cancelled) setHm(hmLocal);
+        const hmLocal = ensureHeightmapShape(raw);
 
-        URL.revokeObjectURL(url);
-      } catch {
+        if (!cancelled) setHm(hmLocal);
+      } catch (e) {
+        console.error(e);
         if (!cancelled) setHm(null);
       }
     }
@@ -92,6 +122,8 @@ export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
     params.detail,
     params.smooth,
     params.edge,
+    params.outputMode,
+    params.baseStyle,
   ]);
 
   async function handleGenerate() {
@@ -99,22 +131,13 @@ export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
     setBusy(true);
 
     try {
-      // Se abbiamo già la heightmap (preview), riusiamo quella: più veloce e coerente
-      let hmLocal = hm;
+      // riusa preview se disponibile, altrimenti calcola
+      let hmLocal: HeightmapData;
 
-      // fallback: se hm non è pronta, la calcoliamo ora
-      if (!hmLocal) {
-        const url = URL.createObjectURL(file);
-        const img = new Image();
-        img.decoding = "async";
-        img.src = url;
-
-        await img.decode().catch(() => {
-          return new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = () => reject(new Error("Impossibile caricare immagine"));
-          });
-        });
+      if (hm) {
+        hmLocal = hm;
+      } else {
+        const img = await loadImage(file);
 
         const iw = img.naturalWidth || img.width;
         const ih = img.naturalHeight || img.height;
@@ -126,30 +149,30 @@ export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
         off.width = w;
         off.height = h;
 
-        const offCtx = off.getContext("2d", { willReadFrequently: true });
-        if (!offCtx) throw new Error("Canvas 2D non disponibile");
+        const ctx = off.getContext("2d", { willReadFrequently: true });
+        if (!ctx) throw new Error("Canvas 2D non disponibile");
 
-        offCtx.drawImage(img, 0, 0, w, h);
-        const imgData = offCtx.getImageData(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        const imgData = ctx.getImageData(0, 0, w, h);
 
-        hmLocal = buildHeightmapFromImageData(imgData, params, {
+        const raw = buildHeightmapFromImageData(imgData, params, {
           normalize: true,
           percentileClip: 0.02,
         });
 
-        URL.revokeObjectURL(url);
+        hmLocal = ensureHeightmapShape(raw);
       }
 
-      const stl = heightmapToAsciiStl(hmLocal.normF32, hmLocal.width, hmLocal.height, {
-        widthMm,
+      // ✅ STL BINARIO (mm)
+      downloadReliefStlBinary({
+        hm: { normF32: hmLocal.normF32, w: hmLocal.w, h: hmLocal.h },
+        stlWidthMm: widthMm,
+        decimateStep: decimateStep,
         depthMm: params.depthMm,
         baseMm: params.baseMm,
-        decimateStep,
-        noBasePlate: true,
+        outputMode: params.outputMode,
+        baseStyle: params.baseStyle,
       });
-
-      const safeName = `relief_${params.projectType}_${widthMm}mm_d${decimateStep}.stl`;
-      downloadTextFile(safeName, stl);
     } finally {
       setBusy(false);
     }
@@ -160,8 +183,7 @@ export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
       <div>
         <h2 className="text-lg font-semibold text-[#1F4E5F]">4) Genera STL</h2>
         <p className="text-sm text-gray-600">
-          STL heightfield chiuso (stampabile). Puoi usare la modalità senza piastra piatta.
-          Se lo STL è troppo pesante, aumenta la decimazione.
+          STL binario chiuso (stampabile). Se lo STL è troppo pesante, aumenta la decimazione.
         </p>
       </div>
 
@@ -194,14 +216,14 @@ export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
           <input
             type="range"
             min={1}
-            max={4}
+            max={6}
             step={1}
             value={decimateStep}
             onChange={(e) => setDecimateStep(Number(e.target.value))}
             className="w-full accent-[#F5A623]"
           />
           <div className="text-xs text-gray-500">
-            x1 = massimo dettaglio · x2/x3 = STL più leggero · x4 = molto leggero
+            x1 = massimo dettaglio · x2–x3 = STL più leggero · x4+ = molto leggero
           </div>
         </label>
       </div>
@@ -210,12 +232,12 @@ export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
       {hm && (
         <ReliefPreview3D
           normF32={hm.normF32}
-          w={hm.width}
-          h={hm.height}
+          w={hm.w}
+          h={hm.h}
           widthMm={widthMm}
           depthMm={params.depthMm}
           baseMm={params.baseMm}
-          previewDecimateStep={3}
+          previewDecimateStep={decimateStep}
         />
       )}
 
@@ -230,7 +252,8 @@ export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
         </button>
 
         <div className="text-xs text-gray-500">
-          Depth: {params.depthMm}mm · Base: {params.baseMm}mm · MaxSize: {maxSize}px
+          Mode: {params.outputMode} · Base: {params.baseStyle} · Depth: {params.depthMm}mm · BaseMm:{" "}
+          {params.baseMm}mm · MaxSize: {maxSize}px
         </div>
       </div>
     </div>
