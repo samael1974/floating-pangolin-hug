@@ -137,26 +137,26 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           </p>
         </div>
 
-        {/* Base thickness */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Spessore base (mm)</Label>
-            <div className="text-sm tabular-nums text-gray-700">
-              {value.baseMm.toFixed(1)}
-            </div>
-          </div>
-          <Slider
-            disabled={disabled}
-            value={[value.baseMm]}
-            min={0.8}
-            max={8}
-            step={0.1}
-            onValueChange={(v) => set("baseMm", clamp(v[0] ?? 2, 0.8, 8))}
-          />
-          <p className="text-xs text-gray-500">
-            Più base = più robusto, ma più materiale. 2.0 mm è un buon default.
-          </p>
-        </div>
+       {/* Base thickness */}
+<div className="space-y-2">
+  <div className="flex items-center justify-between">
+    <Label>Spessore base (mm)</Label>
+    <div className="text-sm tabular-nums text-gray-700">
+      {value.baseMm.toFixed(1)}
+    </div>
+  </div>
+  <Slider
+    disabled={disabled}
+    value={[value.baseMm]}
+    min={0}
+    max={8}
+    step={0.1}
+    onValueChange={(v) => set("baseMm", clamp(v[0] ?? 2, 0, 8))}
+  />
+  <p className="text-xs text-gray-500">
+    0.0 mm = nessuna base (solo rilievo). Consigliato: 1.5–2.5 mm per stampe robuste.
+  </p>
+</div>
 
         {/* Detail */}
         <div className="space-y-2">
