@@ -113,15 +113,41 @@ export function heightmapToAsciiStl(
     }
   }
 
-  // --- BOTTOM (piano) ---
-  const pA = [0, 0, zBase];
-  const pB = [widthMm, 0, zBase];
-  const pC = [widthMm, heightMm, zBase];
-  const pD = [0, heightMm, zBase];
+  // --- BOTTOM ---
+  if (opts.noBasePlate) {
+    // bottom come heightfield (non un piano): evita la "piastra"
+    for (let y = 0; y < dyCount - 1; y++) {
+      for (let x = 0; x < dxCount - 1; x++) {
+        const x0 = x * dx;
+        const y0 = y * dy;
+        const x1 = (x + 1) * dx;
+        const y1 = (y + 1) * dy;
 
-  // orientamento verso il basso (normale outward)
-  out += triFacet(pA, pC, pB);
-  out += triFacet(pA, pD, pC);
+        const z00 = bottomZ(x, y);
+        const z10 = bottomZ(x + 1, y);
+        const z01 = bottomZ(x, y + 1);
+        const z11 = bottomZ(x + 1, y + 1);
+
+        const p00 = [x0, y0, z00];
+        const p10 = [x1, y0, z10];
+        const p01 = [x0, y1, z01];
+        const p11 = [x1, y1, z11];
+
+        // winding opposto al TOP (normali outward)
+        out += triFacet(p00, p11, p10);
+        out += triFacet(p00, p01, p11);
+      }
+    }
+  } else {
+    // bottom piano classico
+    const pA = [0, 0, zBase];
+    const pB = [widthMm, 0, zBase];
+    const pC = [widthMm, heightMm, zBase];
+    const pD = [0, heightMm, zBase];
+
+    out += triFacet(pA, pC, pB);
+    out += triFacet(pA, pD, pC);
+  }
 
   // --- SIDES ---
   // Left (x=0)
