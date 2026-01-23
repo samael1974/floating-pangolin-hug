@@ -20,8 +20,8 @@ export type ProjectType =
 
 export type EdgeMode = "round" | "sharp";
 
-import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
-export type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
+import type { OutputMode, BaseStyle } from "@/lib/reliefModeTypes";
+export type { OutputMode, BaseStyle } from "@/lib/reliefModeTypes";
 
 export type ReliefParams = {
   projectType: ProjectType;
