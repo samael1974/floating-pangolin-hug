@@ -9,6 +9,12 @@ import ReliefHeightmapPreview from "@/components/relief/ReliefHeightmapPreview";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
 
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+
+import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
+import { geometryToBinaryStl } from "@/lib/stl/binaryStl";
+
 type HeightmapState = {
   normF32: Float32Array;
   w: number;
@@ -26,7 +32,6 @@ async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
   img.src = url;
 
   try {
-    // prefer decode when available
     await img.decode();
   } catch {
     await new Promise<void>((resolve, reject) => {
@@ -38,6 +43,47 @@ async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
   }
 
   return img;
+}
+
+function downloadArrayBuffer(buffer: ArrayBuffer, filename: string) {
+  const blob = new Blob([buffer], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Downsample heightmap by step (nearest-neighbor).
+ * step=1 => no change
+ */
+function decimateHeightmap(
+  normF32: Float32Array,
+  w: number,
+  h: number,
+  step: number
+): HeightmapState {
+  const s = Math.max(1, Math.floor(step));
+  if (s === 1) return { normF32, w, h };
+
+  const w2 = Math.max(2, Math.floor((w - 1) / s) + 1);
+  const h2 = Math.max(2, Math.floor((h - 1) / s) + 1);
+
+  const out = new Float32Array(w2 * h2);
+
+  for (let y2 = 0; y2 < h2; y2++) {
+    const y = Math.min(h - 1, y2 * s);
+    for (let x2 = 0; x2 < w2; x2++) {
+      const x = Math.min(w - 1, x2 * s);
+      out[y2 * w2 + x2] = normF32[y * w + x];
+    }
+  }
+
+  return { normF32: out, w: w2, h: h2 };
 }
 
 export default function ReliefWizard() {
@@ -91,7 +137,6 @@ export default function ReliefWizard() {
 
       setHmStatus("loading");
 
-      // Load and scale
       const img = await loadImageFromFile(file);
 
       const iw = img.naturalWidth || img.width;
@@ -110,13 +155,11 @@ export default function ReliefWizard() {
       ctx.drawImage(img, 0, 0, w, h);
       const imgData = ctx.getImageData(0, 0, w, h);
 
-      // Your shared pipeline
       const hm: any = buildHeightmapFromImageData(imgData, params, {
         normalize: true,
         percentileClip: 0.02,
       });
 
-      // Prefer hm.normF32 if provided by your pipeline; fallback from grayU8
       let normF32: Float32Array;
       if (hm?.normF32 instanceof Float32Array) {
         normF32 = hm.normF32;
@@ -125,7 +168,9 @@ export default function ReliefWizard() {
         normF32 = new Float32Array(g.length);
         for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
       } else {
-        throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
+        throw new Error(
+          "Heightmap pipeline: output non valido (manca normF32/grayU8)"
+        );
       }
 
       const hw = Number(hm?.width ?? w);
@@ -169,9 +214,29 @@ export default function ReliefWizard() {
   const canGenerate = !!file && hmStatus === "ready" && !!hmState;
 
   function downloadStl() {
-    // Qui collegheremo lo STL generator: binary STL (mm)
-    // Per ora placeholder.
-    alert("Colleghiamo lo STL generator nel prossimo step 🙂");
+    if (!hmState) return;
+
+    // Apply decimation to reduce triangle count
+    const dm = decimateHeightmap(hmState.normF32, hmState.w, hmState.h, decimateStep);
+
+    // Build CLOSED solid geometry in mm
+    const geometry = buildSolidFromHeightmap({
+      normF32: dm.normF32,
+      w: dm.w,
+      h: dm.h,
+      widthMm: stlWidthMm,
+      depthMm: params.depthMm,
+      baseMm: params.baseMm,
+      outputMode: params.outputMode,
+      baseStyle: params.baseStyle,
+    });
+
+    // Binary STL
+    const stl = geometryToBinaryStl(geometry);
+
+    const tag = `${params.outputMode}_${params.baseStyle}`; // es: relief_flat / mold_recessed
+    const filename = `reliefforge_${tag}_${stlWidthMm.toFixed(0)}mm.stl`;
+    downloadArrayBuffer(stl, filename);
   }
 
   return (
@@ -275,7 +340,6 @@ export default function ReliefWizard() {
                 depthMm={params.depthMm}
                 baseMm={params.baseMm}
                 previewDecimateStep={decimateStep}
-                // invert non esiste più: la logica la gestiamo nel generator con outputMode/baseStyle
               />
             ) : (
               <div className="h-[360px] w-full grid place-items-center text-sm text-gray-500">
@@ -285,7 +349,7 @@ export default function ReliefWizard() {
           </div>
         </div>
 
-        {/* Debug params (se vuoi lo togliamo del tutto) */}
+        {/* Debug params */}
         <details className="text-xs text-gray-500">
           <summary className="cursor-pointer select-none">Debug params</summary>
           <pre className="mt-2 rounded bg-gray-50 p-3 overflow-auto">
