@@ -1,11 +1,15 @@
 import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
 
 function downloadStl() {
-  if (!hmState) return;
+  if (!hmState) {
+    console.warn("downloadStl: hmState non disponibile");
+    return;
+  }
+
   downloadReliefStlBinary({
     hm: hmState,
-    stlWidthMm,
-    decimateStep,
+    stlWidthMm: stlWidthMm,
+    decimateStep: decimateStep,
     depthMm: params.depthMm,
     baseMm: params.baseMm,
     outputMode: params.outputMode,
