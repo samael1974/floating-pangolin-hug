@@ -4,12 +4,14 @@ import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefCon
 import ReliefHeightmapPreview from "@/components/relief/ReliefHeightmapPreview";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
-import { decode as decodePng } from "fast-png";
 
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 
 import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
+
+// ✅ fast-png (16-bit)
+import { decode as decodePng } from "fast-png";
 
 type HeightmapState = {
   normF32: Float32Array;
@@ -23,12 +25,44 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-async function readAsArrayBuffer(file: File): Promise<ArrayBuffer> {
-  return await file.arrayBuffer();
-}
-
 function clamp01(x: number) {
   return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+
+async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.decoding = "async";
+  img.src = url;
+
+  try {
+    await img.decode();
+  } catch {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Impossibile caricare immagine"));
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+
+  return img;
+}
+
+function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState {
+  const { data, width: w, height: h } = imgData;
+  const out = new Float32Array(w * h);
+
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    const r = data[i] ?? 0;
+    const g = data[i + 1] ?? 0;
+    const b = data[i + 2] ?? 0;
+    let v = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; // 0..1
+    if (invert) v = 1 - v;
+    out[p] = clamp01(v);
+  }
+
+  return { normF32: out, w, h };
 }
 
 function depthU16ToNormF32(u16: Uint16Array, invert: boolean) {
@@ -53,38 +87,20 @@ function depthU8ToNormF32(u8: Uint8Array, invert: boolean) {
   return out;
 }
 
-// fallback per JPG/WEBP/PNG (8bit via canvas): luminanza -> Float32
-function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState {
-  const { data, width: w, height: h } = imgData;
-  const out = new Float32Array(w * h);
-
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    const r = data[i] ?? 0;
-    const g = data[i + 1] ?? 0;
-    const b = data[i + 2] ?? 0;
-    let v = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    if (invert) v = 1 - v;
-    out[p] = clamp01(v);
-  }
-
-  return { normF32: out, w, h };
-}
-
 async function decodeDepthMapToHmState(file: File, invert: boolean, maxSize = 512): Promise<HeightmapState> {
   const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
 
-  // ✅ PNG: tenta decode “vero” (supporta 16-bit)
+  // ✅ PNG: prova decode reale (supporta 16-bit)
   if (isPng) {
-    const buf = await readAsArrayBuffer(file);
-    const png = decodePng(new Uint8Array(buf));
+    const buf = await file.arrayBuffer();
+    const png: any = decodePng(new Uint8Array(buf));
 
-    const w = png.width;
-    const h = png.height;
-    const channels = png.channels;
-    const depth = (png as any).depth ?? (png as any).bitDepth ?? 8; // compat
+    const w = Number(png.width);
+    const h = Number(png.height);
+    const channels = Number(png.channels ?? 4);
+    const depth = Number(png.depth ?? png.bitDepth ?? 8);
 
-    // Se è troppo grande, per ora facciamo fallback canvas (rescale rapido).
-    // (Rescale 16bit “pro” si può fare dopo, ma non è indispensabile per MVP.)
+    // Se enorme → fallback canvas (MVP rapido). (Rescale 16-bit puro si può fare dopo)
     if (Math.max(w, h) > maxSize) {
       const img = await loadImageFromFile(file);
       const iw = img.naturalWidth || img.width;
@@ -103,39 +119,31 @@ async function decodeDepthMapToHmState(file: File, invert: boolean, maxSize = 51
       return imageDataToNormF32(imgData, invert);
     }
 
-    // ✅ 16-bit: data spesso è Uint16Array (dipende dalla lib); gestiamo entrambi i casi
-    // png.data può essere Uint8Array o Uint16Array
-    const data: any = (png as any).data;
+    const data: any = png.data;
 
+    // 16-bit
     if (depth === 16 && data instanceof Uint16Array) {
-      // grayscale: channels==1 (ideale), ma se RGBA prendiamo R
       if (channels === 1) {
         return { normF32: depthU16ToNormF32(data, invert), w, h };
       }
       const gray = new Uint16Array(w * h);
-      for (let i = 0, p = 0; p < gray.length; p++, i += channels) {
-        gray[p] = data[i]; // prendo il canale R
-      }
+      for (let i = 0, p = 0; p < gray.length; p++, i += channels) gray[p] = data[i];
       return { normF32: depthU16ToNormF32(gray, invert), w, h };
     }
 
-    // ✅ 8-bit PNG (o 16-bit ma la lib ti ha già “flattenato”): usa Uint8
+    // 8-bit
     if (data instanceof Uint8Array) {
       if (channels === 1) {
         return { normF32: depthU8ToNormF32(data, invert), w, h };
       }
       const gray = new Uint8Array(w * h);
-      for (let i = 0, p = 0; p < gray.length; p++, i += channels) {
-        gray[p] = data[i];
-      }
+      for (let i = 0, p = 0; p < gray.length; p++, i += channels) gray[p] = data[i];
       return { normF32: depthU8ToNormF32(gray, invert), w, h };
     }
-
-    // fallback finale
-    // (non dovrebbe succedere)
+    // se tipo sconosciuto → fallback
   }
 
-  // ✅ Non-PNG (JPG/WEBP): canvas fallback
+  // ✅ JPG/WEBP (o fallback): canvas
   const img = await loadImageFromFile(file);
   const iw = img.naturalWidth || img.width;
   const ih = img.naturalHeight || img.height;
@@ -153,104 +161,29 @@ async function decodeDepthMapToHmState(file: File, invert: boolean, maxSize = 51
   return imageDataToNormF32(imgData, invert);
 }
 
-  return img;
-}
-
-function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState {
-  const { data, width: w, height: h } = imgData;
-  const out = new Float32Array(w * h);
-
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    const r = data[i] ?? 0;
-    const g = data[i + 1] ?? 0;
-    const b = data[i + 2] ?? 0;
-    let v = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; // 0..1
-    if (invert) v = 1 - v;
-    out[p] = v;
-  }
-
-  return { normF32: out, w, h };
-}
-
 export default function ReliefWizard() {
-  // -----------------------------
-  // STATE
-  // -----------------------------
-  const [file, setFile] = React.useState<File | null>(null);
-  const [params, setParams] = React.useState<ReliefParams>(...);
-  const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
-  const [sourceMode, setSourceMode] = React.useState<"image" | "depthmap">("image");
+  // source
+  const [sourceMode, setSourceMode] = React.useState<SourceMode>("image");
   const [invertDepthMap, setInvertDepthMap] = React.useState(false);
 
-  // ✅ REF del canvas (QUESTO DEVE ESISTERE)
+  // upload
+  const [file, setFile] = React.useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+
+  // canvas preview per depthmap
   const dmCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
-  // -----------------------------
-  // useEffect: genera heightmap
-  // -----------------------------
   React.useEffect(() => {
-    // tua pipeline (image o depthmap)
-  }, [file, params, sourceMode, invertDepthMap]);
-
-  // -----------------------------
-  // ✅ useEffect: DISEGNA PREVIEW DEPTH MAP
-  // -----------------------------
-  React.useEffect(() => {
-    if (sourceMode !== "depthmap") return;
-    if (!hmState) return;
-
-    const c = dmCanvasRef.current;
-    if (!c) return;
-
-    c.width = hmState.w;
-    c.height = hmState.h;
-
-    const ctx = c.getContext("2d");
-    if (!ctx) return;
-
-    const img = ctx.createImageData(hmState.w, hmState.h);
-    const d = img.data;
-
-    for (let i = 0; i < hmState.normF32.length; i++) {
-      const v = Math.round(Math.max(0, Math.min(1, hmState.normF32[i])) * 255);
-      const j = i * 4;
-      d[j] = v;
-      d[j + 1] = v;
-      d[j + 2] = v;
-      d[j + 3] = 255;
+    if (!file) {
+      setPreviewUrl(null);
+      return;
     }
-
-    ctx.putImageData(img, 0, 0);
-  }, [sourceMode, hmState]);
-
-  // -----------------------------
-  // JSX
-  // -----------------------------
-  return (
-    <div className="space-y-6">
-      {/* altri step */}
-
-      {sourceMode === "depthmap" && (
-        <div className="rounded-lg border p-4">
-          <div className="text-sm font-semibold mb-2">
-            Anteprima Depth Map (16-bit)
-          </div>
-          <canvas
-            ref={dmCanvasRef}
-            className="block max-h-[320px] w-auto border"
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  // 2) Params (NO invert)
+  // params
   const [params, setParams] = React.useState<ReliefParams>(() => ({
     projectType: "logo_text",
     depthMm: 3,
@@ -262,7 +195,7 @@ export default function ReliefWizard() {
     baseStyle: "flat",
   }));
 
-  // 3) Heightmap pipeline -> normF32/w/h
+  // heightmap
   const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
   const [hmStatus, setHmStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
 
@@ -277,12 +210,23 @@ export default function ReliefWizard() {
       }
 
       setHmStatus("loading");
+      const maxSize = 512;
 
+      // ✅ depthmap (8/16-bit)
+      if (sourceMode === "depthmap") {
+        const hm = await decodeDepthMapToHmState(file, invertDepthMap, maxSize);
+        if (!cancelled) {
+          setHmState(hm);
+          setHmStatus("ready");
+        }
+        return;
+      }
+
+      // ✅ image -> pipeline tua
       const img = await loadImageFromFile(file);
       const iw = img.naturalWidth || img.width;
       const ih = img.naturalHeight || img.height;
 
-      const maxSize = 512;
       const scale = Math.min(1, maxSize / Math.max(iw, ih));
       const w = Math.max(2, Math.round(iw * scale));
       const h = Math.max(2, Math.round(ih * scale));
@@ -297,33 +241,23 @@ export default function ReliefWizard() {
       ctx.drawImage(img, 0, 0, w, h);
       const imgData = ctx.getImageData(0, 0, w, h);
 
+      const hmAny: any = buildHeightmapFromImageData(imgData, params, {
+        normalize: true,
+        percentileClip: 0.02,
+      });
+
+      const outW = Number(hmAny?.w ?? hmAny?.width ?? w);
+      const outH = Number(hmAny?.h ?? hmAny?.height ?? h);
+
       let normF32: Float32Array;
-      let outW = w;
-      let outH = h;
-
-      if (sourceMode === "depthmap") {
-        const hm2 = imageDataToNormF32(imgData, invertDepthMap);
-        normF32 = hm2.normF32;
-        outW = hm2.w;
-        outH = hm2.h;
+      if (hmAny?.normF32 instanceof Float32Array) {
+        normF32 = hmAny.normF32;
+      } else if (hmAny?.grayU8 instanceof Uint8Array) {
+        const g = hmAny.grayU8 as Uint8Array;
+        normF32 = new Float32Array(g.length);
+        for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
       } else {
-        const hm: any = buildHeightmapFromImageData(imgData, params, {
-          normalize: true,
-          percentileClip: 0.02,
-        });
-
-        outW = Number(hm?.w ?? hm?.width ?? w);
-        outH = Number(hm?.h ?? hm?.height ?? h);
-
-        if (hm?.normF32 instanceof Float32Array) {
-          normF32 = hm.normF32;
-        } else if (hm?.grayU8 instanceof Uint8Array) {
-          const g = hm.grayU8 as Uint8Array;
-          normF32 = new Float32Array(g.length);
-          for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
-        } else {
-          throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
-        }
+        throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
       }
 
       if (normF32.length !== outW * outH) {
@@ -361,17 +295,43 @@ export default function ReliefWizard() {
     params.baseStyle,
   ]);
 
-  // 4) STL options
+  // ✅ canvas draw (depthmap)
+  React.useEffect(() => {
+    if (sourceMode !== "depthmap") return;
+    if (!hmState) return;
+
+    const c = dmCanvasRef.current;
+    if (!c) return;
+
+    c.width = hmState.w;
+    c.height = hmState.h;
+
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+
+    const img = ctx.createImageData(hmState.w, hmState.h);
+    const d = img.data;
+
+    for (let i = 0; i < hmState.normF32.length; i++) {
+      const v = Math.round(clamp01(hmState.normF32[i]) * 255);
+      const j = i * 4;
+      d[j] = v;
+      d[j + 1] = v;
+      d[j + 2] = v;
+      d[j + 3] = 255;
+    }
+
+    ctx.putImageData(img, 0, 0);
+  }, [sourceMode, hmState]);
+
+  // STL options
   const [stlWidthMm, setStlWidthMm] = React.useState<number>(120);
   const [decimateStep, setDecimateStep] = React.useState<number>(1);
 
   const canGenerate = !!file && hmStatus === "ready" && !!hmState;
 
   function downloadStl() {
-    if (!hmState) {
-      console.warn("downloadStl: hmState non disponibile");
-      return;
-    }
+    if (!hmState) return;
 
     downloadReliefStlBinary({
       hm: hmState,
@@ -407,7 +367,7 @@ export default function ReliefWizard() {
               sourceMode === "depthmap" ? "bg-gray-900 text-white" : "bg-white text-gray-800"
             }`}
           >
-            Depth map
+            Depth map (8/16-bit)
           </button>
         </div>
 
@@ -426,33 +386,21 @@ export default function ReliefWizard() {
       {/* Step 1: Upload */}
       <ReliefUpload file={file} previewUrl={previewUrl} onPickFile={setFile} />
 
-      {/* Step 2: Controls (disabilitati se usi depthmap esterna) */}
-      <ReliefControls
-        value={params}
-        onChange={setParams}
-        disabled={!file || sourceMode === "depthmap"}
-      />
+      {/* Step 2: Controls */}
+      <ReliefControls value={params} onChange={setParams} disabled={!file || sourceMode === "depthmap"} />
 
       {/* Step 3: Preview 2D */}
       {sourceMode === "image" ? (
         <ReliefHeightmapPreview file={file} params={params} maxSize={512} />
       ) : (
         <div className="rounded-lg bg-white p-4 shadow">
-          <div className="text-sm font-semibold mb-2">Anteprima Depth Map</div>
+          <div className="text-sm font-semibold mb-2">Anteprima Depth Map (PRO)</div>
           <p className="text-xs text-gray-500 mb-3">
-            Carica una depth map in scala di grigi (PNG/JPG/WebP). Se il rilievo è al contrario,
-            abilita “Inverti depth map”.
+            PNG 16-bit supportato. Se il rilievo è al contrario, abilita “Inverti depth map”.
           </p>
-
-          {previewUrl ? (
-            <img
-              src={previewUrl}
-              alt="Depth map preview"
-              className="max-h-[320px] w-auto rounded border"
-            />
-          ) : (
-            <div className="text-sm text-gray-500">Carica una depth map.</div>
-          )}
+          <div className="overflow-auto rounded border bg-white p-2">
+            <canvas ref={dmCanvasRef} className="block max-h-[320px] w-auto" />
+          </div>
         </div>
       )}
 
@@ -500,9 +448,6 @@ export default function ReliefWizard() {
               step={1}
               onValueChange={(v) => setStlWidthMm(clamp(v[0] ?? 120, 30, 300))}
             />
-            <p className="text-xs text-gray-500">
-              Manteniamo le proporzioni dell’immagine (altezza calcolata automaticamente).
-            </p>
           </div>
 
           <div className="space-y-2">
@@ -517,9 +462,6 @@ export default function ReliefWizard() {
               step={1}
               onValueChange={(v) => setDecimateStep(clamp(v[0] ?? 1, 1, 6))}
             />
-            <p className="text-xs text-gray-500">
-              x1 = massimo dettaglio · x2–x3 = STL più leggero · x4+ = molto leggero
-            </p>
           </div>
         </div>
 
