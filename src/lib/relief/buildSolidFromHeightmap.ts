@@ -91,8 +91,8 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   const yB = y0 + heightMm;
 
   // Triangles oriented clockwise when seen from +Z => normals -Z
-  pushTri(xL, yT, 0, xR, yT, 0, xR, yB, 0);
-  pushTri(xL, yT, 0, xR, yB, 0, xL, yB, 0);
+ pushTri(xL, yT, 0, xR, yB, 0, xR, yT, 0);
+pushTri(xL, yT, 0, xL, yB, 0, xR, yB, 0);
 
   // SIDES (collegano topZ al bottom z=0)
   // Left (-X)
