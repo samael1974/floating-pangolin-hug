@@ -67,12 +67,23 @@ export function heightmapToAsciiStl(
   const baseMm = opts.baseMm;
   const invert = !!opts.invert;
 
-  function sample(ix: number, iy: number) {
+  function topZ(ix: number, iy: number) {
     const x = clamp(ix * step, 0, w - 1);
     const y = clamp(iy * step, 0, h - 1);
     const v = normF32[y * w + x];
     const t = invert ? 1 - v : v;
     return zBase + baseMm + t * depthMm;
+  }
+
+  function bottomZ(ix: number, iy: number) {
+    if (opts.noBasePlate) {
+      const x = clamp(ix * step, 0, w - 1);
+      const y = clamp(iy * step, 0, h - 1);
+      const v = normF32[y * w + x];
+      const t = invert ? 1 - v : v;
+      return zBase + t * depthMm; // fondo "a rilievo", niente piastra piatta
+    }
+    return zBase; // fondo classico piatto
   }
 
   let out = "solid relief\n";
