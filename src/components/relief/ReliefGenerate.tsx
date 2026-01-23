@@ -1,7 +1,7 @@
 import React from "react";
 import type { ReliefParams } from "@/components/relief/ReliefControls";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
-import { heightmapToAsciiStl, downloadTextFile } from "@/components/relief/reliefStl";
+import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 
 type Props = {
