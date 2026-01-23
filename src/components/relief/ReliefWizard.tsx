@@ -1,31 +1,52 @@
 import * as React from "react";
 import ReliefUpload from "@/components/relief/ReliefUpload";
-import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefControls";
+import ReliefControls, {
+  type ReliefParams,
+  type OutputMode,
+  type BaseStyle,
+} from "@/components/relief/ReliefControls";
 import ReliefHeightmapPreview from "@/components/relief/ReliefHeightmapPreview";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
+import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
 
-// Se hai già un generatore STL, importalo qui (nome indicativo)
-// import { buildReliefSTL } from "@/components/relief/reliefStl";
-
-const DEFAULT_PARAMS: ReliefParams = {
-  projectType: "logo_text",
-  depthMm: 3,
-  baseMm: 2,
-  detail: 0.55,
-  smooth: 0.15,
-  edge: "sharp",
-
-  outputMode: "relief",   // NEW
-  baseStyle: "flat",      // NEW
-  invert: false,          // NEW
+type HeightmapState = {
+  normF32: Float32Array;
+  w: number;
+  h: number;
 };
 
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.decoding = "async";
+  img.src = url;
+
+  try {
+    // prefer decode when available
+    await img.decode();
+  } catch {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Impossibile caricare immagine"));
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+
+  return img;
+}
+
 export default function ReliefWizard() {
+  // -----------------------------
+  // 1) Upload
+  // -----------------------------
   const [file, setFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
-  const [params, setParams] = React.useState<ReliefParams>(DEFAULT_PARAMS);
 
-  // Preview URL (cleanup corretto)
   React.useEffect(() => {
     if (!file) {
       setPreviewUrl(null);
@@ -36,68 +57,249 @@ export default function ReliefWizard() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  // Props 3D: il tuo ReliefPreview3D renderizza solo se normF32/w/h esistono.
-  // Quindi per ora lo montiamo “safe”.
-  const preview3DProps = React.useMemo(
-    () => ({
-      widthMm: 120,
-      depthMm: params.depthMm,
-      baseMm: params.baseMm,
-      invert: params.invert,
-      previewDecimateStep: 3,
-      // normF32/w/h arriveranno quando colleghi la pipeline heightmap->mesh
-    }),
-    [params.depthMm, params.baseMm, params.invert]
-  );
+  // -----------------------------
+  // 2) Params (✅ NO invert)
+  // -----------------------------
+  const [params, setParams] = React.useState<ReliefParams>(() => ({
+    projectType: "logo_text",
+    depthMm: 3,
+    baseMm: 2,
+    detail: 0.55,
+    smooth: 0.15,
+    edge: "sharp",
+    outputMode: "relief" as OutputMode,
+    baseStyle: "flat" as BaseStyle,
+  }));
 
-  // Download STL: placeholder (non rompe nulla). Lo colleghiamo dopo.
-  async function handleDownloadStl() {
-    // Qui ci agganciamo quando hai la funzione vera che produce STL.
-    // Per ora non facciamo nulla (evita casini).
+  // -----------------------------
+  // 3) Heightmap pipeline -> normF32/w/h
+  // -----------------------------
+  const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
+  const [hmStatus, setHmStatus] = React.useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      if (!file) {
+        setHmState(null);
+        setHmStatus("idle");
+        return;
+      }
+
+      setHmStatus("loading");
+
+      // Load and scale
+      const img = await loadImageFromFile(file);
+
+      const iw = img.naturalWidth || img.width;
+      const ih = img.naturalHeight || img.height;
+      const maxSize = 512;
+      const scale = Math.min(1, maxSize / Math.max(iw, ih));
+      const w = Math.max(1, Math.round(iw * scale));
+      const h = Math.max(1, Math.round(ih * scale));
+
+      const off = document.createElement("canvas");
+      off.width = w;
+      off.height = h;
+      const ctx = off.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("Canvas 2D non disponibile");
+
+      ctx.drawImage(img, 0, 0, w, h);
+      const imgData = ctx.getImageData(0, 0, w, h);
+
+      // Your shared pipeline
+      const hm: any = buildHeightmapFromImageData(imgData, params, {
+        normalize: true,
+        percentileClip: 0.02,
+      });
+
+      // Prefer hm.normF32 if provided by your pipeline; fallback from grayU8
+      let normF32: Float32Array;
+      if (hm?.normF32 instanceof Float32Array) {
+        normF32 = hm.normF32;
+      } else if (hm?.grayU8 instanceof Uint8Array) {
+        const g = hm.grayU8 as Uint8Array;
+        normF32 = new Float32Array(g.length);
+        for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
+      } else {
+        throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
+      }
+
+      const hw = Number(hm?.width ?? w);
+      const hh = Number(hm?.height ?? h);
+
+      if (!cancelled) {
+        setHmState({ normF32, w: hw, h: hh });
+        setHmStatus("ready");
+      }
+    }
+
+    run().catch((e) => {
+      console.error(e);
+      if (!cancelled) {
+        setHmState(null);
+        setHmStatus("error");
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    file,
+    params.projectType,
+    params.depthMm,
+    params.baseMm,
+    params.detail,
+    params.smooth,
+    params.edge,
+    params.outputMode,
+    params.baseStyle,
+  ]);
+
+  // -----------------------------
+  // 4) STL options (mm)
+  // -----------------------------
+  const [stlWidthMm, setStlWidthMm] = React.useState<number>(120);
+  const [decimateStep, setDecimateStep] = React.useState<number>(1);
+
+  const canGenerate = !!file && hmStatus === "ready" && !!hmState;
+
+  function downloadStl() {
+    // Qui collegheremo lo STL generator: binary STL (mm)
+    // Per ora placeholder.
     alert("Colleghiamo lo STL generator nel prossimo step 🙂");
   }
 
   return (
     <div className="space-y-6">
-      <ReliefUpload
-        file={file}
-        previewUrl={previewUrl}
-        onPickFile={setFile}
-      />
+      {/* Step 1: Upload */}
+      <ReliefUpload file={file} previewUrl={previewUrl} onPickFile={setFile} />
 
-      <ReliefControls
-        value={params}
-        onChange={setParams}
-        disabled={!file}
-      />
+      {/* Step 2: Controls */}
+      <ReliefControls value={params} onChange={setParams} disabled={!file} />
 
-      <ReliefHeightmapPreview
-        file={file}
-        params={params}
-        maxSize={512}
-      />
+      {/* Step 3: Heightmap preview (2D) */}
+      <ReliefHeightmapPreview file={file} params={params} maxSize={512} />
 
-      {/* Sezione STL + Preview 3D */}
+      {/* Step 4: STL + Preview 3D */}
       <div className="rounded-lg bg-white p-6 shadow space-y-4">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold">4) Genera STL</h2>
             <p className="text-sm text-gray-600">
-              STL chiuso e stampabile. In base a Modalità/Base/Invert generiamo positivo o stampo.
+              STL chiuso e stampabile. In base a Modalità/Base generiamo positivo o stampo.
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Stato heightmap:{" "}
+              {hmStatus === "loading"
+                ? "Elaborazione…"
+                : hmStatus === "error"
+                ? "Errore"
+                : hmStatus === "ready"
+                ? "Pronto"
+                : "In attesa"}
             </p>
           </div>
 
           <button
             type="button"
-            onClick={handleDownloadStl}
-            className="inline-flex items-center justify-center rounded-md bg-[#E46A52] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-            disabled={!file}
+            onClick={downloadStl}
+            disabled={!canGenerate}
+            className="px-4 py-2 rounded-md bg-[#E35B4F] text-white text-sm font-semibold disabled:opacity-50"
+            title={!canGenerate ? "Carica immagine e attendi preview" : "Scarica STL"}
           >
             Scarica STL
           </button>
         </div>
 
-        <ReliefPreview3D {...preview3DProps} />
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* STL width */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Larghezza STL (mm)</Label>
+              <div className="text-sm tabular-nums text-gray-700">
+                {stlWidthMm.toFixed(0)} mm
+              </div>
+            </div>
+            <Slider
+              value={[stlWidthMm]}
+              min={30}
+              max={300}
+              step={1}
+              onValueChange={(v) => setStlWidthMm(clamp(v[0] ?? 120, 30, 300))}
+            />
+            <p className="text-xs text-gray-500">
+              Manteniamo le proporzioni dell’immagine (altezza calcolata automaticamente).
+            </p>
+          </div>
+
+          {/* Decimation */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Qualità (Decimazione)</Label>
+              <div className="text-sm tabular-nums text-gray-700">x{decimateStep}</div>
+            </div>
+            <Slider
+              value={[decimateStep]}
+              min={1}
+              max={6}
+              step={1}
+              onValueChange={(v) => setDecimateStep(clamp(v[0] ?? 1, 1, 6))}
+            />
+            <p className="text-xs text-gray-500">
+              x1 = massimo dettaglio · x2–x3 = STL più leggero · x4+ = molto leggero
+            </p>
+          </div>
+        </div>
+
+        {/* Preview 3D */}
+        <div className="rounded-lg border bg-white overflow-hidden">
+          <div className="border-b px-4 py-3">
+            <div className="text-sm font-semibold">Preview 3D</div>
+            <div className="text-xs text-gray-500">
+              Ruota con drag • Zoom con rotellina/pinch
+            </div>
+          </div>
+
+          <div className="p-4">
+            {hmState ? (
+              <ReliefPreview3D
+                normF32={hmState.normF32}
+                w={hmState.w}
+                h={hmState.h}
+                widthMm={stlWidthMm}
+                depthMm={params.depthMm}
+                baseMm={params.baseMm}
+                previewDecimateStep={decimateStep}
+                // invert non esiste più: la logica la gestiamo nel generator con outputMode/baseStyle
+              />
+            ) : (
+              <div className="h-[360px] w-full grid place-items-center text-sm text-gray-500">
+                La preview 3D appare dopo la generazione della heightmap (normF32/w/h).
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Debug params (se vuoi lo togliamo del tutto) */}
+        <details className="text-xs text-gray-500">
+          <summary className="cursor-pointer select-none">Debug params</summary>
+          <pre className="mt-2 rounded bg-gray-50 p-3 overflow-auto">
+{JSON.stringify(
+  {
+    ...params,
+    stlWidthMm,
+    decimateStep,
+  },
+  null,
+  2
+)}
+          </pre>
+        </details>
       </div>
     </div>
   );
