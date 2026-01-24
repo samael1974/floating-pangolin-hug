@@ -481,6 +481,7 @@ export default function ReliefWizard() {
               <ReliefControls value={params} onChange={setParams} disabled={!file} />
             </div>
           </div>
+          
 
           {/* STL Options */}
           <div className="rounded-lg bg-white p-4 shadow space-y-4">
