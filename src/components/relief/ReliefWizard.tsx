@@ -723,34 +723,74 @@ export default function ReliefWizard() {
                   </div>
                 )}
 
-                {previewTab === "stl" && (
-                  <div className="space-y-2 text-xs text-gray-600">
-                    <div className="font-medium text-gray-700">Stato</div>
-                    <div>
-                      Sorgente:{" "}
-                      <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
-                    </div>
-                    <div>
-                      Risoluzione hm:{" "}
-                      <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h}` : "—"}</span>
-                    </div>
-                    <div>
-                      Output:{" "}
-                      <span className="font-medium">
-                        {params.outputMode} / {params.baseStyle}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+                      {previewTab === "stl" && (() => {
+                  const s = estimateStlStats();
+                  return (
+                    <div className="space-y-2 text-xs text-gray-600">
+                      <div className="font-medium text-gray-700">Dettagli</div>
 
-            <div className="text-[11px] text-gray-500">
-              Nota: in modalità “Depth map”, i PNG vengono letti in vero 8/16-bit (parser PNG) e preview via canvas.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+                      <div>
+                        Sorgente:{" "}
+                        <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
+                      </div>
+
+                      <div>
+                        Risoluzione hm:{" "}
+                        <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h}` : "—"}</span>
+                      </div>
+
+                      <div>
+                        Output:{" "}
+                        <span className="font-medium">
+                          {params.outputMode} / {params.baseStyle} — base {params.baseMm.toFixed(1)}mm
+                        </span>
+                      </div>
+
+                      <div className="pt-2 border-t">
+                        <div className="font-medium text-gray-700">Stima STL</div>
+
+                        {s ? (
+                          <>
+                            <div>
+                              Campionamento (post-decimazione):{" "}
+                              <span className="font-medium">{s.effW} × {s.effH}</span>
+                            </div>
+                            <div>
+                              Triangoli stimati:{" "}
+                              <span className="font-medium">{s.triangles.toLocaleString()}</span>
+                            </div>
+                            <div>
+                              Peso stimato STL:{" "}
+                              <span className="font-medium">{s.mb.toFixed(1)} MB</span>
+                            </div>
+
+                            {s.isHeavy ? (
+                              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
+                                <div className="font-semibold">⚠️ Mesh pesante</div>
+                                <div className="mt-1">
+                                  Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
+                                  <span className="font-semibold">x{s.suggestedDecimate}</span>{" "}
+                                  (riduce peso e lag in slicer/Blender).
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setDecimateStep(s.suggestedDecimate)}
+                                  className="mt-2 rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                                >
+                                  Applica decimazione consigliata
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-green-900">
+                                ✅ Dimensione ok: dovrebbe essere fluido in slicer e in Blender.
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-gray-500">Carica un file per vedere la stima.</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
 }
