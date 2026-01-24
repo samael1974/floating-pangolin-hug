@@ -302,7 +302,13 @@ export default function ReliefWizard() {
         <div className="space-y-6">
           {/* Source Mode */}
           <div className="rounded-lg bg-white p-4 shadow flex flex-wrap items-center gap-3">
-            <div className="text-sm font-semibold">Sorgente</div>
+            <div>
+  <div className="text-sm font-semibold">Sorgente</div>
+  <div className="text-xs text-gray-500">
+    Usa <span className="font-medium">Immagine</span> per risultati rapidi. Usa{" "}
+    <span className="font-medium">Depth map</span> se hai già una mappa di profondità (meglio PNG 16-bit).
+  </div>
+</div>
 
             <div className="inline-flex rounded-md border overflow-hidden">
               <button
