@@ -134,21 +134,27 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   const yT = y0;
   const yB = y0 - heightMm; // ✅ invert Y (top is +, bottom is -)
 
-  // BOTTOM (z=0)
-  // winding per normali verso -Z
-  pushTri(xL, yT, 0, xR, yB, 0, xR, yT, 0);
-  pushTri(xL, yT, 0, xL, yB, 0, xR, yB, 0);
+// --------------------------
+// BOTTOM (z=0) — GRIGLIA MATCH con TOP
+// (così i bordi coincidono con le SIDES → manifold)
+// winding verso -Z
+// --------------------------
+for (let iy = 0; iy < h - 1; iy++) {
+  for (let ix = 0; ix < w - 1; ix++) {
+    const xA = x0 + ix * dx;
+    const yA = y0 - iy * dy;
+    const xB = x0 + (ix + 1) * dx;
+    const yB2 = yA;
+    const xC = xA;
+    const yC = y0 - (iy + 1) * dy;
+    const xD = xB;
+    const yD = yC;
 
-  // SIDES
-  // Left
-  for (let iy = 0; iy < h - 1; iy++) {
-    const y1 = y0 - iy * dy;
-    const y2 = y0 - (iy + 1) * dy;
-    const z1 = zTop(normF32[idx(0, iy)] ?? 0);
-    const z2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
-    pushTri(xL, y1, 0, xL, y1, z1, xL, y2, z2);
-    pushTri(xL, y1, 0, xL, y2, z2, xL, y2, 0);
+    // invert winding rispetto al TOP per puntare in -Z
+    pushTri(xA, yA, 0, xD, yD, 0, xB, yB2, 0);
+    pushTri(xA, yA, 0, xC, yC, 0, xD, yD, 0);
   }
+}
 
   // Right
   for (let iy = 0; iy < h - 1; iy++) {
