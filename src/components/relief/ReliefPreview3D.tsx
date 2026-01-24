@@ -20,8 +20,6 @@ type Props = {
   previewDecimateStep: number;
   baseStyle: "flat" | "recessed";
   outputMode?: "relief" | "mold";
-    stlWidthMm: number;
-  decimateStep: number;
   stlWidthMm={widthMm}
 decimateStep={previewDecimateStep}
 
