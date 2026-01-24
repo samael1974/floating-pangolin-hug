@@ -18,9 +18,10 @@ export default function Index() {
 </h1>
 
             <p className="text-base text-slate-700 md:text-lg">
-              Carica un’immagine, regola i parametri e scarica uno STL chiuso e pronto
-              per la stampa 3D. Nessun account. Nessun fronzolo.
-            </p>
+  Carica un’immagine, regola profondità e dettaglio, scarica uno{" "}
+  <span className="font-medium text-slate-900">STL chiuso (manifold)</span>{" "}
+  pronto per la stampa 3D. Nessun account.
+</p>
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button
