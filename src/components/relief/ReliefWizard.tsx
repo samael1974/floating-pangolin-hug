@@ -175,14 +175,9 @@ export default function ReliefWizard() {
 
           if (isPng) {
             // ✅ vero 8/16-bit via parser PNG
-            const buf = await file.arrayBuffer();
-            const dec = decodeDepthmapPng(buf);
-            hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
-          } else {
-            // fallback 8-bit via canvas
-            hm = await decodeDepthMapToHmStateCanvas(file, false, maxSize);
-          }
-
+        const buf = new Uint8Array(await file.arrayBuffer());
+const dec = decodeDepthmapPng(buf);
+hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
           // invert opzionale (se attivo)
           if (invertDepthMap) invertHmInPlace(hm);
 
