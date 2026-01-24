@@ -371,9 +371,10 @@ const [openGptHowTo, setOpenGptHowTo] = React.useState(false);
 
     return (
   <>
+    {/* ✅ PAGINA PRINCIPALE: qui dentro va TUTTA la tua UI esistente */}
     <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
-      {/* TUTTA LA TUA UI ESISTENTE QUI DENTRO */}
-      {/* ...non toccare niente del contenuto... */}
+      {/* ✅ INCOLLA QUI la tua UI reale (grid LEFT/RIGHT ecc.) */}
+      {/* ESEMPIO: <div className="grid ..."> ... </div> */}
     </div>
 
     {/* MODAL: Istruzioni conversione */}
@@ -432,6 +433,105 @@ const [openGptHowTo, setOpenGptHowTo] = React.useState(false);
             </div>
           </div>
         </div>
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setOpenConversion(false);
+              setSourceMode("image");
+            }}
+            className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+          >
+            Passa a modalità Immagine
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setOpenConversion(false)}
+            className="rounded-md bg-[#1F4E5F] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+          >
+            Ok, capito
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* MODAL: Come usare il GPT */}
+    <Dialog open={openGptHowTo} onOpenChange={setOpenGptHowTo}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Come usare il GPT “Generatore mappe di profondità”</DialogTitle>
+          <DialogDescription>Workflow consigliato per ottenere depth map pulite e compatibili con STL stampabili.</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 text-sm">
+          <div className="rounded-md border bg-gray-50 p-3">
+            <div className="font-semibold">1) Prompt consigliato</div>
+            <div className="mt-2 text-gray-700">
+              Chiedi al GPT una depth map:
+              <ul className="mt-2 list-disc pl-5 space-y-1">
+                <li><span className="font-medium">grayscale</span> (scala di grigi)</li>
+                <li><span className="font-medium">16-bit PNG</span></li>
+                <li>alto contrasto ma <span className="font-medium">senza banding</span></li>
+                <li>superfici <span className="font-medium">lisce</span> (meno rumore)</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="rounded-md border p-3">
+            <div className="font-semibold">2) Export corretto</div>
+            <div className="mt-2 text-gray-700">
+              Quando salvi/esporti, assicurati:
+              <ul className="mt-2 list-disc pl-5 space-y-1">
+                <li><span className="font-medium">PNG</span></li>
+                <li><span className="font-medium">Grayscale</span></li>
+                <li><span className="font-medium">16-bit</span> (oppure 8-bit se non disponibile)</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="rounded-md border p-3">
+            <div className="font-semibold">3) Nell’app: scelta della sorgente</div>
+            <div className="mt-2 text-gray-700">
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Se hai una depth map pronta: <span className="font-medium">Sorgente → Depth map (8/16-bit)</span></li>
+                <li>Se il file dà errore o non sei sicuro: <span className="font-medium">Sorgente → Immagine</span></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-green-200 bg-green-50 p-3 text-xs text-green-900">
+            <div className="font-semibold">Tip pratico</div>
+            <div className="mt-1">
+              Se vuoi solo il rilievo senza basetta: imposta <span className="font-medium">Spessore base = 0</span>.
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          <a
+            href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+          >
+            Apri il GPT
+          </a>
+
+          <button
+            type="button"
+            onClick={() => setOpenGptHowTo(false)}
+            className="rounded-md bg-[#1F4E5F] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+          >
+            Ok
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
+);
+
 
         <DialogFooter className="gap-2 sm:gap-2">
           <button
