@@ -48,7 +48,7 @@ export default function ReliefWizard() {
     outputMode: "relief",
     baseStyle: "flat",
   }));
-
+  
   // ...il resto del componente
 
 
