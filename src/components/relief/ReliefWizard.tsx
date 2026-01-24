@@ -480,15 +480,13 @@ export default function ReliefWizard() {
             <div className="pt-2">
               <ReliefControls value={params} onChange={setParams} disabled={!file} />
             </div>
-          </div>
-        </div>
+        
           {/* STL Options */}
           <div className="rounded-lg bg-white p-4 shadow space-y-4">
             <div>
               <div className="text-sm font-semibold">3) Genera STL</div>
               <div className="text-xs text-gray-500">STL binario chiuso (stampabile).</div>
             </div>
-         </div>
 
             {/* Nome file */}
             <div className="space-y-2">
