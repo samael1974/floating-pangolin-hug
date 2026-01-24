@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ReliefWizard } from "@/components/relief/ReliefWizard";
+import ReliefWizard from "@/components/relief/ReliefWizard";
 
 export default function ReliefPage() {
   return (
