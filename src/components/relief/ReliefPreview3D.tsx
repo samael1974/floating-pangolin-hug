@@ -20,9 +20,8 @@ type Props = {
   previewDecimateStep: number;
   baseStyle: "flat" | "recessed";
   outputMode?: "relief" | "mold";
-  stlWidthMm={widthMm}
-decimateStep={previewDecimateStep}
-
+    stlWidthMm: number;
+  decimateStep: number;
 };
 
 function decimateHm(hm: HeightmapState, step: number): HeightmapState {
