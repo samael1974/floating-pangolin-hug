@@ -28,6 +28,8 @@ type HeightmapState = {
   h: number;
 };
 
+
+
 export default function ReliefWizard() {
   // ✅ Preview tab (colonna destra)
   const [previewTab, setPreviewTab] = React.useState<"image" | "depth" | "stl">("stl");
