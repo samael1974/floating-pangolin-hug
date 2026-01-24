@@ -68,7 +68,7 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
+            <div className="space-y-2">
         <Label>Tipo progetto</Label>
         <Select
           disabled={disabled}
@@ -79,13 +79,19 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
             <SelectValue placeholder="Scegli..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="logo_text">Logo / Testo</SelectItem>
-            <SelectItem value="human_face">Volto umano</SelectItem>
-            <SelectItem value="animal">Animale</SelectItem>
-            <SelectItem value="nature_landscape">Natura / Paesaggio</SelectItem>
-            <SelectItem value="decorative_pattern">Pattern decorativo</SelectItem>
+            <SelectItem value="logo_text">Logo / Testo (bordi netti)</SelectItem>
+            <SelectItem value="human_face">Volto umano (sfumature)</SelectItem>
+            <SelectItem value="animal">Animale (texture)</SelectItem>
+            <SelectItem value="nature_landscape">Natura / Paesaggio (profondità)</SelectItem>
+            <SelectItem value="decorative_pattern">Pattern decorativo (ripetizione)</SelectItem>
           </SelectContent>
         </Select>
+
+        <p className="text-xs text-slate-600">
+          Suggerimento:{" "}
+          <span className="font-medium text-slate-700">Logo/Testo</span> aumenta contrasto e bordi;{" "}
+          <span className="font-medium text-slate-700">Volto</span> mantiene sfumature e volumi.
+        </p>
       </div>
 
       <Separator />
