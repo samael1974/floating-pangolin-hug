@@ -30,12 +30,12 @@ function downloadArrayBuffer(buffer: ArrayBuffer, filename: string) {
 }
 
 function decimateHeightmap(hm: HeightmapState, step: number): HeightmapState {
-  const s = Math.max(1, Math.floor(step));
+  const s = Math.max(1, Math.ceil(step));
   if (s === 1) return hm;
 
   const { normF32, w, h } = hm;
-  const w2 = Math.max(2, Math.floor((w - 1) / s) + 1);
-  const h2 = Math.max(2, Math.floor((h - 1) / s) + 1);
+  const w2 = Math.max(2, Math.ceil((w - 1) / s) + 1);
+  const h2 = Math.max(2, Math.ceil((h - 1) / s) + 1);
   const out = new Float32Array(w2 * h2);
 
   for (let y2 = 0; y2 < h2; y2++) {
