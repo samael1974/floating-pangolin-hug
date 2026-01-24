@@ -303,49 +303,49 @@ export default function ReliefWizard() {
           {/* Source Mode */}
           <div className="rounded-lg bg-white p-4 shadow flex flex-wrap items-center gap-3">
             <div>
-  <div className="text-sm font-semibold">Sorgente</div>
-  <div className="text-xs text-gray-500">
-    Usa <span className="font-medium">Immagine</span> per risultati rapidi. Usa{" "}
-    <span className="font-medium">Depth map</span> se hai già una mappa di profondità (meglio PNG 16-bit).
-  </div>
-</div>
+              <div className="text-sm font-semibold">Sorgente</div>
+              <div className="text-xs text-gray-500">
+                Usa <span className="font-medium">Immagine</span> per risultati rapidi. Usa{" "}
+                <span className="font-medium">Depth map</span> se hai già una mappa di profondità (meglio PNG 16-bit).
+              </div>
+            </div>
 
             <div className="inline-flex rounded-md border overflow-hidden">
               <button
-  type="button"
-  onClick={() => setSourceMode("image")}
-  className={`px-3 py-1.5 text-sm ${
-    sourceMode === "image"
-      ? "bg-[#1F4E5F] text-white"
-      : "bg-white text-[#1F4E5F] hover:bg-gray-50"
-  }`}
->
-  Immagine
-</button>
-<button
-  type="button"
-  onClick={() => setSourceMode("depthmap")}
-  className={`px-3 py-1.5 text-sm ${
-    sourceMode === "depthmap"
-      ? "bg-[#1F4E5F] text-white"
-      : "bg-white text-[#1F4E5F] hover:bg-gray-50"
-  }`}
->
-  Depth map (8/16-bit)
-</button>
+                type="button"
+                onClick={() => setSourceMode("image")}
+                className={`px-3 py-1.5 text-sm ${
+                  sourceMode === "image"
+                    ? "bg-[#1F4E5F] text-white"
+                    : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                }`}
+              >
+                Immagine
+              </button>
+              <button
+                type="button"
+                onClick={() => setSourceMode("depthmap")}
+                className={`px-3 py-1.5 text-sm ${
+                  sourceMode === "depthmap"
+                    ? "bg-[#1F4E5F] text-white"
+                    : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                }`}
+              >
+                Depth map (8/16-bit)
+              </button>
             </div>
 
             {sourceMode === "depthmap" && (
-  <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
-    <input
-      type="checkbox"
-      checked={invertDepthMap}
-      onChange={(e) => setInvertDepthMap(e.target.checked)}
-    />
-    <span>Inverti depth map</span>
-    <span className="text-xs text-gray-500">(se viene “al contrario”)</span>
-  </label>
-)}
+              <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={invertDepthMap}
+                  onChange={(e) => setInvertDepthMap(e.target.checked)}
+                />
+                <span>Inverti depth map</span>
+                <span className="text-xs text-gray-500">(se viene “al contrario”)</span>
+              </label>
+            )}
           </div>
 
           {/* Upload */}
@@ -353,9 +353,7 @@ export default function ReliefWizard() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">1) Carica un file</div>
-                <div className="text-xs text-gray-500">
-                  JPG/JPEG/PNG/WEBP. Per Depth map: PNG consigliato.
-                </div>
+                <div className="text-xs text-gray-500">JPG/JPEG/PNG/WEBP. Per Depth map: PNG consigliato.</div>
               </div>
 
               {file && (
@@ -405,11 +403,9 @@ export default function ReliefWizard() {
             <div>
               <div className="text-sm font-semibold">2) Parametri bassorilievo</div>
               <div className="text-xs text-gray-500">
-  I parametri restano attivi anche in modalità Depth map.{" "}
-  <span className="font-medium">Tip:</span> se vuoi solo il rilievo senza basetta, imposta{" "}
-  <span className="font-medium">Spessore base = 0</span>.
-</div>
-
+                I parametri restano attivi anche in modalità Depth map. <span className="font-medium">Tip:</span> se vuoi
+                solo il rilievo senza basetta, imposta <span className="font-medium">Spessore base = 0</span>.
+              </div>
             </div>
 
             <div className="pt-2">
@@ -474,25 +470,23 @@ export default function ReliefWizard() {
                 disabled={!file}
               />
               <div className="text-xs text-gray-500">
-  Suggerimento: x2–x3 è un buon compromesso. Valori più alti = file più leggero, ma meno dettaglio.
-</div>
-
+                Suggerimento: x2–x3 è un buon compromesso. Valori più alti = file più leggero, ma meno dettaglio.
+              </div>
             </div>
 
             <div className="flex flex-col gap-2 pt-2">
               <button
-                <button
-  type="button"
-  onClick={downloadStl}
-  disabled={!canGenerate}
-  className={`rounded-md px-4 py-2 text-sm font-semibold ${
-    canGenerate
-      ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]"
-      : "bg-gray-200 text-gray-500 cursor-not-allowed"
-  }`}
->
-  Scarica STL
-</button>
+                type="button"
+                onClick={downloadStl}
+                disabled={!canGenerate}
+                className={`rounded-md px-4 py-2 text-sm font-semibold ${
+                  canGenerate
+                    ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]"
+                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                Scarica STL
+              </button>
 
               <a
                 href="https://www.paypal.me/federicocordioli72"
@@ -517,21 +511,13 @@ export default function ReliefWizard() {
 
               <div className="text-xs">
                 {hmStatus === "ready" ? (
-                  <span className="rounded-full bg-green-100 px-2 py-1 font-medium text-green-800">
-                    Heightmap pronta
-                  </span>
+                  <span className="rounded-full bg-green-100 px-2 py-1 font-medium text-green-800">Heightmap pronta</span>
                 ) : hmStatus === "loading" ? (
-                  <span className="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-800">
-                    Calcolo…
-                  </span>
+                  <span className="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-800">Calcolo…</span>
                 ) : hmStatus === "error" ? (
-                  <span className="rounded-full bg-red-100 px-2 py-1 font-medium text-red-800">
-                    Errore
-                  </span>
+                  <span className="rounded-full bg-red-100 px-2 py-1 font-medium text-red-800">Errore</span>
                 ) : (
-                  <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">
-                    In attesa
-                  </span>
+                  <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">In attesa</span>
                 )}
               </div>
             </div>
@@ -565,7 +551,9 @@ export default function ReliefWizard() {
                   type="button"
                   onClick={() => setPreviewTab("image")}
                   className={`rounded px-2 py-1 text-xs font-medium ${
-                    previewTab === "image" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] border hover:bg-gray-50"
+                    previewTab === "image"
+                      ? "bg-[#1F4E5F] text-white"
+                      : "bg-white text-[#1F4E5F] border hover:bg-gray-50"
                   }`}
                 >
                   Immagine
@@ -574,20 +562,24 @@ export default function ReliefWizard() {
                   type="button"
                   onClick={() => setPreviewTab("depth")}
                   className={`rounded px-2 py-1 text-xs font-medium ${
-                    previewTab === "depth" ? "bg-gray-900 text-white" : "bg-white text-gray-700 border"
+                    previewTab === "depth"
+                      ? "bg-[#1F4E5F] text-white"
+                      : "bg-white text-[#1F4E5F] border hover:bg-gray-50"
                   }`}
                 >
                   Depth map
                 </button>
                 <button
-  type="button"
-  onClick={() => setPreviewTab("stl")}
-  className={`rounded px-2 py-1 text-xs font-medium ${
-    previewTab === "stl" ? "bg-gray-900 text-white" : "bg-white text-gray-700 border"
-  }`}
->
-  Dettagli
-</button>
+                  type="button"
+                  onClick={() => setPreviewTab("stl")}
+                  className={`rounded px-2 py-1 text-xs font-medium ${
+                    previewTab === "stl"
+                      ? "bg-[#1F4E5F] text-white"
+                      : "bg-white text-[#1F4E5F] border hover:bg-gray-50"
+                  }`}
+                >
+                  Dettagli
+                </button>
               </div>
 
               <div className="p-3">
@@ -625,10 +617,7 @@ export default function ReliefWizard() {
                     <div className="font-medium text-gray-700">Stato</div>
                     <div>
                       Sorgente:{" "}
-<span className="font-medium">
-  {sourceMode === "image" ? "Immagine" : "Depth map"}
-</span>
-
+                      <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
                     </div>
                     <div>
                       Risoluzione hm:{" "}
