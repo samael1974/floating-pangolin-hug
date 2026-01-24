@@ -575,14 +575,14 @@ export default function ReliefWizard() {
                   Depth map
                 </button>
                 <button
-                  type="button"
-                  onClick={() => setPreviewTab("stl")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
-                    previewTab === "stl" ? "bg-gray-900 text-white" : "bg-white text-gray-700 border"
-                  }`}
-                >
-                  Info
-                </button>
+  type="button"
+  onClick={() => setPreviewTab("stl")}
+  className={`rounded px-2 py-1 text-xs font-medium ${
+    previewTab === "stl" ? "bg-gray-900 text-white" : "bg-white text-gray-700 border"
+  }`}
+>
+  Dettagli
+</button>
               </div>
 
               <div className="p-3">
