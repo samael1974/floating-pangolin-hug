@@ -28,3 +28,11 @@ export default function ReliefPage() {
     </div>
   );
 }
+1 error
+Run checks
+Clear all
+Fix 1 problem
+
+src/pages/Relief.tsx
+2:10
+Module '"@/components/relief/ReliefWizard"' has no exported m
