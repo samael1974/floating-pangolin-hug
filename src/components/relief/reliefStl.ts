@@ -35,7 +35,6 @@ function decimateHeightmap(hm: Heightmap, step: number): Heightmap {
 
   return { normF32: out, w: w2, h: h2 };
 }
-
 export function downloadReliefStlBinary(opts: {
   hm: HeightmapState;
   stlWidthMm: number;
