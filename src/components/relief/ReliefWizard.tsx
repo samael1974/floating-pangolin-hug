@@ -488,6 +488,7 @@ export default function ReliefWizard() {
               <div className="text-sm font-semibold">3) Genera STL</div>
               <div className="text-xs text-gray-500">STL binario chiuso (stampabile).</div>
             </div>
+         </div>
 
             {/* Nome file */}
             <div className="space-y-2">
