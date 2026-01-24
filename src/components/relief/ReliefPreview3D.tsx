@@ -12,15 +12,14 @@ type HeightmapState = {
   h: number;
 };
 
-type Props =
-ReliefPreview3D
-  hmState={hmState}
-  stlWidthMm={widthMm}
-  decimateStep={previewDecimateStep}
-  depthMm={depthMm}
-  baseMm={baseMm}
-  outputMode="relief"
-  baseStyle={baseStyle}
+type Props = {
+  hmState: HeightmapState | null;
+  stlWidthMm: number;
+  decimateStep: number;
+  depthMm: number;
+  baseMm: number;
+  outputMode: OutputMode;
+  baseStyle: BaseStyle;
 };
 
 function decimateHm(hm: HeightmapState, step: number): HeightmapState {
@@ -42,20 +41,20 @@ function decimateHm(hm: HeightmapState, step: number): HeightmapState {
   return { normF32: out, w: w2, h: h2 };
 }
 
-function Scene({
-  geometry,
-}: {
-  geometry: THREE.BufferGeometry;
-}) {
+function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
   return (
     <>
-      <ambientLight intensity={0.9} />
-      <directionalLight position={[2, 3, 4]} intensity={1.2} />
+      {/* luce “leggibile” per bassorilievi */}
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[2, 3, 4]} intensity={1.1} />
+      <directionalLight position={[-3, -2, 2]} intensity={0.55} />
+
       <group>
-        <mesh geometry={geometry}>
-          <meshStandardMaterial roughness={0.9} metalness={0.05} />
+        <mesh geometry={geometry} castShadow receiveShadow>
+          <meshStandardMaterial roughness={0.85} metalness={0.05} />
         </mesh>
       </group>
+
       <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
     </>
   );
@@ -81,13 +80,13 @@ export default function ReliefPreview3D(props: Props) {
         baseStyle,
       });
 
-      // centra e scala “ragionevole” per camera
+      // centra e porta a z=0
       geo.computeBoundingBox();
       const bb = geo.boundingBox;
       if (bb) {
         const center = new THREE.Vector3();
         bb.getCenter(center);
-        geo.translate(-center.x, -center.y, -bb.min.z); // poggia a z=0
+        geo.translate(-center.x, -center.y, -bb.min.z);
       }
 
       return geo;
