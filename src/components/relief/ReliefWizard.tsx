@@ -1,6 +1,15 @@
-// ===============================
-// Heightmap helpers & types
-// ===============================
+import * as React from "react";
+
+import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefControls";
+import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
+import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
+import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
+import { inspectPng, pngCompatibilityMessage } from "@/lib/relief/inspectPng";
+
+
+// ✅ 16-bit PNG support
+import { decodeDepthmapPng } from "@/lib/relief/decodeDepthmapPng";
+import { renderDepthmapToCanvas } from "@/lib/relief/renderDepthmapToCanvas";
 
 type SourceMode = "image" | "depthmap";
 
@@ -14,10 +23,8 @@ type HeightmapBuildOutput =
   | { normF32: Float32Array; w: number; h: number }
   | { grayU8: Uint8Array; w?: number; h?: number; width?: number; height?: number };
 
-function clamp01(x: number): number {
-  if (x < 0) return 0;
-  if (x > 1) return 1;
-  return x;
+function clamp01(x: number) {
+  return x < 0 ? 0 : x > 1 ? 1 : x;
 }
 
 async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
@@ -48,10 +55,8 @@ function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState
     const r = data[i] ?? 0;
     const g = data[i + 1] ?? 0;
     const b = data[i + 2] ?? 0;
-
     let v = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
     if (invert) v = 1 - v;
-
     out[p] = clamp01(v);
   }
 
@@ -59,8 +64,8 @@ function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState
 }
 
 /**
- * Fallback Canvas (8-bit) per JPG/WEBP/PNG.
- * Il vero 16-bit passa da decodeDepthmapPng (solo PNG).
+ * Fallback via Canvas (8-bit) per JPG/WEBP/PNG (se il browser lo “schiaccia”)
+ * Il “vero 16-bit” passa da decodeDepthmapPng() (solo PNG).
  */
 async function decodeDepthMapToHmStateCanvas(
   file: File,
@@ -75,22 +80,782 @@ async function decodeDepthMapToHmStateCanvas(
   const w = Math.max(2, Math.round(iw * scale));
   const h = Math.max(2, Math.round(ih * scale));
 
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
+  const off = document.createElement("canvas");
+  off.width = w;
+  off.height = h;
 
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const ctx = off.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("Canvas 2D non disponibile");
 
   ctx.drawImage(img, 0, 0, w, h);
   const imgData = ctx.getImageData(0, 0, w, h);
-
   return imageDataToNormF32(imgData, invert);
 }
 
-function invertHmInPlace(hm: HeightmapState): void {
+function invertHmInPlace(hm: HeightmapState) {
   const a = hm.normF32;
-  for (let i = 0; i < a.length; i++) {
-    a[i] = 1 - clamp01(a[i] ?? 0);
+  for (let i = 0; i < a.length; i++) a[i] = 1 - clamp01(a[i] ?? 0);
+}
+
+export default function ReliefWizard() {
+  // ✅ Preview tab (colonna destra)
+  const [previewTab, setPreviewTab] = React.useState<"image" | "depth" | "stl">("stl");
+
+  // ✅ Sorgente
+  const [sourceMode, setSourceMode] = React.useState<SourceMode>("image");
+  const [invertDepthMap, setInvertDepthMap] = React.useState(false);
+
+  // ✅ Upload
+  const [file, setFile] = React.useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+
+  // ✅ Canvas preview depthmap
+  const dmCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
+
+  // ✅ Nome file STL (personalizzabile)
+  const [customName, setCustomName] = React.useState<string>("reliefforge");
+
+  // ✅ Params
+  const [params, setParams] = React.useState<ReliefParams>(() => ({
+    projectType: "logo_text",
+    depthMm: 3,
+    baseMm: 2,
+    detail: 0.55,
+    smooth: 0.15,
+    edge: "sharp",
+    outputMode: "relief",
+    baseStyle: "flat",
+  }));
+
+  // ✅ Heightmap state/status
+  const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
+  const [hmStatus, setHmStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [fileWarning, setFileWarning] = React.useState<string | null>(null);
+
+  // ✅ STL options
+  const [stlWidthMm, setStlWidthMm] = React.useState<number>(120);
+  const [decimateStep, setDecimateStep] = React.useState<number>(2);
+
+  const canGenerate = !!file && hmStatus === "ready" && !!hmState;
+
+  // ✅ preview url
+  React.useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  // ✅ UX: quando carichi un file vai su "Immagine"
+  React.useEffect(() => {
+    if (file) setPreviewTab("image");
+  }, [file]);
+
+  // ✅ UX: quando hm pronta vai su "STL"
+  React.useEffect(() => {
+    if (hmStatus === "ready") setPreviewTab("stl");
+  }, [hmStatus]);
+
+  // ✅ pipeline heightmap (image / depthmap 8-16bit)
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      if (!file) {
+        setHmState(null);
+        setHmStatus("idle");
+        return;
+      }
+            // reset warning ogni run
+      setFileWarning(null);
+
+      // Se sono in depthmap e il file è PNG: controllo IHDR prima di decodificare
+      if (sourceMode === "depthmap") {
+        const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+        if (isPng) {
+          try {
+            const head = new Uint8Array(await file.arrayBuffer());
+            const info = inspectPng(head);
+            const msg = pngCompatibilityMessage(info);
+
+            if (msg) {
+              // Mostra warning e blocca pipeline depthmap (così eviti STL rotti)
+              if (!cancelled) {
+                setFileWarning(
+                  `Depth map non compatibile: ${msg}  |  Soluzione: esporta PNG grayscale 16-bit oppure passa a “Modalità Immagine”.`
+                );
+                setHmState(null);
+                setHmStatus("error");
+              }
+              return;
+            }
+          } catch {
+            // Se fallisce il check, non bloccare: lascia che il decoder gestisca
+          }
+        }
+      }
+      setHmStatus("loading");
+      const maxSize = 512;
+
+      try {
+        // --------------------------
+        // DEPTHMAP MODE (PNG 8/16-bit + fallback canvas)
+        // --------------------------
+        if (sourceMode === "depthmap") {
+          const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+
+          let hm: HeightmapState;
+
+          if (isPng) {
+            const buf = new Uint8Array(await file.arrayBuffer());
+            const dec = decodeDepthmapPng(buf);
+            hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
+            if (invertDepthMap) invertHmInPlace(hm);
+          } else {
+            // fallback canvas (8-bit)
+            hm = await decodeDepthMapToHmStateCanvas(file, invertDepthMap, maxSize);
+          }
+
+          if (!cancelled) {
+            setHmState(hm);
+            setHmStatus("ready");
+          }
+          return;
+        }
+
+        // --------------------------
+        // IMAGE MODE (tua pipeline)
+        // --------------------------
+        const img = await loadImageFromFile(file);
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
+
+        const scale = Math.min(1, maxSize / Math.max(iw, ih));
+        const w = Math.max(2, Math.round(iw * scale));
+        const h = Math.max(2, Math.round(ih * scale));
+
+        const off = document.createElement("canvas");
+        off.width = w;
+        off.height = h;
+
+        const ctx = off.getContext("2d", { willReadFrequently: true });
+        if (!ctx) throw new Error("Canvas 2D non disponibile");
+
+        ctx.drawImage(img, 0, 0, w, h);
+        const imgData = ctx.getImageData(0, 0, w, h);
+
+        const hmAny = buildHeightmapFromImageData(imgData, params, {
+          normalize: true,
+          percentileClip: 0.02,
+        }) as unknown as HeightmapBuildOutput;
+
+        const outW = Number((hmAny as any)?.w ?? (hmAny as any)?.width ?? w);
+        const outH = Number((hmAny as any)?.h ?? (hmAny as any)?.height ?? h);
+
+        let normF32: Float32Array;
+        if ((hmAny as any)?.normF32 instanceof Float32Array) {
+          normF32 = (hmAny as any).normF32 as Float32Array;
+        } else if ((hmAny as any)?.grayU8 instanceof Uint8Array) {
+          const g = (hmAny as any).grayU8 as Uint8Array;
+          normF32 = new Float32Array(g.length);
+          for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
+        } else {
+          throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
+        }
+
+        if (normF32.length !== outW * outH) {
+          throw new Error(`Heightmap mismatch: normF32(${normF32.length}) != ${outW}*${outH}`);
+        }
+
+        if (!cancelled) {
+          setHmState({ normF32, w: outW, h: outH });
+          setHmStatus("ready");
+        }
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          setHmState(null);
+          setHmStatus("error");
+        }
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    file,
+    sourceMode,
+    invertDepthMap,
+    params.projectType,
+    params.depthMm,
+    params.baseMm,
+    params.detail,
+    params.smooth,
+    params.edge,
+    params.outputMode,
+    params.baseStyle,
+  ]);
+
+  // ✅ draw canvas: quando apro il tab "Depth map"
+  React.useEffect(() => {
+    if (previewTab !== "depth") return;
+    if (sourceMode !== "depthmap") return;
+    if (!hmState) return;
+    const c = dmCanvasRef.current;
+    if (!c) return;
+
+    renderDepthmapToCanvas(c, hmState.normF32, hmState.w, hmState.h);
+  }, [previewTab, sourceMode, hmState]);
+
+  function estimateStlStats() {
+    if (!hmState) return null;
+
+    const effW = Math.max(2, Math.floor(hmState.w / Math.max(1, decimateStep)));
+    const effH = Math.max(2, Math.floor(hmState.h / Math.max(1, decimateStep)));
+
+    const topTris = 2 * (effW - 1) * (effH - 1);
+
+    const perimeterQuads = 2 * (effW - 1) + 2 * (effH - 1);
+    const sideTris = 2 * perimeterQuads;
+
+    const bottomTris = params.baseMm > 0 ? 2 * (effW - 1) * (effH - 1) : 0;
+
+    const triangles = topTris + sideTris + bottomTris;
+
+    const bytes = 84 + triangles * 50;
+    const mb = bytes / (1024 * 1024);
+
+    const isHeavy = triangles > 900_000 || mb > 45;
+
+    let suggestedDecimate = decimateStep;
+    if (triangles > 1_800_000) suggestedDecimate = Math.max(decimateStep, 5);
+    else if (triangles > 1_200_000) suggestedDecimate = Math.max(decimateStep, 4);
+    else if (triangles > 900_000) suggestedDecimate = Math.max(decimateStep, 3);
+
+    return { effW, effH, triangles, mb, isHeavy, suggestedDecimate };
   }
+
+  function downloadStl() {
+    if (!hmState) return;
+
+    const safe = (customName || "").trim().replace(/[\\/:*?"<>|]+/g, "_") || "reliefforge";
+
+    downloadReliefStlBinary({
+      hm: hmState,
+      stlWidthMm,
+      decimateStep,
+      depthMm: params.depthMm,
+      baseMm: params.baseMm,
+      outputMode: params.outputMode as any,
+      baseStyle: params.baseStyle as any,
+      filename: `${safe}.stl`,
+    });
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
+      <div className="grid gap-6 md:grid-cols-[420px_1fr] lg:grid-cols-[460px_1fr]">
+        {/* LEFT */}
+        <div className="space-y-6">
+          {/* Source Mode */}
+          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-white p-4 shadow">
+            <div className="min-w-[220px]">
+              <div className="text-sm font-semibold">Sorgente</div>
+              <div className="text-xs text-gray-500">
+                Usa <span className="font-medium">Immagine</span> per risultati rapidi. Usa{" "}
+                <span className="font-medium">Depth map</span> se hai già una mappa di profondità (meglio PNG 16-bit).
+              </div>
+            </div>
+
+            <div className="inline-flex overflow-hidden rounded-md border">
+              <button
+                type="button"
+                onClick={() => setSourceMode("image")}
+                className={`px-3 py-1.5 text-sm ${
+                  sourceMode === "image" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                }`}
+              >
+                Immagine
+              </button>
+              <button
+                type="button"
+                onClick={() => setSourceMode("depthmap")}
+                className={`px-3 py-1.5 text-sm ${
+                  sourceMode === "depthmap" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                }`}
+              >
+                Depth map (8/16-bit)
+              </button>
+            </div>
+
+            {sourceMode === "depthmap" && (
+              <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={invertDepthMap}
+                  onChange={(e) => setInvertDepthMap(e.target.checked)}
+                />
+                <span>Inverti depth map</span>
+                <span className="text-xs text-gray-500">(se viene “al contrario”)</span>
+              </label>
+            )}
+          </div>
+
+          {/* Upload */}
+          <div className="space-y-3 rounded-lg bg-white p-4 shadow">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">1) Carica un file</div>
+                <div className="text-xs text-gray-500">JPG/JPEG/PNG/WEBP. Per Depth map: PNG consigliato.</div>
+              </div>
+
+              {file && (
+                <button
+                  type="button"
+                  onClick={() => setFile(null)}
+                  className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
+                >
+                  Rimuovi
+                </button>
+              )}
+            </div>
+
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm"
+            />
+            {fileWarning && (
+  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+    <div className="font-semibold">Depth map non compatibile</div>
+    <div className="mt-1 text-xs leading-snug">{fileWarning}</div>
+
+    <div className="mt-3 flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          // apri modal / pannello istruzioni (se non hai modal, per ora usa alert o un state)
+          alert(`Converti in PNG Grayscale 16-bit.\n\nGIMP: Immagine→Modalità→Scala di grigi; Immagine→Precisione→Intero 16-bit; Esporta PNG.\n\nIn alternativa passa a Modalità Immagine.`);
+        }}
+        className="rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+      >
+        🔧 Apri istruzioni conversione
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setSourceMode("image")}
+        className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
+      >
+        🖼 Passa a modalità Immagine
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          alert(`Workflow GPT:\n1) Esporta PNG grayscale 16-bit.\n2) In app usa “Depth map”.\n3) Se errori: usa “Immagine”.`);
+        }}
+        className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
+      >
+        🤖 Come usare il GPT
+      </button>
+    </div>
+  </div>
+)}
+
+            {file && (
+              <div className="text-xs text-gray-600">
+                <div className="font-medium">File:</div>
+                <div className="break-all">{file.name}</div>
+                <div className="mt-1">
+                  Stato heightmap:{" "}
+                  <span
+                    className={`font-medium ${
+                      hmStatus === "ready"
+                        ? "text-green-700"
+                        : hmStatus === "loading"
+                        ? "text-amber-700"
+                        : hmStatus === "error"
+                        ? "text-red-700"
+                        : "text-gray-600"
+                    }`}
+                  >
+                    {hmStatus}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Params */}
+          <div className="space-y-3 rounded-lg bg-white p-4 shadow">
+            <div>
+              <div className="text-sm font-semibold">2) Parametri bassorilievo</div>
+              <div className="text-xs text-gray-500">
+                I parametri restano attivi anche in modalità Depth map. <span className="font-medium">Tip:</span> se vuoi
+                solo il rilievo senza basetta, imposta <span className="font-medium">Spessore base = 0</span>.
+              </div>
+            </div>
+
+            {/* Preset rapidi */}
+            <div className="flex flex-wrap gap-2 pt-2">
+              <button
+                type="button"
+                disabled={!file}
+                onClick={() => {
+                  setParams((p) => ({
+                    ...p,
+                    projectType: "logo_text",
+                    depthMm: 3.0,
+                    baseMm: 2.0,
+                    detail: 0.65,
+                    smooth: 0.12,
+                    edge: "sharp",
+                    outputMode: "relief",
+                    baseStyle: "flat",
+                  }));
+                  setDecimateStep(2);
+                }}
+                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
+                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
+                }`}
+              >
+                Preset: Logo/Testo
+              </button>
+
+              <button
+                type="button"
+                disabled={!file}
+                onClick={() => {
+                  setParams((p) => ({
+                    ...p,
+                    projectType: "human_face",
+                    depthMm: 4.0,
+                    baseMm: 2.0,
+                    detail: 0.55,
+                    smooth: 0.28,
+                    edge: "round",
+                    outputMode: "relief",
+                    baseStyle: "flat",
+                  }));
+                  setDecimateStep(2);
+                }}
+                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
+                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
+                }`}
+              >
+                Preset: Volto
+              </button>
+
+              <button
+                type="button"
+                disabled={!file}
+                onClick={() => {
+                  setParams((p) => ({
+                    ...p,
+                    projectType: "nature_landscape",
+                    depthMm: 5.0,
+                    baseMm: 2.0,
+                    detail: 0.58,
+                    smooth: 0.2,
+                    edge: "round",
+                    outputMode: "relief",
+                    baseStyle: "flat",
+                  }));
+                  setDecimateStep(3);
+                }}
+                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
+                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
+                }`}
+              >
+                Preset: Paesaggio
+              </button>
+
+              <div className="self-center text-[11px] text-gray-500">1 click per partire bene, poi rifinisci sotto.</div>
+            </div>
+
+            <div className="pt-2">
+              <ReliefControls value={params} onChange={setParams} disabled={!file} />
+            </div>
+          </div>
+
+          {/* STL Options */}
+          <div className="space-y-4 rounded-lg bg-white p-4 shadow">
+            <div>
+              <div className="text-sm font-semibold">3) Genera STL</div>
+              <div className="text-xs text-gray-500">STL binario chiuso (stampabile).</div>
+            </div>
+
+            {/* Nome file */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Nome file STL</span>
+                <span className="text-xs text-gray-500">.stl</span>
+              </div>
+              <input
+                type="text"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="es. logo_giovanni_v1"
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                disabled={!file}
+              />
+              <div className="text-xs text-gray-500">Se vuoto, userò un nome di default.</div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Larghezza STL (mm)</span>
+                <span className="tabular-nums text-gray-700">{Math.round(stlWidthMm)} mm</span>
+              </div>
+              <input
+                type="range"
+                min={30}
+                max={300}
+                step={1}
+                value={stlWidthMm}
+                onChange={(e) => setStlWidthMm(Number(e.target.value))}
+                className="w-full"
+                disabled={!file}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Qualità (Decimazione)</span>
+                <span className="tabular-nums text-gray-700">x{decimateStep}</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={6}
+                step={1}
+                value={decimateStep}
+                onChange={(e) => setDecimateStep(Number(e.target.value))}
+                className="w-full"
+                disabled={!file}
+              />
+              <div className="text-xs text-gray-500">
+                Suggerimento: x2–x3 è un buon compromesso. Più alto = più leggero, meno dettaglio.
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={downloadStl}
+                disabled={!canGenerate}
+                className={`rounded-md px-4 py-2 text-sm font-semibold ${
+                  canGenerate ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]" : "cursor-not-allowed bg-gray-200 text-gray-500"
+                }`}
+              >
+                Scarica STL
+              </button>
+
+              <a
+                href="https://www.paypal.me/federicocordioli72"
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border px-4 py-2 text-center text-sm hover:bg-gray-50"
+              >
+                Dona su PayPal
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT */}
+        <div className="self-start md:sticky md:top-4">
+          <div className="space-y-4 rounded-lg bg-white p-4 shadow">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">Anteprime</div>
+                <div className="text-xs text-gray-500">Il 3D resta visibile mentre modifichi i parametri.</div>
+              </div>
+
+              <div className="text-xs">
+                {hmStatus === "ready" ? (
+                  <span className="rounded-full bg-green-100 px-2 py-1 font-medium text-green-800">Heightmap pronta</span>
+                ) : hmStatus === "loading" ? (
+                  <span className="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-800">Calcolo…</span>
+                ) : hmStatus === "error" ? (
+                  <span className="rounded-full bg-red-100 px-2 py-1 font-medium text-red-800">Errore</span>
+                ) : (
+                  <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">In attesa</span>
+                )}
+              </div>
+            </div>
+
+            {/* 3D */}
+            <div className="overflow-hidden rounded-md border">
+              <div className="flex items-center justify-between border-b bg-gray-50 px-3 py-2">
+                <div className="text-sm font-medium">Preview 3D</div>
+                <div className="text-xs text-gray-500">Drag • Zoom</div>
+              </div>
+
+              <div className="h-[420px] lg:h-[520px]">
+                <ReliefPreview3D
+                  {...({
+                    hmState,
+                    stlWidthMm,
+                    decimateStep,
+                    depthMm: params.depthMm,
+                    baseMm: params.baseMm,
+                    outputMode: params.outputMode,
+                    baseStyle: params.baseStyle,
+                  } as any)}
+                />
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="overflow-hidden rounded-md border">
+              <div className="flex items-center gap-2 border-b bg-gray-50 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => setPreviewTab("image")}
+                  className={`rounded px-2 py-1 text-xs font-medium ${
+                    previewTab === "image"
+                      ? "bg-[#1F4E5F] text-white"
+                      : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                  }`}
+                >
+                  Immagine
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewTab("depth")}
+                  className={`rounded px-2 py-1 text-xs font-medium ${
+                    previewTab === "depth"
+                      ? "bg-[#1F4E5F] text-white"
+                      : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                  }`}
+                >
+                  Depth map
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewTab("stl")}
+                  className={`rounded px-2 py-1 text-xs font-medium ${
+                    previewTab === "stl"
+                      ? "bg-[#1F4E5F] text-white"
+                      : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                  }`}
+                >
+                  Dettagli
+                </button>
+              </div>
+
+              <div className="p-3">
+                {previewTab === "image" && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-gray-700">Anteprima immagine</div>
+                    {previewUrl ? (
+                      <img
+                        src={previewUrl}
+                        alt="Anteprima"
+                        className="max-h-[240px] w-full rounded-md border object-contain"
+                      />
+                    ) : (
+                      <div className="text-xs text-gray-500">Carica un file per vedere l’anteprima.</div>
+                    )}
+                  </div>
+                )}
+
+                {previewTab === "depth" && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-gray-700">Anteprima depth map</div>
+
+                    {sourceMode === "depthmap" ? (
+                      <canvas ref={dmCanvasRef} className="max-h-[240px] w-full rounded-md border" />
+                    ) : (
+                      <div className="text-xs text-gray-500">
+                        In modalità Immagine, la depthmap è interna alla pipeline (vedi 3D).
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {previewTab === "stl" && (() => {
+                  const s = estimateStlStats();
+                  return (
+                    <div className="space-y-2 text-xs text-gray-600">
+                      <div className="font-medium text-gray-700">Dettagli</div>
+
+                      <div>
+                        Sorgente:{" "}
+                        <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
+                      </div>
+
+                      <div>
+                        Risoluzione hm:{" "}
+                        <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h}` : "—"}</span>
+                      </div>
+
+                      <div>
+                        Output:{" "}
+                        <span className="font-medium">
+                          {params.outputMode} / {params.baseStyle} — base {params.baseMm.toFixed(1)}mm
+                        </span>
+                      </div>
+
+                      <div className="border-t pt-2">
+                        <div className="font-medium text-gray-700">Stima STL</div>
+
+                        {s ? (
+                          <>
+                            <div>
+                              Campionamento (post-decimazione):{" "}
+                              <span className="font-medium">
+                                {s.effW} × {s.effH}
+                              </span>
+                            </div>
+                            <div>
+                              Triangoli stimati: <span className="font-medium">{s.triangles.toLocaleString()}</span>
+                            </div>
+                            <div>
+                              Peso stimato STL: <span className="font-medium">{s.mb.toFixed(1)} MB</span>
+                            </div>
+
+                            {s.isHeavy ? (
+                              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
+                                <div className="font-semibold">⚠️ Mesh pesante</div>
+                                <div className="mt-1">
+                                  Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
+                                  <span className="font-semibold">x{s.suggestedDecimate}</span>.
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setDecimateStep(s.suggestedDecimate)}
+                                  className="mt-2 rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                                >
+                                  Applica decimazione consigliata
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-green-900">
+                                ✅ Dimensione ok: dovrebbe essere fluido in slicer e in Blender.
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-gray-500">Carica un file per vedere la stima.</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
