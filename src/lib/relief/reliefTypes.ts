@@ -1,2 +1,2 @@
 export type OutputMode = "relief" | "mold";
-export type BaseStyle = "flat" | "recessed";
+export type BaseStyle = "flat" | "recessed" | "offset";
