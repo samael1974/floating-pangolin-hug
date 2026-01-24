@@ -122,10 +122,10 @@ export default function Index() {
                 Supporta lo sviluppo (facoltativo)
               </h2>
               <p className="mt-2 text-sm text-slate-600">
-                Questo progetto resta gratuito. Se lo usi spesso o ti ha tolto un
-                problema (Blender, booleane, mesh rotte…), puoi offrire un caffè.
-                Nessuna pressione: davvero.
-              </p>
+  Questo progetto resta gratuito. Se ti ha evitato Blender, booleane o mesh rotte,
+  puoi offrire un caffè. Nessuna pressione: davvero.
+</p>
+
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
