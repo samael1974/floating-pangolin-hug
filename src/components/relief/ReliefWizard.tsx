@@ -17,6 +17,10 @@ type HeightmapState = {
   h: number;
 };
 
+type HeightmapBuildOutput =
+  | { normF32: Float32Array; w: number; h: number }
+  | { grayU8: Uint8Array; w?: number; h?: number; width?: number; height?: number };
+
 function clamp01(x: number) {
   return x < 0 ? 0 : x > 1 ? 1 : x;
 }
@@ -213,19 +217,19 @@ export default function ReliefWizard() {
         ctx.drawImage(img, 0, 0, w, h);
         const imgData = ctx.getImageData(0, 0, w, h);
 
-        const hmAny: any = buildHeightmapFromImageData(imgData, params, {
+        const hmAny = buildHeightmapFromImageData(imgData, params, {
           normalize: true,
           percentileClip: 0.02,
-        });
+        }) as unknown as HeightmapBuildOutput;
 
-        const outW = Number(hmAny?.w ?? hmAny?.width ?? w);
-        const outH = Number(hmAny?.h ?? hmAny?.height ?? h);
+        const outW = Number((hmAny as any)?.w ?? (hmAny as any)?.width ?? w);
+        const outH = Number((hmAny as any)?.h ?? (hmAny as any)?.height ?? h);
 
         let normF32: Float32Array;
-        if (hmAny?.normF32 instanceof Float32Array) {
-          normF32 = hmAny.normF32;
-        } else if (hmAny?.grayU8 instanceof Uint8Array) {
-          const g = hmAny.grayU8 as Uint8Array;
+        if ((hmAny as any)?.normF32 instanceof Float32Array) {
+          normF32 = (hmAny as any).normF32 as Float32Array;
+        } else if ((hmAny as any)?.grayU8 instanceof Uint8Array) {
+          const g = (hmAny as any).grayU8 as Uint8Array;
           normF32 = new Float32Array(g.length);
           for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
         } else {
@@ -281,46 +285,31 @@ export default function ReliefWizard() {
   function estimateStlStats() {
     if (!hmState) return null;
 
-    // campionamento “effettivo” dopo decimazione
     const effW = Math.max(2, Math.floor(hmState.w / Math.max(1, decimateStep)));
     const effH = Math.max(2, Math.floor(hmState.h / Math.max(1, decimateStep)));
 
-    // Top surface (grid triangolata)
     const topTris = 2 * (effW - 1) * (effH - 1);
 
-    // Side walls: perimetro di quads -> 2 tris per quad
     const perimeterQuads = 2 * (effW - 1) + 2 * (effH - 1);
     const sideTris = 2 * perimeterQuads;
 
-    // Bottom cap: lo consideriamo solo se baseMm > 0 (più “targa”)
-    // Nota: la tua pipeline potrebbe chiudere comunque il fondo, ma come stima va bene così.
     const bottomTris = params.baseMm > 0 ? 2 * (effW - 1) * (effH - 1) : 0;
 
     const triangles = topTris + sideTris + bottomTris;
 
-    // STL binario: 84 byte header + 50 byte per triangolo
     const bytes = 84 + triangles * 50;
     const mb = bytes / (1024 * 1024);
 
-    // Soglie “pratiche” per browser/Blender
     const isHeavy = triangles > 900_000 || mb > 45;
 
-    // Suggerimento decimazione (euristico)
     let suggestedDecimate = decimateStep;
     if (triangles > 1_800_000) suggestedDecimate = Math.max(decimateStep, 5);
     else if (triangles > 1_200_000) suggestedDecimate = Math.max(decimateStep, 4);
     else if (triangles > 900_000) suggestedDecimate = Math.max(decimateStep, 3);
 
-    return {
-      effW,
-      effH,
-      triangles,
-      mb,
-      isHeavy,
-      suggestedDecimate,
-    };
+    return { effW, effH, triangles, mb, isHeavy, suggestedDecimate };
   }
-  
+
   function downloadStl() {
     if (!hmState) return;
 
@@ -344,8 +333,8 @@ export default function ReliefWizard() {
         {/* LEFT */}
         <div className="space-y-6">
           {/* Source Mode */}
-          <div className="rounded-lg bg-white p-4 shadow flex flex-wrap items-center gap-3">
-            <div>
+          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-white p-4 shadow">
+            <div className="min-w-[220px]">
               <div className="text-sm font-semibold">Sorgente</div>
               <div className="text-xs text-gray-500">
                 Usa <span className="font-medium">Immagine</span> per risultati rapidi. Usa{" "}
@@ -353,14 +342,12 @@ export default function ReliefWizard() {
               </div>
             </div>
 
-            <div className="inline-flex rounded-md border overflow-hidden">
+            <div className="inline-flex overflow-hidden rounded-md border">
               <button
                 type="button"
                 onClick={() => setSourceMode("image")}
                 className={`px-3 py-1.5 text-sm ${
-                  sourceMode === "image"
-                    ? "bg-[#1F4E5F] text-white"
-                    : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                  sourceMode === "image" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] hover:bg-gray-50"
                 }`}
               >
                 Immagine
@@ -369,9 +356,7 @@ export default function ReliefWizard() {
                 type="button"
                 onClick={() => setSourceMode("depthmap")}
                 className={`px-3 py-1.5 text-sm ${
-                  sourceMode === "depthmap"
-                    ? "bg-[#1F4E5F] text-white"
-                    : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                  sourceMode === "depthmap" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] hover:bg-gray-50"
                 }`}
               >
                 Depth map (8/16-bit)
@@ -392,7 +377,7 @@ export default function ReliefWizard() {
           </div>
 
           {/* Upload */}
-          <div className="rounded-lg bg-white p-4 shadow space-y-3">
+          <div className="space-y-3 rounded-lg bg-white p-4 shadow">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">1) Carica un file</div>
@@ -441,18 +426,8 @@ export default function ReliefWizard() {
             )}
           </div>
 
-                                {/* Params */}
-          <div className="rounded-lg bg-white p-4 shadow space-y-3">
-            <div>
-              <div className="text-sm font-semibold">2) Parametri bassorilievo</div>
-              <div className="text-xs text-gray-500">
-                I parametri restano attivi anche in modalità Depth map. <span className="font-medium">Tip:</span> se vuoi
-                solo il rilievo senza basetta, imposta <span className="font-medium">Spessore base = 0</span>.
-              </div>
-            </div>
-
-              {/* Params */}
-          <div className="rounded-lg bg-white p-4 shadow space-y-3">
+          {/* Params */}
+          <div className="space-y-3 rounded-lg bg-white p-4 shadow">
             <div>
               <div className="text-sm font-semibold">2) Parametri bassorilievo</div>
               <div className="text-xs text-gray-500">
@@ -481,7 +456,7 @@ export default function ReliefWizard() {
                   setDecimateStep(2);
                 }}
                 className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
-                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "text-gray-400 cursor-not-allowed"
+                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
                 }`}
               >
                 Preset: Logo/Testo
@@ -505,7 +480,7 @@ export default function ReliefWizard() {
                   setDecimateStep(2);
                 }}
                 className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
-                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "text-gray-400 cursor-not-allowed"
+                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
                 }`}
               >
                 Preset: Volto
@@ -529,15 +504,13 @@ export default function ReliefWizard() {
                   setDecimateStep(3);
                 }}
                 className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
-                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "text-gray-400 cursor-not-allowed"
+                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
                 }`}
               >
                 Preset: Paesaggio
               </button>
 
-              <div className="text-[11px] text-gray-500 self-center">
-                1 click per partire bene, poi rifinisci i parametri sotto.
-              </div>
+              <div className="self-center text-[11px] text-gray-500">1 click per partire bene, poi rifinisci sotto.</div>
             </div>
 
             <div className="pt-2">
@@ -546,7 +519,7 @@ export default function ReliefWizard() {
           </div>
 
           {/* STL Options */}
-          <div className="rounded-lg bg-white p-4 shadow space-y-4">
+          <div className="space-y-4 rounded-lg bg-white p-4 shadow">
             <div>
               <div className="text-sm font-semibold">3) Genera STL</div>
               <div className="text-xs text-gray-500">STL binario chiuso (stampabile).</div>
@@ -602,7 +575,7 @@ export default function ReliefWizard() {
                 disabled={!file}
               />
               <div className="text-xs text-gray-500">
-                Suggerimento: x2–x3 è un buon compromesso. Valori più alti = file più leggero, ma meno dettaglio.
+                Suggerimento: x2–x3 è un buon compromesso. Più alto = più leggero, meno dettaglio.
               </div>
             </div>
 
@@ -612,9 +585,7 @@ export default function ReliefWizard() {
                 onClick={downloadStl}
                 disabled={!canGenerate}
                 className={`rounded-md px-4 py-2 text-sm font-semibold ${
-                  canGenerate
-                    ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]"
-                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                  canGenerate ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]" : "cursor-not-allowed bg-gray-200 text-gray-500"
                 }`}
               >
                 Scarica STL
@@ -633,8 +604,8 @@ export default function ReliefWizard() {
         </div>
 
         {/* RIGHT */}
-        <div className="md:sticky md:top-4 self-start">
-          <div className="rounded-lg bg-white p-4 shadow space-y-4">
+        <div className="self-start md:sticky md:top-4">
+          <div className="space-y-4 rounded-lg bg-white p-4 shadow">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">Anteprime</div>
@@ -655,8 +626,8 @@ export default function ReliefWizard() {
             </div>
 
             {/* 3D */}
-            <div className="rounded-md border overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2 border-b bg-gray-50">
+            <div className="overflow-hidden rounded-md border">
+              <div className="flex items-center justify-between border-b bg-gray-50 px-3 py-2">
                 <div className="text-sm font-medium">Preview 3D</div>
                 <div className="text-xs text-gray-500">Drag • Zoom</div>
               </div>
@@ -677,15 +648,15 @@ export default function ReliefWizard() {
             </div>
 
             {/* Tabs */}
-            <div className="rounded-md border overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2 border-b bg-gray-50">
+            <div className="overflow-hidden rounded-md border">
+              <div className="flex items-center gap-2 border-b bg-gray-50 px-3 py-2">
                 <button
                   type="button"
                   onClick={() => setPreviewTab("image")}
                   className={`rounded px-2 py-1 text-xs font-medium ${
                     previewTab === "image"
                       ? "bg-[#1F4E5F] text-white"
-                      : "bg-white text-[#1F4E5F] border hover:bg-gray-50"
+                      : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                   }`}
                 >
                   Immagine
@@ -696,7 +667,7 @@ export default function ReliefWizard() {
                   className={`rounded px-2 py-1 text-xs font-medium ${
                     previewTab === "depth"
                       ? "bg-[#1F4E5F] text-white"
-                      : "bg-white text-[#1F4E5F] border hover:bg-gray-50"
+                      : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                   }`}
                 >
                   Depth map
@@ -707,7 +678,7 @@ export default function ReliefWizard() {
                   className={`rounded px-2 py-1 text-xs font-medium ${
                     previewTab === "stl"
                       ? "bg-[#1F4E5F] text-white"
-                      : "bg-white text-[#1F4E5F] border hover:bg-gray-50"
+                      : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                   }`}
                 >
                   Dettagli
@@ -722,7 +693,7 @@ export default function ReliefWizard() {
                       <img
                         src={previewUrl}
                         alt="Anteprima"
-                        className="w-full rounded-md border object-contain max-h-[240px]"
+                        className="max-h-[240px] w-full rounded-md border object-contain"
                       />
                     ) : (
                       <div className="text-xs text-gray-500">Carica un file per vedere l’anteprima.</div>
@@ -735,7 +706,7 @@ export default function ReliefWizard() {
                     <div className="text-xs font-medium text-gray-700">Anteprima depth map</div>
 
                     {sourceMode === "depthmap" ? (
-                      <canvas ref={dmCanvasRef} className="w-full rounded-md border max-h-[240px]" />
+                      <canvas ref={dmCanvasRef} className="max-h-[240px] w-full rounded-md border" />
                     ) : (
                       <div className="text-xs text-gray-500">
                         In modalità Immagine, la depthmap è interna alla pipeline (vedi 3D).
@@ -744,7 +715,7 @@ export default function ReliefWizard() {
                   </div>
                 )}
 
-                      {previewTab === "stl" && (() => {
+                {previewTab === "stl" && (() => {
                   const s = estimateStlStats();
                   return (
                     <div className="space-y-2 text-xs text-gray-600">
@@ -767,22 +738,22 @@ export default function ReliefWizard() {
                         </span>
                       </div>
 
-                      <div className="pt-2 border-t">
+                      <div className="border-t pt-2">
                         <div className="font-medium text-gray-700">Stima STL</div>
 
                         {s ? (
                           <>
                             <div>
                               Campionamento (post-decimazione):{" "}
-                              <span className="font-medium">{s.effW} × {s.effH}</span>
+                              <span className="font-medium">
+                                {s.effW} × {s.effH}
+                              </span>
                             </div>
                             <div>
-                              Triangoli stimati:{" "}
-                              <span className="font-medium">{s.triangles.toLocaleString()}</span>
+                              Triangoli stimati: <span className="font-medium">{s.triangles.toLocaleString()}</span>
                             </div>
                             <div>
-                              Peso stimato STL:{" "}
-                              <span className="font-medium">{s.mb.toFixed(1)} MB</span>
+                              Peso stimato STL: <span className="font-medium">{s.mb.toFixed(1)} MB</span>
                             </div>
 
                             {s.isHeavy ? (
@@ -790,8 +761,7 @@ export default function ReliefWizard() {
                                 <div className="font-semibold">⚠️ Mesh pesante</div>
                                 <div className="mt-1">
                                   Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
-                                  <span className="font-semibold">x{s.suggestedDecimate}</span>{" "}
-                                  (riduce peso e lag in slicer/Blender).
+                                  <span className="font-semibold">x{s.suggestedDecimate}</span>.
                                 </div>
                                 <button
                                   type="button"
@@ -814,3 +784,11 @@ export default function ReliefWizard() {
                     </div>
                   );
                 })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
