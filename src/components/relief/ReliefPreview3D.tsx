@@ -21,7 +21,7 @@ type Props =
   baseMm={baseMm}
   outputMode="relief"
   baseStyle={baseStyle}
-/>
+>
 };
 
 function decimateHm(hm: HeightmapState, step: number): HeightmapState {
