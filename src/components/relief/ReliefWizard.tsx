@@ -282,28 +282,23 @@ React.useEffect(() => {
     renderDepthmapToCanvas(c, hmState.normF32, hmState.w, hmState.h);
   }, [previewTab, sourceMode, hmState]);
 
-function downloadStl() {
-  if (!hmState) return;
+  function downloadStl() {
+    if (!hmState) return;
 
-  const defaultName = "relief";
-  const name = window.prompt(
-    "Nome file STL (senza estensione):",
-    defaultName
-  );
+    const safe =
+      (customName || "").trim().replace(/[\\/:*?"<>|]+/g, "_") || "reliefforge";
 
-  if (!name) return; // annullato dall’utente
-
-downloadReliefStlBinary({
-  hm: hmState,
-  stlWidthMm,
-  decimateStep,
-  depthMm: params.depthMm,
-  baseMm: params.baseMm,
-  outputMode: params.outputMode as any,
-  baseStyle: params.baseStyle as any,
-  filename: customName, // es: "mio_modello.stl"
-});
-
+    downloadReliefStlBinary({
+      hm: hmState,
+      stlWidthMm,
+      decimateStep,
+      depthMm: params.depthMm,
+      baseMm: params.baseMm,
+      outputMode: params.outputMode as any,
+      baseStyle: params.baseStyle as any,
+      filename: `${safe}.stl`,
+    });
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
