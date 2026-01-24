@@ -619,7 +619,11 @@ export default function ReliefWizard() {
                   <div className="space-y-2 text-xs text-gray-600">
                     <div className="font-medium text-gray-700">Stato</div>
                     <div>
-                      Sorgente: <span className="font-medium">{sourceMode}</span>
+                      Sorgente:{" "}
+<span className="font-medium">
+  {sourceMode === "image" ? "Immagine" : "Depth map"}
+</span>
+
                     </div>
                     <div>
                       Risoluzione hm:{" "}
