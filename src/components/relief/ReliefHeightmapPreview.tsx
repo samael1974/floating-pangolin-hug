@@ -1,132 +1,239 @@
-import React from "react";
-import type { ReliefParams } from "@/components/relief/ReliefControls";
-import {
-  buildHeightmapFromImageData,
-  drawHeightmapToCanvas,
-} from "@/components/relief/reliefHeightmap";
+import * as React from "react";
+import * as THREE from "three";
+import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
+import type { BaseStyle, OutputMode } from "@/lib/reliefTypes";
+
+type HeightmapState = { normF32: Float32Array; w: number; h: number };
 
 type Props = {
-  file: File | null;
-  params: ReliefParams;
-  maxSize?: number; // px
+  hmState: HeightmapState | null;
+  widthMm: number;
+  depthMm: number;
+  baseMm: number;
+  previewDecimateStep: number;
+  baseStyle: BaseStyle;
+  // output fisso in app, ma teniamo param per compatibilità se serve
+  outputMode?: OutputMode;
 };
 
-export default function ReliefHeightmapPreview({
-  file,
-  params,
-  maxSize = 512,
+export default function ReliefPreview3D({
+  hmState,
+  widthMm,
+  depthMm,
+  baseMm,
+  previewDecimateStep,
+  baseStyle,
+  outputMode = "relief",
 }: Props) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
-  const [status, setStatus] = React.useState<
-    "idle" | "loading" | "ready" | "error"
-  >("idle");
 
   React.useEffect(() => {
-    let revokedUrl: string | null = null;
-    let cancelled = false;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    async function run() {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer.setClearColor(0x000000, 0); // trasparente
 
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx) throw new Error("Canvas 2D non disponibile");
+    const scene = new THREE.Scene();
 
-      // Placeholder
-      if (!file) {
-        canvas.width = 640;
-        canvas.height = 360;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#f3f4f6";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#6b7280";
-        ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto";
-        ctx.fillText("Carica un’immagine per vedere la heightmap.", 20, 40);
-        setStatus("idle");
+    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 5000);
+    camera.position.set(0, -Math.max(160, widthMm * 1.2), Math.max(120, widthMm * 0.9));
+    camera.lookAt(0, 0, 0);
+
+    // LUCI
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.55);
+    scene.add(hemi);
+
+    const dir = new THREE.DirectionalLight(0xffffff, 1.15);
+    dir.position.set(200, -300, 500);
+    scene.add(dir);
+
+    const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+    fill.position.set(-250, 200, 250);
+    scene.add(fill);
+
+    // “piano” leggero per ombre visive (senza shadow map per semplicità)
+    const grid = new THREE.GridHelper(widthMm * 1.2, 12, 0xcccccc, 0xdddddd);
+    (grid.material as THREE.Material).transparent = true;
+    (grid.material as THREE.Material).opacity = 0.25;
+    grid.rotation.x = Math.PI / 2;
+    grid.position.z = -0.02;
+    scene.add(grid);
+
+    // Mesh
+    let mesh: THREE.Mesh | null = null;
+
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xe9e9e9,
+      roughness: 0.9,
+      metalness: 0.0,
+    });
+
+    function rebuild() {
+      if (!hmState) {
+        if (mesh) {
+          scene.remove(mesh);
+          mesh.geometry.dispose();
+          mesh = null;
+        }
         return;
       }
 
-      setStatus("loading");
+      // decimazione preview (semplice): campionamento su griglia
+      const step = Math.max(1, Math.floor(previewDecimateStep));
+      const w = hmState.w;
+      const h = hmState.h;
 
-      // Load image safely
-      const url = URL.createObjectURL(file);
-      revokedUrl = url;
+      if (step > 1) {
+        const dw = Math.floor((w - 1) / step) + 1;
+        const dh = Math.floor((h - 1) / step) + 1;
+        const out = new Float32Array(dw * dh);
 
-      const img = new Image();
-      img.decoding = "async";
-      img.src = url;
+        let p = 0;
+        for (let iy = 0; iy < h; iy += step) {
+          for (let ix = 0; ix < w; ix += step) {
+            out[p++] = hmState.normF32[iy * w + ix];
+          }
+        }
 
-      await img.decode().catch(() => {
-        return new Promise<void>((resolve, reject) => {
-          img.onload = () => resolve();
-          img.onerror = () => reject(new Error("Impossibile caricare immagine"));
+        const geom = buildSolidFromHeightmap({
+          normF32: out,
+          w: dw,
+          h: dh,
+          widthMm,
+          depthMm,
+          baseMm,
+          outputMode,
+          baseStyle,
         });
+
+        if (mesh) {
+          scene.remove(mesh);
+          mesh.geometry.dispose();
+        }
+        mesh = new THREE.Mesh(geom, material);
+        // orientamento: Z su, Y “in basso sullo schermo” già ok; ruotiamo per vista più naturale
+        mesh.rotation.x = 0;
+        scene.add(mesh);
+        return;
+      }
+
+      const geom = buildSolidFromHeightmap({
+        normF32: hmState.normF32,
+        w: hmState.w,
+        h: hmState.h,
+        widthMm,
+        depthMm,
+        baseMm,
+        outputMode,
+        baseStyle,
       });
 
-      if (cancelled) return;
-
-      // Scale to maxSize
-      const iw = img.naturalWidth || img.width;
-      const ih = img.naturalHeight || img.height;
-      const scale = Math.min(1, maxSize / Math.max(iw, ih));
-      const w = Math.max(1, Math.round(iw * scale));
-      const h = Math.max(1, Math.round(ih * scale));
-
-      // Draw to offscreen and read pixels
-      const off = document.createElement("canvas");
-      off.width = w;
-      off.height = h;
-      const offCtx = off.getContext("2d", { willReadFrequently: true });
-      if (!offCtx) throw new Error("Canvas 2D non disponibile");
-
-      offCtx.drawImage(img, 0, 0, w, h);
-      const imgData = offCtx.getImageData(0, 0, w, h);
-
-      // ✅ Use shared pipeline (same one you'll use for STL)
-      const hm = buildHeightmapFromImageData(imgData, params, {
-        normalize: true,
-        percentileClip: 0.02,
-      });
-
-      drawHeightmapToCanvas(canvas, hm.grayU8, hm.width, hm.height);
-
-      setStatus("ready");
+      if (mesh) {
+        scene.remove(mesh);
+        mesh.geometry.dispose();
+      }
+      mesh = new THREE.Mesh(geom, material);
+      scene.add(mesh);
     }
 
-    run().catch((e) => {
-      console.error(e);
-      setStatus("error");
-    });
+    function resize() {
+      const parent = canvas.parentElement;
+      const w = parent ? parent.clientWidth : 600;
+      const h = parent ? parent.clientHeight : 400;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+
+    // orbit minimal (drag)
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let yaw = 0;
+    let pitch = 0.55;
+    let dist = Math.max(180, widthMm * 1.3);
+
+    function updateCamera() {
+      const cx = dist * Math.cos(pitch) * Math.sin(yaw);
+      const cy = -dist * Math.cos(pitch) * Math.cos(yaw);
+      const cz = dist * Math.sin(pitch);
+      camera.position.set(cx, cy, cz);
+      camera.lookAt(0, 0, baseMm * 0.25);
+    }
+
+    function onDown(e: PointerEvent) {
+      dragging = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+    }
+    function onMove(e: PointerEvent) {
+      if (!dragging) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+
+      yaw += dx * 0.006;
+      pitch = Math.max(0.15, Math.min(1.35, pitch + dy * 0.006));
+      updateCamera();
+    }
+    function onUp() {
+      dragging = false;
+    }
+    function onWheel(e: WheelEvent) {
+      dist = Math.max(60, Math.min(1200, dist + e.deltaY * 0.35));
+      updateCamera();
+    }
+
+    canvas.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    canvas.addEventListener("wheel", onWheel, { passive: true });
+
+    resize();
+    updateCamera();
+    rebuild();
+
+    const ro = new ResizeObserver(() => resize());
+    canvas.parentElement && ro.observe(canvas.parentElement);
+
+    let raf = 0;
+    const loop = () => {
+      raf = requestAnimationFrame(loop);
+      renderer.render(scene, camera);
+    };
+    loop();
 
     return () => {
-      cancelled = true;
-      if (revokedUrl) URL.revokeObjectURL(revokedUrl);
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+
+      canvas.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      canvas.removeEventListener("wheel", onWheel as any);
+
+      if (mesh) {
+        scene.remove(mesh);
+        mesh.geometry.dispose();
+      }
+      material.dispose();
+      renderer.dispose();
     };
-  }, [file, params.projectType, params.detail, params.smooth, params.edge, maxSize]);
+    // rebuild when inputs change:
+  }, [hmState, widthMm, depthMm, baseMm, previewDecimateStep, baseStyle]);
 
   return (
-    <div className="rounded-lg bg-white p-6 shadow space-y-3">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold">3) Heightmap preview (2D)</h2>
-          <p className="text-sm text-gray-600">
-            Anteprima in scala di grigi del rilievo (bianco = alto, nero = basso).
-          </p>
+    <div className="relative h-full w-full">
+      <canvas ref={canvasRef} className="h-full w-full" />
+      {!hmState && (
+        <div className="absolute inset-0 grid place-items-center text-xs text-gray-500">
+          La preview 3D appare dopo la generazione della heightmap (normF32/w/h).
         </div>
-        <div className="text-xs text-gray-500">
-          {status === "loading"
-            ? "Elaborazione…"
-            : status === "error"
-            ? "Errore preview"
-            : status === "ready"
-            ? "Pronto"
-            : "In attesa"}
-        </div>
-      </div>
-
-      <div className="w-full rounded border bg-gray-50 overflow-auto">
-        <canvas ref={canvasRef} className="block max-w-full" />
-      </div>
+      )}
     </div>
   );
 }
