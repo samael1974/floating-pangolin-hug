@@ -33,12 +33,10 @@ export type ReliefParams = {
   smooth: number; // 0..1
   edge: EdgeMode;
 
-  // ✅ outputMode resta nel tipo (compat), ma verrà forzato a "relief"
+  // tenuti nei params per compatibilità, ma in UI sarà fisso:
   outputMode: OutputMode;
-  baseStyle: BaseStyle;
 
-  // opzionale/legacy
-  invertDepthMap?: boolean;
+  baseStyle: BaseStyle;
 };
 
 type Props = {
@@ -58,15 +56,13 @@ const DEFAULTS: ReliefParams = {
   detail: 0.5,
   smooth: 0.5,
   edge: "round",
-  outputMode: "relief",
+  outputMode: "relief", // ✅ fisso
   baseStyle: "flat",
-  invertDepthMap: false,
 };
 
 export default function ReliefControls({ value, onChange, disabled }: Props) {
-  const v = { ...DEFAULTS, ...value, outputMode: "relief" as OutputMode };
+  const v = { ...DEFAULTS, ...value, outputMode: "relief" as const };
 
-  // ✅ Forziamo SEMPRE outputMode="relief"
   const set = (patch: Partial<ReliefParams>) =>
     onChange({ ...v, ...patch, outputMode: "relief" });
 
@@ -94,8 +90,6 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
 
       <Separator />
 
-      {/* ✅ Output rimosso: outputMode è fisso a "relief" */}
-
       <div className="space-y-2">
         <Label>Base</Label>
         <Select
@@ -109,6 +103,7 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           <SelectContent>
             <SelectItem value="flat">Piatta</SelectItem>
             <SelectItem value="recessed">Incassata</SelectItem>
+            <SelectItem value="offset">Offset</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -173,16 +168,6 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           disabled={disabled}
           checked={v.edge === "round"}
           onCheckedChange={(checked) => set({ edge: checked ? "round" : "sharp" })}
-        />
-      </div>
-
-      {/* ⚠️ Questo lo togliamo nel prossimo step (come da richiesta), per ora resta */}
-      <div className="flex items-center justify-between">
-        <Label>Inverti depthmap</Label>
-        <Switch
-          disabled={disabled}
-          checked={!!v.invertDepthMap}
-          onCheckedChange={(checked) => set({ invertDepthMap: checked })}
         />
       </div>
     </div>
