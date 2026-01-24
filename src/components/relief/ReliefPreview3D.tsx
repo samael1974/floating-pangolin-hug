@@ -12,7 +12,7 @@ type HeightmapState = {
   h: number;
 };
 
-type Props = {
+type Props =
 <ReliefPreview3D
   hmState={hmState}
   stlWidthMm={widthMm}
