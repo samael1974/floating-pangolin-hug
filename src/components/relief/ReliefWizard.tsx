@@ -278,19 +278,28 @@ React.useEffect(() => {
     renderDepthmapToCanvas(c, hmState.normF32, hmState.w, hmState.h);
   }, [previewTab, sourceMode, hmState]);
 
-  function downloadStl() {
-    if (!hmState) return;
+function downloadStl() {
+  if (!hmState) return;
 
-    downloadReliefStlBinary({
-      hm: hmState,
-      stlWidthMm,
-      decimateStep,
-      depthMm: params.depthMm,
-      baseMm: params.baseMm,
-      outputMode: params.outputMode as any,
-      baseStyle: params.baseStyle as any,
-    });
-  }
+  const defaultName = "relief";
+  const name = window.prompt(
+    "Nome file STL (senza estensione):",
+    defaultName
+  );
+
+  if (!name) return; // annullato dall’utente
+
+  downloadReliefStlBinary({
+    hm: hmState,
+    stlWidthMm,
+    decimateStep,
+    depthMm: params.depthMm,
+    baseMm: params.baseMm,
+    outputMode: params.outputMode as any,
+    baseStyle: params.baseStyle as any,
+    filename: `${name}.stl`,
+  });
+}
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
