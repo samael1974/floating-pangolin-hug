@@ -186,8 +186,10 @@ export default function ReliefWizard() {
               // Mostra warning e blocca pipeline depthmap (così eviti STL rotti)
               if (!cancelled) {
                 setFileWarning(
-                  `Depth map non compatibile: ${msg}  |  Soluzione: esporta PNG grayscale 16-bit oppure passa a “Modalità Immagine”.`
-                );
+  `Questo file non è una depth map compatibile (probabile 32-bit/float o RGB). 
+  Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità Immagine”.`
+);
+
                 setHmState(null);
                 setHmStatus("error");
               }
