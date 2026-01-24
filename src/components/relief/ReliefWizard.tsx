@@ -444,7 +444,18 @@ export default function ReliefWizard() {
         type="button"
         onClick={() => {
           // apri modal / pannello istruzioni (se non hai modal, per ora usa alert o un state)
-          alert(`Converti in PNG Grayscale 16-bit.\n\nGIMP: Immagine→Modalità→Scala di grigi; Immagine→Precisione→Intero 16-bit; Esporta PNG.\n\nIn alternativa passa a Modalità Immagine.`);
+          alert(
+  "✅ Depth map compatibile = PNG in SCALA DI GRIGI (Grayscale) + 16-bit (consigliato)\n\n" +
+  "Se la depth map è 32-bit / float / RGB / HDR → può generare STL rotti o errori.\n\n" +
+  "🔧 Metodo rapido (GIMP – gratis):\n" +
+  "1) Apri immagine\n" +
+  "2) Immagine → Modalità → Scala di grigi\n" +
+  "3) Immagine → Precisione → Intero 16-bit\n" +
+  "4) File → Esporta come… → PNG\n\n" +
+  "🖼 Alternativa semplice:\n" +
+  "Se non vuoi convertire, usa 'Modalità Immagine' nell’app."
+);
+
         }}
         className="rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
       >
