@@ -530,5 +530,12 @@ const [openGptHowTo, setOpenGptHowTo] = React.useState(false);
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* ✅ QUI deve esserci TUTTA la pagina (il tuo layout principale) */}
+    <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
+      {/* INCOLLA QUI tutto il tuo JSX principale che prima stava nel return */}
+      {/* Es: grid LEFT/RIGHT, controls, preview, ecc. */}
+    </div>
   </>
 );
+
