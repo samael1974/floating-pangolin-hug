@@ -4,7 +4,9 @@ import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefCon
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
 import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
+
 import { inspectPng, pngCompatibilityMessage } from "@/lib/relief/inspectPng";
+
 import {
   Dialog,
   DialogContent,
@@ -14,6 +16,17 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+// ✅ 16-bit PNG support (se le usi sotto, altrimenti puoi rimuoverle)
+import { decodeDepthmapPng } from "@/lib/relief/decodeDepthmapPng";
+import { renderDepthmapToCanvas } from "@/lib/relief/renderDepthmapToCanvas";
+
+type SourceMode = "image" | "depthmap";
+
+type HeightmapState = {
+  normF32: Float32Array;
+  w: number;
+  h: number;
+};
 
 export default function ReliefWizard() {
   // ✅ Preview tab (colonna destra)
@@ -48,9 +61,6 @@ export default function ReliefWizard() {
     outputMode: "relief",
     baseStyle: "flat",
   }));
-  
-  // ...il resto del componente
-
 
   // ✅ Heightmap state/status
   const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
@@ -62,6 +72,8 @@ export default function ReliefWizard() {
   const [decimateStep, setDecimateStep] = React.useState<number>(2);
 
   const canGenerate = !!file && hmStatus === "ready" && !!hmState;
+
+  // ...continua con il resto del componente (useEffect, funzioni, return ecc.)
 
   // ✅ preview url
   React.useEffect(() => {
