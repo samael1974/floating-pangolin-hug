@@ -470,8 +470,9 @@ export default function ReliefWizard() {
                 disabled={!file}
               />
               <div className="text-xs text-gray-500">
-                Suggerimento: x2–x3 spesso riduce rumore e alleggerisce lo STL.
-              </div>
+  Suggerimento: x2–x3 è un buon compromesso. Valori più alti = file più leggero, ma meno dettaglio.
+</div>
+
             </div>
 
             <div className="flex flex-col gap-2 pt-2">
