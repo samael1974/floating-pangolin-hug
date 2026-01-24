@@ -94,7 +94,7 @@ export default function Index() {
                 2) Regola il rilievo
               </h3>
               <p className="mt-2 text-sm text-slate-600">
-  Profondità, dettaglio e smussatura. Anteprima 3D sempre visibile mentre regoli i parametri.
+  STL chiuso e stampabile. Se il file è pesante, aumenta la decimazione per alleggerirlo.
 </p>
 
             </CardContent>
