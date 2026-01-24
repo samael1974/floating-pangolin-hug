@@ -371,689 +371,166 @@ const [openGptHowTo, setOpenGptHowTo] = React.useState(false);
     });
   }
 
-  return (
+    return (
+  <>
     <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
+      {/* TUTTA LA TUA UI ESISTENTE QUI DENTRO */}
+      {/* ...non toccare niente del contenuto... */}
+    </div>
+
     {/* MODAL: Istruzioni conversione */}
-<Dialog open={openConversion} onOpenChange={setOpenConversion}>
-  <DialogContent className="max-w-xl">
-    <DialogHeader>
-      <DialogTitle>Converti depth map in PNG 16-bit compatibile</DialogTitle>
-      <DialogDescription>
-        Se il file non è in scala di grigi o ha un bit-depth non supportato, può generare STL non-manifold.
-        Formato consigliato: <span className="font-medium">PNG Grayscale 16-bit</span> (ok anche 8-bit).
-      </DialogDescription>
-    </DialogHeader>
+    <Dialog open={openConversion} onOpenChange={setOpenConversion}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Converti depth map in PNG 16-bit compatibile</DialogTitle>
+          <DialogDescription>
+            Se il file non è in scala di grigi o ha un bit-depth non supportato, può generare STL non-manifold.
+            Formato consigliato: <span className="font-medium">PNG Grayscale 16-bit</span> (ok anche 8-bit).
+          </DialogDescription>
+        </DialogHeader>
 
-    <div className="space-y-4 text-sm">
-      <div className="rounded-md border bg-gray-50 p-3">
-        <div className="font-semibold">Checklist rapida</div>
-        <ul className="mt-2 list-disc pl-5 text-gray-700 space-y-1">
-          <li>Formato: <span className="font-medium">PNG</span></li>
-          <li>Colore: <span className="font-medium">Grayscale</span> (scala di grigi)</li>
-          <li>Profondità: <span className="font-medium">16-bit</span> (consigliato) / <span className="font-medium">8-bit</span> (ok)</li>
-          <li>Evita: <span className="font-medium">RGB/RGBA</span>, HDR/EXR, “float”, profili strani</li>
-        </ul>
-      </div>
-
-      <div className="space-y-3">
-        <div className="font-semibold">Metodo 1 — GIMP (gratis)</div>
-        <ol className="list-decimal pl-5 text-gray-700 space-y-1">
-          <li>Apri l’immagine</li>
-          <li><span className="font-medium">Immagine → Modalità → Scala di grigi</span></li>
-          <li><span className="font-medium">Immagine → Precisione → Intero 16-bit</span></li>
-          <li><span className="font-medium">File → Esporta come… → PNG</span></li>
-        </ol>
-
-        <div className="font-semibold">Metodo 2 — Photoshop</div>
-        <ol className="list-decimal pl-5 text-gray-700 space-y-1">
-          <li>Apri l’immagine</li>
-          <li><span className="font-medium">Image → Mode → Grayscale</span></li>
-          <li><span className="font-medium">Image → Mode → 16 Bits/Channel</span></li>
-          <li><span className="font-medium">File → Export → PNG</span></li>
-        </ol>
-
-        <div className="font-semibold">Metodo 3 — ImageMagick (avanzato)</div>
-        <div className="rounded-md border bg-black text-white p-3 text-xs overflow-auto">
-          magick input.png -colorspace Gray -depth 16 output.png
-        </div>
-      </div>
-
-      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-        <div className="font-semibold">Perché succede?</div>
-        <div className="mt-1">
-          Depth map non compatibili possono introdurre valori anomali → triangoli degeneri, micro-fessure e spigoli non-manifold.
-          Convertire in <span className="font-medium">Grayscale 16-bit</span> riduce drasticamente questi errori.
-        </div>
-      </div>
-    </div>
-
-    <DialogFooter className="gap-2 sm:gap-2">
-      <button
-        type="button"
-        onClick={() => {
-          setOpenConversion(false);
-          setSourceMode("image");
-        }}
-        className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-      >
-        Passa a modalità Immagine
-      </button>
-
-      <button
-        type="button"
-        onClick={() => setOpenConversion(false)}
-        className="rounded-md bg-[#1F4E5F] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
-      >
-        Ok, capito
-      </button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
-
-{/* MODAL: Come usare il GPT */}
-<Dialog open={openGptHowTo} onOpenChange={setOpenGptHowTo}>
-  <DialogContent className="max-w-xl">
-    <DialogHeader>
-      <DialogTitle>Come usare il GPT “Generatore mappe di profondità”</DialogTitle>
-      <DialogDescription>
-        Workflow consigliato per ottenere depth map pulite e compatibili con STL stampabili.
-      </DialogDescription>
-    </DialogHeader>
-
-    <div className="space-y-4 text-sm">
-      <div className="rounded-md border bg-gray-50 p-3">
-        <div className="font-semibold">1) Prompt consigliato</div>
-        <div className="mt-2 text-gray-700">
-          Chiedi al GPT una depth map:
-          <ul className="mt-2 list-disc pl-5 space-y-1">
-            <li><span className="font-medium">grayscale</span> (scala di grigi)</li>
-            <li><span className="font-medium">16-bit PNG</span></li>
-            <li>alto contrasto ma <span className="font-medium">senza banding</span></li>
-            <li>superfici <span className="font-medium">lisce</span> (meno rumore)</li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="rounded-md border p-3">
-        <div className="font-semibold">2) Export corretto</div>
-        <div className="mt-2 text-gray-700">
-          Quando salvi/esporti, assicurati:
-          <ul className="mt-2 list-disc pl-5 space-y-1">
-            <li><span className="font-medium">PNG</span></li>
-            <li><span className="font-medium">Grayscale</span></li>
-            <li><span className="font-medium">16-bit</span> (oppure 8-bit se non disponibile)</li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="rounded-md border p-3">
-        <div className="font-semibold">3) Nell’app: scelta della sorgente</div>
-        <div className="mt-2 text-gray-700">
-          <ul className="list-disc pl-5 space-y-1">
-            <li>Se hai una depth map pronta: <span className="font-medium">Sorgente → Depth map (8/16-bit)</span></li>
-            <li>Se il file dà errore o non sei sicuro: <span className="font-medium">Sorgente → Immagine</span></li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="rounded-md border border-green-200 bg-green-50 p-3 text-xs text-green-900">
-        <div className="font-semibold">Tip pratico</div>
-        <div className="mt-1">
-          Se vuoi solo il rilievo senza basetta: imposta <span className="font-medium">Spessore base = 0</span>.
-        </div>
-      </div>
-    </div>
-
-    <DialogFooter className="gap-2 sm:gap-2">
-      <a
-        href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5"
-        target="_blank"
-        rel="noreferrer"
-        className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-      >
-        Apri il GPT
-      </a>
-
-      <button
-        type="button"
-        onClick={() => setOpenGptHowTo(false)}
-        className="rounded-md bg-[#1F4E5F] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
-      >
-        Ok
-      </button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
-
-      <div className="grid gap-6 md:grid-cols-[420px_1fr] lg:grid-cols-[460px_1fr]">
-        {/* LEFT */}
-        <div className="space-y-6">
-          {/* Source Mode */}
-          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-white p-4 shadow">
-            <div className="min-w-[220px]">
-              <div className="text-sm font-semibold">Sorgente</div>
-              <div className="text-xs text-gray-500">
-                Usa <span className="font-medium">Immagine</span> per risultati rapidi. Usa{" "}
-                <span className="font-medium">Depth map</span> se hai già una mappa di profondità (meglio PNG 16-bit).
-              </div>
-            </div>
-
-            <div className="inline-flex overflow-hidden rounded-md border">
-              <button
-                type="button"
-                onClick={() => setSourceMode("image")}
-                className={`px-3 py-1.5 text-sm ${
-                  sourceMode === "image" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] hover:bg-gray-50"
-                }`}
-              >
-                Immagine
-              </button>
-              <button
-                type="button"
-                onClick={() => setSourceMode("depthmap")}
-                className={`px-3 py-1.5 text-sm ${
-                  sourceMode === "depthmap" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] hover:bg-gray-50"
-                }`}
-              >
-                Depth map (8/16-bit)
-              </button>
-            </div>
-
-            <div className="inline-flex overflow-hidden rounded-md border">
-  ...
-</div>
-
-{/* CTA helper */}
-<div className="flex flex-wrap gap-2">
-  <button
-    type="button"
-    onClick={() => setOpenConversion(true)}
-    className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50"
-  >
-    Apri istruzioni conversione
-  </button>
-
-  <button
-    type="button"
-    onClick={() => setSourceMode("image")}
-    className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50"
-  >
-    Passa a modalità Immagine
-  </button>
-
-  <button
-    type="button"
-    onClick={() => setOpenGptHowTo(true)}
-    className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50"
-  >
-    Come usare il GPT
-  </button>
-</div>
-
-{sourceMode === "depthmap" && (
-  <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
-    ...
-  </label>
-)}
-
-            {sourceMode === "depthmap" && (
-              <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={invertDepthMap}
-                  onChange={(e) => setInvertDepthMap(e.target.checked)}
-                />
-                <span>Inverti depth map</span>
-                <span className="text-xs text-gray-500">(se viene “al contrario”)</span>
-              </label>
-            )}
+        <div className="space-y-4 text-sm">
+          <div className="rounded-md border bg-gray-50 p-3">
+            <div className="font-semibold">Checklist rapida</div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-700">
+              <li>Formato: <span className="font-medium">PNG</span></li>
+              <li>Colore: <span className="font-medium">Grayscale</span> (scala di grigi)</li>
+              <li>
+                Profondità: <span className="font-medium">16-bit</span> (consigliato) /{" "}
+                <span className="font-medium">8-bit</span> (ok)
+              </li>
+              <li>Evita: <span className="font-medium">RGB/RGBA</span>, HDR/EXR, “float”, profili strani</li>
+            </ul>
           </div>
 
-          {/* Upload */}
-          <div className="space-y-3 rounded-lg bg-white p-4 shadow">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold">1) Carica un file</div>
-                <div className="text-xs text-gray-500">JPG/JPEG/PNG/WEBP. Per Depth map: PNG consigliato.</div>
-              </div>
+          <div className="space-y-3">
+            <div className="font-semibold">Metodo 1 — GIMP (gratis)</div>
+            <ol className="list-decimal space-y-1 pl-5 text-gray-700">
+              <li>Apri l’immagine</li>
+              <li><span className="font-medium">Immagine → Modalità → Scala di grigi</span></li>
+              <li><span className="font-medium">Immagine → Precisione → Intero 16-bit</span></li>
+              <li><span className="font-medium">File → Esporta come… → PNG</span></li>
+            </ol>
 
-              {file && (
-                <button
-                  type="button"
-                  onClick={() => setFile(null)}
-                  className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
-                >
-                  Rimuovi
-                </button>
-              )}
-            </div>
+            <div className="font-semibold">Metodo 2 — Photoshop</div>
+            <ol className="list-decimal space-y-1 pl-5 text-gray-700">
+              <li>Apri l’immagine</li>
+              <li><span className="font-medium">Image → Mode → Grayscale</span></li>
+              <li><span className="font-medium">Image → Mode → 16 Bits/Channel</span></li>
+              <li><span className="font-medium">File → Export → PNG</span></li>
+            </ol>
 
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm"
-            />
-            {fileWarning && (
-  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-    <div className="font-semibold">Depth map non compatibile</div>
-    <div className="mt-1 text-xs leading-snug">{fileWarning}</div>
-
-    <div className="mt-3 flex flex-wrap gap-2">
-      <button
-  type="button"
-  onClick={() => setOpenConversion(true)}
-  className="rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
->
-  🔧 Apri istruzioni conversione
-</button>
-
-<button
-  type="button"
-  onClick={() => setSourceMode("image")}
-  className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
->
-  🖼 Passa a modalità Immagine
-</button>
-
-<button
-  type="button"
-  onClick={() => setOpenGptHowTo(true)}
-  className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
->
-  🤖 Come usare il GPT
-</button>
-    </div>
-  </div>
-)}
-
-            {file && (
-              <div className="text-xs text-gray-600">
-                <div className="font-medium">File:</div>
-                <div className="break-all">{file.name}</div>
-                <div className="mt-1">
-                  Stato heightmap:{" "}
-                  <span
-                    className={`font-medium ${
-                      hmStatus === "ready"
-                        ? "text-green-700"
-                        : hmStatus === "loading"
-                        ? "text-amber-700"
-                        : hmStatus === "error"
-                        ? "text-red-700"
-                        : "text-gray-600"
-                    }`}
-                  >
-                    {hmStatus}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Params */}
-          <div className="space-y-3 rounded-lg bg-white p-4 shadow">
-            <div>
-              <div className="text-sm font-semibold">2) Parametri bassorilievo</div>
-              <div className="text-xs text-gray-500">
-                I parametri restano attivi anche in modalità Depth map. <span className="font-medium">Tip:</span> se vuoi
-                solo il rilievo senza basetta, imposta <span className="font-medium">Spessore base = 0</span>.
-              </div>
-            </div>
-
-            {/* Preset rapidi */}
-            <div className="flex flex-wrap gap-2 pt-2">
-              <button
-                type="button"
-                disabled={!file}
-                onClick={() => {
-                  setParams((p) => ({
-                    ...p,
-                    projectType: "logo_text",
-                    depthMm: 3.0,
-                    baseMm: 2.0,
-                    detail: 0.65,
-                    smooth: 0.12,
-                    edge: "sharp",
-                    outputMode: "relief",
-                    baseStyle: "flat",
-                  }));
-                  setDecimateStep(2);
-                }}
-                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
-                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
-                }`}
-              >
-                Preset: Logo/Testo
-              </button>
-
-              <button
-                type="button"
-                disabled={!file}
-                onClick={() => {
-                  setParams((p) => ({
-                    ...p,
-                    projectType: "human_face",
-                    depthMm: 4.0,
-                    baseMm: 2.0,
-                    detail: 0.55,
-                    smooth: 0.28,
-                    edge: "round",
-                    outputMode: "relief",
-                    baseStyle: "flat",
-                  }));
-                  setDecimateStep(2);
-                }}
-                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
-                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
-                }`}
-              >
-                Preset: Volto
-              </button>
-
-              <button
-                type="button"
-                disabled={!file}
-                onClick={() => {
-                  setParams((p) => ({
-                    ...p,
-                    projectType: "nature_landscape",
-                    depthMm: 5.0,
-                    baseMm: 2.0,
-                    detail: 0.58,
-                    smooth: 0.2,
-                    edge: "round",
-                    outputMode: "relief",
-                    baseStyle: "flat",
-                  }));
-                  setDecimateStep(3);
-                }}
-                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
-                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
-                }`}
-              >
-                Preset: Paesaggio
-              </button>
-
-              <div className="self-center text-[11px] text-gray-500">1 click per partire bene, poi rifinisci sotto.</div>
-            </div>
-
-            <div className="pt-2">
-              <ReliefControls value={params} onChange={setParams} disabled={!file} />
+            <div className="font-semibold">Metodo 3 — ImageMagick (avanzato)</div>
+            <div className="overflow-auto rounded-md border bg-black p-3 text-xs text-white">
+              magick input.png -colorspace Gray -depth 16 output.png
             </div>
           </div>
 
-          {/* STL Options */}
-          <div className="space-y-4 rounded-lg bg-white p-4 shadow">
-            <div>
-              <div className="text-sm font-semibold">3) Genera STL</div>
-              <div className="text-xs text-gray-500">STL binario chiuso (stampabile).</div>
-            </div>
-
-            {/* Nome file */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">Nome file STL</span>
-                <span className="text-xs text-gray-500">.stl</span>
-              </div>
-              <input
-                type="text"
-                value={customName}
-                onChange={(e) => setCustomName(e.target.value)}
-                placeholder="es. logo_giovanni_v1"
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                disabled={!file}
-              />
-              <div className="text-xs text-gray-500">Se vuoto, userò un nome di default.</div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">Larghezza STL (mm)</span>
-                <span className="tabular-nums text-gray-700">{Math.round(stlWidthMm)} mm</span>
-              </div>
-              <input
-                type="range"
-                min={30}
-                max={300}
-                step={1}
-                value={stlWidthMm}
-                onChange={(e) => setStlWidthMm(Number(e.target.value))}
-                className="w-full"
-                disabled={!file}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">Qualità (Decimazione)</span>
-                <span className="tabular-nums text-gray-700">x{decimateStep}</span>
-              </div>
-              <input
-                type="range"
-                min={1}
-                max={6}
-                step={1}
-                value={decimateStep}
-                onChange={(e) => setDecimateStep(Number(e.target.value))}
-                className="w-full"
-                disabled={!file}
-              />
-              <div className="text-xs text-gray-500">
-                Suggerimento: x2–x3 è un buon compromesso. Più alto = più leggero, meno dettaglio.
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 pt-2">
-              <button
-                type="button"
-                onClick={downloadStl}
-                disabled={!canGenerate}
-                className={`rounded-md px-4 py-2 text-sm font-semibold ${
-                  canGenerate ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]" : "cursor-not-allowed bg-gray-200 text-gray-500"
-                }`}
-              >
-                Scarica STL
-              </button>
-
-              <a
-                href="https://www.paypal.me/federicocordioli72"
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-md border px-4 py-2 text-center text-sm hover:bg-gray-50"
-              >
-                Dona su PayPal
-              </a>
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <div className="font-semibold">Perché succede?</div>
+            <div className="mt-1">
+              Depth map non compatibili possono introdurre valori anomali → triangoli degeneri, micro-fessure e spigoli non-manifold.
+              Convertire in <span className="font-medium">Grayscale 16-bit</span> riduce drasticamente questi errori.
             </div>
           </div>
         </div>
 
-        {/* RIGHT */}
-        <div className="self-start md:sticky md:top-4">
-          <div className="space-y-4 rounded-lg bg-white p-4 shadow">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold">Anteprime</div>
-                <div className="text-xs text-gray-500">Il 3D resta visibile mentre modifichi i parametri.</div>
-              </div>
+        <DialogFooter className="gap-2 sm:gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setOpenConversion(false);
+              setSourceMode("image");
+            }}
+            className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+          >
+            Passa a modalità Immagine
+          </button>
 
-              <div className="text-xs">
-                {hmStatus === "ready" ? (
-                  <span className="rounded-full bg-green-100 px-2 py-1 font-medium text-green-800">Heightmap pronta</span>
-                ) : hmStatus === "loading" ? (
-                  <span className="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-800">Calcolo…</span>
-                ) : hmStatus === "error" ? (
-                  <span className="rounded-full bg-red-100 px-2 py-1 font-medium text-red-800">Errore</span>
-                ) : (
-                  <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">In attesa</span>
-                )}
-              </div>
+          <button
+            type="button"
+            onClick={() => setOpenConversion(false)}
+            className="rounded-md bg-[#1F4E5F] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+          >
+            Ok, capito
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* MODAL: Come usare il GPT */}
+    <Dialog open={openGptHowTo} onOpenChange={setOpenGptHowTo}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Come usare il GPT “Generatore mappe di profondità”</DialogTitle>
+          <DialogDescription>
+            Workflow consigliato per ottenere depth map pulite e compatibili con STL stampabili.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 text-sm">
+          <div className="rounded-md border bg-gray-50 p-3">
+            <div className="font-semibold">1) Prompt consigliato</div>
+            <div className="mt-2 text-gray-700">
+              Chiedi al GPT una depth map:
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                <li><span className="font-medium">grayscale</span> (scala di grigi)</li>
+                <li><span className="font-medium">16-bit PNG</span></li>
+                <li>alto contrasto ma <span className="font-medium">senza banding</span></li>
+                <li>superfici <span className="font-medium">lisce</span> (meno rumore)</li>
+              </ul>
             </div>
+          </div>
 
-            {/* 3D */}
-            <div className="overflow-hidden rounded-md border">
-              <div className="flex items-center justify-between border-b bg-gray-50 px-3 py-2">
-                <div className="text-sm font-medium">Preview 3D</div>
-                <div className="text-xs text-gray-500">Drag • Zoom</div>
-              </div>
-
-              <div className="h-[420px] lg:h-[520px]">
-                <ReliefPreview3D
-                  {...({
-                    hmState,
-                    stlWidthMm,
-                    decimateStep,
-                    depthMm: params.depthMm,
-                    baseMm: params.baseMm,
-                    outputMode: params.outputMode,
-                    baseStyle: params.baseStyle,
-                  } as any)}
-                />
-              </div>
+          <div className="rounded-md border p-3">
+            <div className="font-semibold">2) Export corretto</div>
+            <div className="mt-2 text-gray-700">
+              Quando salvi/esporti, assicurati:
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                <li><span className="font-medium">PNG</span></li>
+                <li><span className="font-medium">Grayscale</span></li>
+                <li><span className="font-medium">16-bit</span> (oppure 8-bit se non disponibile)</li>
+              </ul>
             </div>
+          </div>
 
-            {/* Tabs */}
-            <div className="overflow-hidden rounded-md border">
-              <div className="flex items-center gap-2 border-b bg-gray-50 px-3 py-2">
-                <button
-                  type="button"
-                  onClick={() => setPreviewTab("image")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
-                    previewTab === "image"
-                      ? "bg-[#1F4E5F] text-white"
-                      : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
-                  }`}
-                >
-                  Immagine
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewTab("depth")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
-                    previewTab === "depth"
-                      ? "bg-[#1F4E5F] text-white"
-                      : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
-                  }`}
-                >
-                  Depth map
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewTab("stl")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
-                    previewTab === "stl"
-                      ? "bg-[#1F4E5F] text-white"
-                      : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
-                  }`}
-                >
-                  Dettagli
-                </button>
-              </div>
+          <div className="rounded-md border p-3">
+            <div className="font-semibold">3) Nell’app: scelta della sorgente</div>
+            <div className="mt-2 text-gray-700">
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Se hai una depth map pronta: <span className="font-medium">Sorgente → Depth map (8/16-bit)</span></li>
+                <li>Se il file dà errore o non sei sicuro: <span className="font-medium">Sorgente → Immagine</span></li>
+              </ul>
+            </div>
+          </div>
 
-              <div className="p-3">
-                {previewTab === "image" && (
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-gray-700">Anteprima immagine</div>
-                    {previewUrl ? (
-                      <img
-                        src={previewUrl}
-                        alt="Anteprima"
-                        className="max-h-[240px] w-full rounded-md border object-contain"
-                      />
-                    ) : (
-                      <div className="text-xs text-gray-500">Carica un file per vedere l’anteprima.</div>
-                    )}
-                  </div>
-                )}
-
-                {previewTab === "depth" && (
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-gray-700">Anteprima depth map</div>
-
-                    {sourceMode === "depthmap" ? (
-                      <canvas ref={dmCanvasRef} className="max-h-[240px] w-full rounded-md border" />
-                    ) : (
-                      <div className="text-xs text-gray-500">
-                        In modalità Immagine, la depthmap è interna alla pipeline (vedi 3D).
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {previewTab === "stl" && (() => {
-                  const s = estimateStlStats();
-                  return (
-                    <div className="space-y-2 text-xs text-gray-600">
-                      <div className="font-medium text-gray-700">Dettagli</div>
-
-                      <div>
-                        Sorgente:{" "}
-                        <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
-                      </div>
-
-                      <div>
-                        Risoluzione hm:{" "}
-                        <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h}` : "—"}</span>
-                      </div>
-
-                      <div>
-                        Output:{" "}
-                        <span className="font-medium">
-                          {params.outputMode} / {params.baseStyle} — base {params.baseMm.toFixed(1)}mm
-                        </span>
-                      </div>
-
-                      <div className="border-t pt-2">
-                        <div className="font-medium text-gray-700">Stima STL</div>
-
-                        {s ? (
-                          <>
-                            <div>
-                              Campionamento (post-decimazione):{" "}
-                              <span className="font-medium">
-                                {s.effW} × {s.effH}
-                              </span>
-                            </div>
-                            <div>
-                              Triangoli stimati: <span className="font-medium">{s.triangles.toLocaleString()}</span>
-                            </div>
-                            <div>
-                              Peso stimato STL: <span className="font-medium">{s.mb.toFixed(1)} MB</span>
-                            </div>
-
-                            {s.isHeavy ? (
-                              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
-                                <div className="font-semibold">⚠️ Mesh pesante</div>
-                                <div className="mt-1">
-                                  Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
-                                  <span className="font-semibold">x{s.suggestedDecimate}</span>.
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setDecimateStep(s.suggestedDecimate)}
-                                  className="mt-2 rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
-                                >
-                                  Applica decimazione consigliata
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-green-900">
-                                ✅ Dimensione ok: dovrebbe essere fluido in slicer e in Blender.
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="text-gray-500">Carica un file per vedere la stima.</div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
+          <div className="rounded-md border border-green-200 bg-green-50 p-3 text-xs text-green-900">
+            <div className="font-semibold">Tip pratico</div>
+            <div className="mt-1">
+              Se vuoi solo il rilievo senza basetta: imposta <span className="font-medium">Spessore base = 0</span>.
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          <a
+            href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+          >
+            Apri il GPT
+          </a>
+
+          <button
+            type="button"
+            onClick={() => setOpenGptHowTo(false)}
+            className="rounded-md bg-[#1F4E5F] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+          >
+            Ok
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
+);
