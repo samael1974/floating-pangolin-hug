@@ -298,7 +298,6 @@ React.useEffect(() => {
     });
   }
 }
-
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
       <div className="grid gap-6 md:grid-cols-[420px_1fr] lg:grid-cols-[460px_1fr]">
