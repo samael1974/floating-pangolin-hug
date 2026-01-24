@@ -289,17 +289,17 @@ function downloadStl() {
 
   if (!name) return; // annullato dall’utente
 
-  downloadReliefStlBinary({
-    hm: hmState,
-    stlWidthMm,
-    decimateStep,
-    depthMm: params.depthMm,
-    baseMm: params.baseMm,
-    outputMode: params.outputMode as any,
-    baseStyle: params.baseStyle as any,
-    filename: `${name}.stl`,
-  });
-}
+downloadReliefStlBinary({
+  hm: hmState,
+  stlWidthMm,
+  decimateStep,
+  depthMm: params.depthMm,
+  baseMm: params.baseMm,
+  outputMode: params.outputMode as any,
+  baseStyle: params.baseStyle as any,
+  filename: customName, // es: "mio_modello.stl"
+});
+
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
