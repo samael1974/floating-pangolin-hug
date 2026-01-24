@@ -419,6 +419,17 @@ export default function ReliefWizard() {
             </div>
           </div>
 
+return (
+  <>
+    <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
+      {/* ...tua UI... */}
+    </div>
+
+    {/* MODAL conversione */}
+    ...
+
+    {/* MODAL GPT */}
+    ...
 
         <DialogFooter className="gap-2 sm:gap-2">
           <a
