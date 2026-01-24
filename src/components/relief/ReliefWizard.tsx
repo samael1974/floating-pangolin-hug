@@ -116,7 +116,6 @@ function invertHmInPlace(hm: HeightmapState) {
   for (let i = 0; i < a.length; i++) a[i] = 1 - clamp01(a[i] ?? 0);
 }
 
-
 export default function ReliefWizard() {
   // ✅ Preview tab (colonna destra)
   const [previewTab, setPreviewTab] = React.useState<"image" | "depth" | "stl">("stl");
