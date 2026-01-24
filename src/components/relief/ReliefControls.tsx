@@ -65,7 +65,8 @@ const DEFAULTS: ReliefParams = {
 export default function ReliefControls({ value, onChange, disabled }: Props) {
   const v = { ...DEFAULTS, ...value };
 
-  const set = (patch: Partial<ReliefParams>) => onChange({ ...v, ...patch });
+const set = (patch: Partial<ReliefParams>) =>
+  onChange({ ...v, ...patch, outputMode: "relief" });
 
   return (
     <div className="space-y-4">
