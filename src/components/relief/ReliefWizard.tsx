@@ -557,6 +557,43 @@ const [openGptHowTo, setOpenGptHowTo] = React.useState(false);
               </button>
             </div>
 
+            <div className="inline-flex overflow-hidden rounded-md border">
+  ...
+</div>
+
+{/* CTA helper */}
+<div className="flex flex-wrap gap-2">
+  <button
+    type="button"
+    onClick={() => setOpenConversion(true)}
+    className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50"
+  >
+    Apri istruzioni conversione
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setSourceMode("image")}
+    className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50"
+  >
+    Passa a modalità Immagine
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setOpenGptHowTo(true)}
+    className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50"
+  >
+    Come usare il GPT
+  </button>
+</div>
+
+{sourceMode === "depthmap" && (
+  <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
+    ...
+  </label>
+)}
+
             {sourceMode === "depthmap" && (
               <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
                 <input
