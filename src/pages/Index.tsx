@@ -94,8 +94,9 @@ export default function Index() {
                 2) Regola il rilievo
               </h3>
               <p className="mt-2 text-sm text-slate-600">
-                Depth, dettaglio, smoothing e bordi netti. Preview 2D immediata.
-              </p>
+  Profondità, dettaglio e smussatura. Anteprima 3D sempre visibile mentre regoli i parametri.
+</p>
+
             </CardContent>
           </Card>
 
