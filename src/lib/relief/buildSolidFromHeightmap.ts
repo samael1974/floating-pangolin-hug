@@ -93,38 +93,32 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   }
 
   // --------------------------
-  // OFFSET: aggiungi BOTTOM “displacement duplicato”
-  // (mesh APERTA: niente fianchi, niente tappo)
-  // --------------------------
-  if (baseStyle === "offset") {
-    for (let iy = 0; iy < h - 1; iy++) {
-      for (let ix = 0; ix < w - 1; ix++) {
-        const xA = x0 + ix * dx;
-        const yA = y0 - iy * dy;           // ✅ invert Y
-        const xB = x0 + (ix + 1) * dx;
-        const yB = yA;
-        const xC = xA;
-        const yC = y0 - (iy + 1) * dy;     // ✅ invert Y
-        const xD = xB;
-        const yD = yC;
-
-        const zA = zBottomOffset(normF32[idx(ix, iy)] ?? 0);
-        const zB = zBottomOffset(normF32[idx(ix + 1, iy)] ?? 0);
-        const zC = zBottomOffset(normF32[idx(ix, iy + 1)] ?? 0);
-        const zD = zBottomOffset(normF32[idx(ix + 1, iy + 1)] ?? 0);
-
-        // winding INVERTITO (così le normali puntano “giù”)
-        pushTri(xA, yA, zA, xD, yD, zD, xB, yB, zB);
-        pushTri(xA, yA, zA, xC, yC, zC, xD, yD, zD);
-      }
+ // --------------------------
+// OFFSET: aggiungi BOTTOM “displacement duplicato”
+// (mesh APERTA: niente fianchi, niente tappo)
+// --------------------------
+if (baseStyle === "offset") {
+  for (let iy = 0; iy < h - 1; iy++) {
+    for (let ix = 0; ix < w - 1; ix++) {
+      ...
+      // winding INVERTITO
+      pushTri(...);
+      pushTri(...);
     }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
     geometry.computeVertexNormals();
     return geometry;
   }
-
   // --------------------------
   // NON-OFFSET: qui resta la tua mesh CHIUSA
   // bottom piatto + fianchi
