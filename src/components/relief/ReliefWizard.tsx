@@ -481,17 +481,18 @@ export default function ReliefWizard() {
 
             <div className="flex flex-col gap-2 pt-2">
               <button
-                type="button"
-                onClick={downloadStl}
-                disabled={!canGenerate}
-                className={`rounded-md px-4 py-2 text-sm font-semibold ${
-                  canGenerate
-                    ? "bg-gray-900 text-white hover:bg-gray-800"
-                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                }`}
-              >
-                Scarica STL
-              </button>
+                <button
+  type="button"
+  onClick={downloadStl}
+  disabled={!canGenerate}
+  className={`rounded-md px-4 py-2 text-sm font-semibold ${
+    canGenerate
+      ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]"
+      : "bg-gray-200 text-gray-500 cursor-not-allowed"
+  }`}
+>
+  Scarica STL
+</button>
 
               <a
                 href="https://www.paypal.me/federicocordioli72"
