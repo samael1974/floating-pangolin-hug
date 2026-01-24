@@ -230,15 +230,16 @@ export default function ReliefGenerate({ file, params, maxSize = 512 }: Props) {
 
       {/* Preview 3D */}
       {hm && (
-        <ReliefPreview3D
-          normF32={hm.normF32}
-          w={hm.w}
-          h={hm.h}
-          widthMm={widthMm}
-          depthMm={params.depthMm}
-          baseMm={params.baseMm}
-          previewDecimateStep={decimateStep}
-        />
+    const hmState = React.useMemo(() => ({ normF32, w, h }), [normF32, w, h]);
+<ReliefPreview3D
+  hmState={hmState}
+  stlWidthMm={widthMm}
+  decimateStep={previewDecimateStep}
+  depthMm={depthMm}
+  baseMm={baseMm}
+  outputMode={outputMode}
+  baseStyle={baseStyle}
+/>
       )}
 
       {/* Action */}
