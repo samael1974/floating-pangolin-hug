@@ -21,8 +21,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   if (depthMm < 0) throw new Error("Solid build: depthMm must be >= 0");
   if (baseMm < 0) throw new Error("Solid build: baseMm must be >= 0");
 
-  // ✅ helper: index in 1D array
-  const idx = (x: number, y: number) => y * w + x;
+  const idx = (ix: number, iy: number) => iy * w + ix;
 
   const aspect = h / w;
   const heightMm = widthMm * aspect;
@@ -32,82 +31,71 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
 
   const x0 = -widthMm / 2;
 
-  // 🔥 FIX: immagine ha Y che cresce verso il basso.
-  // In Three vogliamo Y che cresce verso l’alto -> invertiamo la mappatura.
+  // 🔥 FIX flip Y: ImageData cresce verso il basso, in scena vogliamo Y verso l’alto
+  // quindi partiamo da +height/2 e scendiamo
   const y0 = heightMm / 2;
 
   // --- TOP surface Z ---
-  // Regole chiare:
-  // - baseStyle === "recessed" => cavità SEMPRE (indipendente da outputMode)
-  // - altrimenti:
-  //    outputMode "relief" => positivo
-  //    outputMode "mold"   => invertito (ma sopra base)
+  // baseStyle "recessed" = cavità sempre
+  // altrimenti: relief = positivo; mold = invertito sopra base
   const topZ = (H: number) => {
     const h01 = Math.max(0, Math.min(1, H));
 
     if (baseStyle === "recessed") {
-      // cavità: scende dentro la base
+      // cavità: scende DENTRO la base (da baseMm verso 0)
+      // clamp a 0 per evitare valori negativi
       return Math.max(0, baseMm - depthMm * h01);
     }
 
     if (outputMode === "mold") {
-      // stampo “invertito” (senza cavità)
       return baseMm + depthMm * (1 - h01);
     }
 
-    // rilievo positivo
     return baseMm + depthMm * h01;
   };
 
   const verts: number[] = [];
-
   const pushTri = (
-    ax: number,
-    ay: number,
-    az: number,
-    bx: number,
-    by: number,
-    bz: number,
-    cx: number,
-    cy: number,
-    cz: number
+    ax: number, ay: number, az: number,
+    bx: number, by: number, bz: number,
+    cx: number, cy: number, cz: number
   ) => {
     verts.push(ax, ay, az, bx, by, bz, cx, cy, cz);
   };
 
-  // TOP (due triangoli per cella)
+  // TOP (2 tri per cella)
   for (let iy = 0; iy < h - 1; iy++) {
     for (let ix = 0; ix < w - 1; ix++) {
       const xA = x0 + ix * dx;
-      const yA = y0 - iy * dy; // ✅ inverted Y
       const xB = x0 + (ix + 1) * dx;
-      const yB = yA;
-      const xC = xA;
-      const yC = y0 - (iy + 1) * dy; // ✅ inverted Y
-      const xD = xB;
-      const yD = yC;
+
+      // y scende (flip)
+      const yA = y0 - iy * dy;
+      const yC = y0 - (iy + 1) * dy;
 
       const zA = topZ(normF32[idx(ix, iy)]);
       const zB = topZ(normF32[idx(ix + 1, iy)]);
       const zC = topZ(normF32[idx(ix, iy + 1)]);
       const zD = topZ(normF32[idx(ix + 1, iy + 1)]);
 
-      pushTri(xA, yA, zA, xB, yB, zB, xD, yD, zD);
-      pushTri(xA, yA, zA, xD, yD, zD, xC, yC, zC);
+      // A(xA,yA) B(xB,yA) D(xB,yC) C(xA,yC)
+      pushTri(xA, yA, zA, xB, yA, zB, xB, yC, zD);
+      pushTri(xA, yA, zA, xB, yC, zD, xA, yC, zC);
     }
   }
 
-  // BOTTOM (z=0) – winding for normals DOWN
+  // BOTTOM (z=0)
   const xL = x0;
   const xR = x0 + widthMm;
-  const yT = y0;
-  const yB = y0 - heightMm; // ✅ inverted Y extent
 
-  // Triangles oriented clockwise when seen from +Z => normals -Z
+  const yT = y0;             // top in scena
+  const yB = y0 - heightMm;  // bottom in scena (perché abbiamo invertito)
+
+  // winding per normali verso -Z
   pushTri(xL, yT, 0, xR, yB, 0, xR, yT, 0);
   pushTri(xL, yT, 0, xL, yB, 0, xR, yB, 0);
 
-  // SIDES (collegano topZ al bottom z=0)
+  // SIDES: collegano topZ a bottom z=0
 
   // Left (-X)
   for (let iy = 0; iy < h - 1; iy++) {
