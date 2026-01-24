@@ -106,6 +106,10 @@ export default function ReliefWizard() {
   // ✅ Canvas preview depthmap
   const dmCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
+  // ✅ Nome file STL (personalizzabile)
+  const [customName, setCustomName] = React.useState<string>("reliefforge");
+
+
   // ✅ Params
   const [params, setParams] = React.useState<ReliefParams>(() => ({
     projectType: "logo_text",
