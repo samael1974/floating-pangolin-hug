@@ -13,15 +13,15 @@ type HeightmapState = {
 };
 
 type Props = {
- hmState: { normF32: Float32Array; w: number; h: number } | null;
-  widthMm: number;
-  depthMm: number;
-  baseMm: number;
-  previewDecimateStep: number;
-  baseStyle: "flat" | "recessed";
-  outputMode?: "relief" | "mold";
-    stlWidthMm: number;
-  decimateStep: number;
+<ReliefPreview3D
+  hmState={hmState}
+  stlWidthMm={widthMm}
+  decimateStep={previewDecimateStep}
+  depthMm={depthMm}
+  baseMm={baseMm}
+  outputMode="relief"
+  baseStyle={baseStyle}
+/>
 };
 
 function decimateHm(hm: HeightmapState, step: number): HeightmapState {
