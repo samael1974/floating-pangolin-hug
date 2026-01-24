@@ -13,9 +13,9 @@ export default function Index() {
               Tool gratuito • STL stampabile • Flow rapido
             </div>
 
-            <h1 className="text-4xl font-bold tracking-tight text-[#1F4E5F] md:text-5xl">
-              ReliefForge — a Floating Pangolin Hug project
-            </h1>
+         <h1 className="text-4xl font-bold tracking-tight text-[#1F4E5F] md:text-5xl">
+  Trasforma una foto in un bassorilievo STL stampabile in pochi minuti.
+</h1>
 
             <p className="text-base text-slate-700 md:text-lg">
               Carica un’immagine, regola i parametri e scarica uno STL chiuso e pronto
