@@ -398,13 +398,82 @@ export default function ReliefWizard() {
             )}
           </div>
 
-          {/* Params */}
-          <div className="rounded-lg bg-white p-4 shadow space-y-3">
-            <div>
-              <div className="text-sm font-semibold">2) Parametri bassorilievo</div>
-              <div className="text-xs text-gray-500">
-                I parametri restano attivi anche in modalità Depth map. <span className="font-medium">Tip:</span> se vuoi
-                solo il rilievo senza basetta, imposta <span className="font-medium">Spessore base = 0</span>.
+                      {/* Preset rapidi */}
+            <div className="flex flex-wrap gap-2 pt-2">
+              <button
+                type="button"
+                disabled={!file}
+                onClick={() => {
+                  setParams((p) => ({
+                    ...p,
+                    projectType: "logo_text",
+                    depthMm: 3.0,
+                    baseMm: 2.0,
+                    detail: 0.65,
+                    smooth: 0.12,
+                    edge: "sharp",
+                    outputMode: "relief",
+                    baseStyle: "flat",
+                  }));
+                  setDecimateStep(2);
+                }}
+                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
+                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                Preset: Logo/Testo
+              </button>
+
+              <button
+                type="button"
+                disabled={!file}
+                onClick={() => {
+                  setParams((p) => ({
+                    ...p,
+                    projectType: "human_face",
+                    depthMm: 4.0,
+                    baseMm: 2.0,
+                    detail: 0.55,
+                    smooth: 0.28,
+                    edge: "round",
+                    outputMode: "relief",
+                    baseStyle: "flat",
+                  }));
+                  setDecimateStep(2);
+                }}
+                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
+                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                Preset: Volto
+              </button>
+
+              <button
+                type="button"
+                disabled={!file}
+                onClick={() => {
+                  setParams((p) => ({
+                    ...p,
+                    projectType: "nature_landscape",
+                    depthMm: 5.0,
+                    baseMm: 2.0,
+                    detail: 0.58,
+                    smooth: 0.20,
+                    edge: "round",
+                    outputMode: "relief",
+                    baseStyle: "flat",
+                  }));
+                  setDecimateStep(3);
+                }}
+                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
+                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                Preset: Paesaggio
+              </button>
+
+              <div className="text-[11px] text-gray-500 self-center">
+                1 click per partire bene, poi rifinisci i parametri sotto.
               </div>
             </div>
 
