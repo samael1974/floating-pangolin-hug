@@ -82,8 +82,9 @@ export default function Index() {
                 1) Carica un’immagine
               </h3>
               <p className="mt-2 text-sm text-slate-600">
-                JPG/PNG/WEBP. Se l’immagine arriva dai social, di solito è già ok.
-              </p>
+  JPG/PNG/WEBP. Va bene anche una foto “normale”. Se vuoi più resa (volti/loghi),
+  puoi usare una depth map (PNG 8/16-bit).
+</p>
             </CardContent>
           </Card>
 
