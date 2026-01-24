@@ -108,8 +108,7 @@ function invertHmInPlace(hm: HeightmapState) {
 export default function ReliefWizard() {
   // ✅ Preview tab (colonna destra)
   const [previewTab, setPreviewTab] = React.useState<"image" | "depth" | "stl">("stl");
-  const [openConversion, setOpenConversion] = React.useState(false);
-const [openGptHowTo, setOpenGptHowTo] = React.useState(false);
+  const [openGptHowTo, setOpenGptHowTo] = React.useState(false);
 
   // ✅ Modals (help)
 const [openConversion, setOpenConversion] = React.useState(false);
