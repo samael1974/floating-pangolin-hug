@@ -95,3 +95,4 @@ function invertHmInPlace(hm: HeightmapState): void {
   const a = hm.normF32;
   for (let i = 0; i < a.length; i++) a[i] = 1 - clamp01(a[i] ?? 0);
 }
+export default ReliefWizard;
