@@ -194,9 +194,7 @@ React.useEffect(() => {
           setHmStatus("ready");
         }
         return;
-      
-
-
+ }     
       // --------------------------
       // IMAGE MODE (tua pipeline)
       // --------------------------
