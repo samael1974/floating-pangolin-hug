@@ -401,8 +401,11 @@ export default function ReliefWizard() {
             <div>
               <div className="text-sm font-semibold">2) Parametri bassorilievo</div>
               <div className="text-xs text-gray-500">
-                I parametri restano attivi anche in modalità Depth map.
-              </div>
+  I parametri restano attivi anche in modalità Depth map.{" "}
+  <span className="font-medium">Tip:</span> se vuoi solo il rilievo senza basetta, imposta{" "}
+  <span className="font-medium">Spessore base = 0</span>.
+</div>
+
             </div>
 
             <div className="pt-2">
