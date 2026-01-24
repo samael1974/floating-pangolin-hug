@@ -312,23 +312,27 @@ export default function ReliefWizard() {
 
             <div className="inline-flex rounded-md border overflow-hidden">
               <button
-                type="button"
-                onClick={() => setSourceMode("image")}
-                className={`px-3 py-1.5 text-sm ${
-                  sourceMode === "image" ? "bg-gray-900 text-white" : "bg-white text-gray-800"
-                }`}
-              >
-                Immagine
-              </button>
-              <button
-                type="button"
-                onClick={() => setSourceMode("depthmap")}
-                className={`px-3 py-1.5 text-sm ${
-                  sourceMode === "depthmap" ? "bg-gray-900 text-white" : "bg-white text-gray-800"
-                }`}
-              >
-                Depth map (8/16-bit)
-              </button>
+  type="button"
+  onClick={() => setSourceMode("image")}
+  className={`px-3 py-1.5 text-sm ${
+    sourceMode === "image"
+      ? "bg-[#1F4E5F] text-white"
+      : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+  }`}
+>
+  Immagine
+</button>
+<button
+  type="button"
+  onClick={() => setSourceMode("depthmap")}
+  className={`px-3 py-1.5 text-sm ${
+    sourceMode === "depthmap"
+      ? "bg-[#1F4E5F] text-white"
+      : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+  }`}
+>
+  Depth map (8/16-bit)
+</button>
             </div>
 
             {sourceMode === "depthmap" && (
