@@ -278,6 +278,8 @@ export default function ReliefWizard() {
     renderDepthmapToCanvas(c, hmState.normF32, hmState.w, hmState.h);
   }, [previewTab, sourceMode, hmState]);
 
+
+  
   function downloadStl() {
     if (!hmState) return;
 
