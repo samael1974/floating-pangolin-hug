@@ -278,7 +278,48 @@ export default function ReliefWizard() {
     renderDepthmapToCanvas(c, hmState.normF32, hmState.w, hmState.h);
   }, [previewTab, sourceMode, hmState]);
 
+  function estimateStlStats() {
+    if (!hmState) return null;
 
+    // campionamento “effettivo” dopo decimazione
+    const effW = Math.max(2, Math.floor(hmState.w / Math.max(1, decimateStep)));
+    const effH = Math.max(2, Math.floor(hmState.h / Math.max(1, decimateStep)));
+
+    // Top surface (grid triangolata)
+    const topTris = 2 * (effW - 1) * (effH - 1);
+
+    // Side walls: perimetro di quads -> 2 tris per quad
+    const perimeterQuads = 2 * (effW - 1) + 2 * (effH - 1);
+    const sideTris = 2 * perimeterQuads;
+
+    // Bottom cap: lo consideriamo solo se baseMm > 0 (più “targa”)
+    // Nota: la tua pipeline potrebbe chiudere comunque il fondo, ma come stima va bene così.
+    const bottomTris = params.baseMm > 0 ? 2 * (effW - 1) * (effH - 1) : 0;
+
+    const triangles = topTris + sideTris + bottomTris;
+
+    // STL binario: 84 byte header + 50 byte per triangolo
+    const bytes = 84 + triangles * 50;
+    const mb = bytes / (1024 * 1024);
+
+    // Soglie “pratiche” per browser/Blender
+    const isHeavy = triangles > 900_000 || mb > 45;
+
+    // Suggerimento decimazione (euristico)
+    let suggestedDecimate = decimateStep;
+    if (triangles > 1_800_000) suggestedDecimate = Math.max(decimateStep, 5);
+    else if (triangles > 1_200_000) suggestedDecimate = Math.max(decimateStep, 4);
+    else if (triangles > 900_000) suggestedDecimate = Math.max(decimateStep, 3);
+
+    return {
+      effW,
+      effH,
+      triangles,
+      mb,
+      isHeavy,
+      suggestedDecimate,
+    };
+  }
   
   function downloadStl() {
     if (!hmState) return;
