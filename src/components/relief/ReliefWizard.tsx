@@ -130,6 +130,7 @@ export default function ReliefWizard() {
   // ✅ Heightmap state/status
   const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
   const [hmStatus, setHmStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [fileWarning, setFileWarning] = React.useState<string | null>(null);
 
   // ✅ STL options
   const [stlWidthMm, setStlWidthMm] = React.useState<number>(120);
