@@ -451,6 +451,16 @@ export default function ReliefWizard() {
               </div>
             </div>
 
+              {/* Params */}
+          <div className="rounded-lg bg-white p-4 shadow space-y-3">
+            <div>
+              <div className="text-sm font-semibold">2) Parametri bassorilievo</div>
+              <div className="text-xs text-gray-500">
+                I parametri restano attivi anche in modalità Depth map. <span className="font-medium">Tip:</span> se vuoi
+                solo il rilievo senza basetta, imposta <span className="font-medium">Spessore base = 0</span>.
+              </div>
+            </div>
+
             {/* Preset rapidi */}
             <div className="flex flex-wrap gap-2 pt-2">
               <button
@@ -534,7 +544,7 @@ export default function ReliefWizard() {
               <ReliefControls value={params} onChange={setParams} disabled={!file} />
             </div>
           </div>
-          
+
           {/* STL Options */}
           <div className="rounded-lg bg-white p-4 shadow space-y-4">
             <div>
