@@ -5,6 +5,8 @@ import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
 import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
 import { inspectPng, pngCompatibilityMessage } from "@/lib/relief/inspectPng";
+import ReliefWizard from "@/components/relief/ReliefWizard";
+
 
 
 // ✅ 16-bit PNG support
