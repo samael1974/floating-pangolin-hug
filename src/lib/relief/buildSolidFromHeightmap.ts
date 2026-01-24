@@ -21,7 +21,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   if (depthMm < 0) throw new Error("Solid build: depthMm must be >= 0");
   if (baseMm < 0) throw new Error("Solid build: baseMm must be >= 0");
 
-  const idx = (ix: number, iy: number) => iy * w + ix;
+  const idx = (x: number, y: number) => y * w + x;
 
   const aspect = h / w;
   const heightMm = widthMm * aspect;
@@ -31,19 +31,15 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
 
   const x0 = -widthMm / 2;
 
-  // 🔥 FIX flip Y: ImageData cresce verso il basso, in scena vogliamo Y verso l’alto
-  // quindi partiamo da +height/2 e scendiamo
-  const y0 = heightMm / 2;
+  // Y in canvas cresce verso il basso, in Three vogliamo “su” positivo.
+  // Quindi: start da +height/2 e scendiamo sottraendo.
+  const yTop = heightMm / 2;
 
-  // --- TOP surface Z ---
-  // baseStyle "recessed" = cavità sempre
-  // altrimenti: relief = positivo; mold = invertito sopra base
   const topZ = (H: number) => {
     const h01 = Math.max(0, Math.min(1, H));
 
     if (baseStyle === "recessed") {
-      // cavità: scende DENTRO la base (da baseMm verso 0)
-      // clamp a 0 per evitare valori negativi
+      // cavità dentro la base
       return Math.max(0, baseMm - depthMm * h01);
     }
 
@@ -51,6 +47,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
       return baseMm + depthMm * (1 - h01);
     }
 
+    // relief positivo
     return baseMm + depthMm * h01;
   };
 
@@ -59,58 +56,58 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     ax: number, ay: number, az: number,
     bx: number, by: number, bz: number,
     cx: number, cy: number, cz: number
-  ) => {
-    verts.push(ax, ay, az, bx, by, bz, cx, cy, cz);
-  };
+  ) => verts.push(ax, ay, az, bx, by, bz, cx, cy, cz);
 
-  // TOP (2 tri per cella)
+  // TOP
   for (let iy = 0; iy < h - 1; iy++) {
     for (let ix = 0; ix < w - 1; ix++) {
       const xA = x0 + ix * dx;
       const xB = x0 + (ix + 1) * dx;
 
-      // y scende (flip)
-      const yA = y0 - iy * dy;
-      const yC = y0 - (iy + 1) * dy;
+      const yA = yTop - iy * dy;
+      const yC = yTop - (iy + 1) * dy;
+
+      const xC = xA;
+      const xD = xB;
+
+      const yB = yA;
+      const yD = yC;
 
       const zA = topZ(normF32[idx(ix, iy)]);
       const zB = topZ(normF32[idx(ix + 1, iy)]);
       const zC = topZ(normF32[idx(ix, iy + 1)]);
       const zD = topZ(normF32[idx(ix + 1, iy + 1)]);
 
-      // A(xA,yA) B(xB,yA) D(xB,yC) C(xA,yC)
-      pushTri(xA, yA, zA, xB, yA, zB, xB, yC, zD);
-      pushTri(xA, yA, zA, xB, yC, zD, xA, yC, zC);
+      pushTri(xA, yA, zA, xB, yB, zB, xD, yD, zD);
+      pushTri(xA, yA, zA, xD, yD, zD, xC, yC, zC);
     }
   }
 
-  // BOTTOM (z=0)
+  // BOTTOM piatto z=0
   const xL = x0;
   const xR = x0 + widthMm;
+  const yT = yTop;
+  const yB = yTop - heightMm;
 
-  const yT = y0;             // top in scena
-  const yB = y0 - heightMm;  // bottom in scena (perché abbiamo invertito)
-
-  // winding per normali verso -Z
+  // winding verso -Z
   pushTri(xL, yT, 0, xR, yB, 0, xR, yT, 0);
   pushTri(xL, yT, 0, xL, yB, 0, xR, yB, 0);
 
-  // SIDES: collegano topZ a bottom z=0
-
-  // Left (-X)
+  // SIDES
+  // Left
   for (let iy = 0; iy < h - 1; iy++) {
-    const y1 = y0 - iy * dy;
-    const y2 = y0 - (iy + 1) * dy;
+    const y1 = yTop - iy * dy;
+    const y2 = yTop - (iy + 1) * dy;
     const z1 = topZ(normF32[idx(0, iy)]);
     const z2 = topZ(normF32[idx(0, iy + 1)]);
     pushTri(xL, y1, 0, xL, y1, z1, xL, y2, z2);
     pushTri(xL, y1, 0, xL, y2, z2, xL, y2, 0);
   }
 
-  // Right (+X)
+  // Right
   for (let iy = 0; iy < h - 1; iy++) {
-    const y1 = y0 - iy * dy;
-    const y2 = y0 - (iy + 1) * dy;
+    const y1 = yTop - iy * dy;
+    const y2 = yTop - (iy + 1) * dy;
     const z1 = topZ(normF32[idx(w - 1, iy)]);
     const z2 = topZ(normF32[idx(w - 1, iy + 1)]);
     pushTri(xR, y1, 0, xR, y2, z2, xR, y1, z1);
