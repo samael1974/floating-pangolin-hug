@@ -33,10 +33,11 @@ export type ReliefParams = {
   smooth: number; // 0..1
   edge: EdgeMode;
 
+  // ✅ outputMode resta nel tipo (compat), ma verrà forzato a "relief"
   outputMode: OutputMode;
   baseStyle: BaseStyle;
 
-  // opzionali (se li usi altrove, non danno fastidio)
+  // opzionale/legacy
   invertDepthMap?: boolean;
 };
 
@@ -63,30 +64,37 @@ const DEFAULTS: ReliefParams = {
 };
 
 export default function ReliefControls({ value, onChange, disabled }: Props) {
-  const v = { ...DEFAULTS, ...value };
+  const v = { ...DEFAULTS, ...value, outputMode: "relief" as OutputMode };
 
-const set = (patch: Partial<ReliefParams>) =>
-  onChange({ ...v, ...patch, outputMode: "relief" });
+  // ✅ Forziamo SEMPRE outputMode="relief"
+  const set = (patch: Partial<ReliefParams>) =>
+    onChange({ ...v, ...patch, outputMode: "relief" });
 
-
-      <Separator />
-
+  return (
+    <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Output</Label>
+        <Label>Tipo progetto</Label>
         <Select
           disabled={disabled}
-          value={v.outputMode}
-          onValueChange={(x) => set({ outputMode: x as OutputMode })}
+          value={v.projectType}
+          onValueChange={(x) => set({ projectType: x as ProjectType })}
         >
           <SelectTrigger>
             <SelectValue placeholder="Scegli..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="relief">Rilievo (positivo)</SelectItem>
-            <SelectItem value="mold">Stampo (negativo)</SelectItem>
+            <SelectItem value="logo_text">Logo / Testo</SelectItem>
+            <SelectItem value="human_face">Volto umano</SelectItem>
+            <SelectItem value="animal">Animale</SelectItem>
+            <SelectItem value="nature_landscape">Natura / Paesaggio</SelectItem>
+            <SelectItem value="decorative_pattern">Pattern decorativo</SelectItem>
           </SelectContent>
         </Select>
       </div>
+
+      <Separator />
+
+      {/* ✅ Output rimosso: outputMode è fisso a "relief" */}
 
       <div className="space-y-2">
         <Label>Base</Label>
@@ -168,6 +176,7 @@ const set = (patch: Partial<ReliefParams>) =>
         />
       </div>
 
+      {/* ⚠️ Questo lo togliamo nel prossimo step (come da richiesta), per ora resta */}
       <div className="flex items-center justify-between">
         <Label>Inverti depthmap</Label>
         <Switch
