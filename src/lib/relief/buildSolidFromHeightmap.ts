@@ -21,39 +21,41 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   if (depthMm < 0) throw new Error("Solid build: depthMm must be >= 0");
   if (baseMm < 0) throw new Error("Solid build: baseMm must be >= 0");
 
-  const aspect = h / w;
-  const heightMm = widthMm * aspect;
+const aspect = h / w;
+const heightMm = widthMm * aspect;
 
-  const dx = widthMm / (w - 1);
-  const dy = heightMm / (h - 1);
+const dx = widthMm / (w - 1);
+const dy = heightMm / (h - 1);
 
-  const x0 = -widthMm / 2;
-  const y0 = -heightMm / 2;
+const x0 = -widthMm / 2;
 
-  const idx = (ix: number, iy: number) => iy * w + ix;
+// 🔥 FIX: immagine ha Y che cresce verso il basso.
+// In Three vogliamo Y che cresce verso l’alto -> invertiamo la mappatura.
+const y0 = heightMm / 2;
 
-  // --- TOP surface Z ---
-  // relief + flat:     z = baseMm + depthMm * H
-  // mold + recessed:   z = baseMm - depthMm * H  (clamp >= 0)
-  // altri mix: comportamenti coerenti e non ambigui
-  const topZ = (H: number) => {
-    const h01 = Math.max(0, Math.min(1, H));
+// --- TOP surface Z ---
+// Regole chiare:
+// - baseStyle === "recessed" => cavità SEMPRE (indipendente da outputMode)
+// - altrimenti:
+//    outputMode "relief" => positivo
+//    outputMode "mold"   => invertito (ma sopra base)
+const topZ = (H: number) => {
+  const h01 = Math.max(0, Math.min(1, H));
 
-    if (outputMode === "relief") {
-      // rilievo positivo
-      return baseMm + depthMm * h01;
-    }
+  if (baseStyle === "recessed") {
+    // cavità: scende dentro la base
+    return Math.max(0, baseMm - depthMm * h01);
+  }
 
-    // outputMode === "mold"
-    if (baseStyle === "recessed") {
-      // cavità: scende dentro la base
-      return Math.max(0, baseMm - depthMm * h01);
-    }
-
-    // baseStyle === "flat": stampo "piatto" (in pratica inversione senza cavità)
-    // tiene la stessa "altezza totale" ma invertita
+  if (outputMode === "mold") {
+    // stampo “invertito” (senza cavità)
     return baseMm + depthMm * (1 - h01);
-  };
+  }
+
+  // rilievo positivo
+  return baseMm + depthMm * h01;
+};
+
 
   const verts: number[] = [];
   const pushTri = (
