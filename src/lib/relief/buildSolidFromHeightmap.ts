@@ -56,16 +56,23 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     return baseMm + depthMm * h01;
   };
 
-  // --- BOTTOM Z per OFFSET (mesh aperta) ---
-  // vogliamo “due pelli” identiche: bottom = top - baseMm
+  // --- BOTTOM Z per OFFSET (shell): bottom = top - baseMm
   const zBottomOffset = (H: number) => zTop(H) - baseMm;
 
   const verts: number[] = [];
   const pushTri = (
-    ax: number, ay: number, az: number,
-    bx: number, by: number, bz: number,
-    cx: number, cy: number, cz: number
-  ) => verts.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+    ax: number,
+    ay: number,
+    az: number,
+    bx: number,
+    by: number,
+    bz: number,
+    cx: number,
+    cy: number,
+    cz: number
+  ) => {
+    verts.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+  };
 
   // --------------------------
   // TOP surface (sempre)
@@ -73,11 +80,11 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   for (let iy = 0; iy < h - 1; iy++) {
     for (let ix = 0; ix < w - 1; ix++) {
       const xA = x0 + ix * dx;
-      const yA = y0 - iy * dy;           // ✅ invert Y
+      const yA = y0 - iy * dy; // invert Y
       const xB = x0 + (ix + 1) * dx;
       const yB = yA;
       const xC = xA;
-      const yC = y0 - (iy + 1) * dy;     // ✅ invert Y
+      const yC = y0 - (iy + 1) * dy; // invert Y
       const xD = xB;
       const yD = yC;
 
@@ -93,64 +100,128 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   }
 
   // --------------------------
- // --------------------------
-// OFFSET: aggiungi BOTTOM “displacement duplicato”
-// (mesh APERTA: niente fianchi, niente tappo)
-// --------------------------
-if (baseStyle === "offset") {
-  for (let iy = 0; iy < h - 1; iy++) {
-    for (let ix = 0; ix < w - 1; ix++) {
-      ...
-      // winding INVERTITO
-      pushTri(...);
-      pushTri(...);
+  // OFFSET (SHELL CHIUSO): bottom offset + pareti laterali
+  // --------------------------
+  if (baseStyle === "offset") {
+    // Nota: per un shell sensato baseMm dovrebbe essere > 0 (anche 0.8–1mm).
+    // Se baseMm=0 top e bottom coincidono e puoi avere triangoli degeneri.
+    // Non blocco l'export, ma è bene saperlo.
+
+    // 1) bottom offset surface
+    for (let iy = 0; iy < h - 1; iy++) {
+      for (let ix = 0; ix < w - 1; ix++) {
+        const xA = x0 + ix * dx;
+        const yA = y0 - iy * dy;
+        const xB = x0 + (ix + 1) * dx;
+        const yB = yA;
+        const xC = xA;
+        const yC = y0 - (iy + 1) * dy;
+        const xD = xB;
+        const yD = yC;
+
+        const zA = zBottomOffset(normF32[idx(ix, iy)] ?? 0);
+        const zB = zBottomOffset(normF32[idx(ix + 1, iy)] ?? 0);
+        const zC = zBottomOffset(normF32[idx(ix, iy + 1)] ?? 0);
+        const zD = zBottomOffset(normF32[idx(ix + 1, iy + 1)] ?? 0);
+
+        // winding verso -Z
+        pushTri(xA, yA, zA, xD, yD, zD, xB, yB, zB);
+        pushTri(xA, yA, zA, xC, yC, zC, xD, yD, zD);
+      }
     }
-  }
 
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-  geometry.computeVertexNormals();
-  return geometry;
-}
+    // 2) SIDE WALLS: collega top e bottomOffset lungo tutto il bordo
 
+    // Left edge (x=0)
+    for (let iy = 0; iy < h - 1; iy++) {
+      const x = x0;
+      const y1 = y0 - iy * dy;
+      const y2 = y0 - (iy + 1) * dy;
+
+      const zT1 = zTop(normF32[idx(0, iy)] ?? 0);
+      const zT2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
+      const zB1 = zBottomOffset(normF32[idx(0, iy)] ?? 0);
+      const zB2 = zBottomOffset(normF32[idx(0, iy + 1)] ?? 0);
+
+      // due triangoli per quad (winding verso fuori)
+      pushTri(x, y1, zB1, x, y1, zT1, x, y2, zT2);
+      pushTri(x, y1, zB1, x, y2, zT2, x, y2, zB2);
+    }
+
+    // Right edge (x=w-1)
+    for (let iy = 0; iy < h - 1; iy++) {
+      const x = x0 + widthMm;
+      const y1 = y0 - iy * dy;
+      const y2 = y0 - (iy + 1) * dy;
+
+      const zT1 = zTop(normF32[idx(w - 1, iy)] ?? 0);
+      const zT2 = zTop(normF32[idx(w - 1, iy + 1)] ?? 0);
+      const zB1 = zBottomOffset(normF32[idx(w - 1, iy)] ?? 0);
+      const zB2 = zBottomOffset(normF32[idx(w - 1, iy + 1)] ?? 0);
+
+      pushTri(x, y1, zB1, x, y2, zT2, x, y1, zT1);
+      pushTri(x, y1, zB1, x, y2, zB2, x, y2, zT2);
+    }
+
+    // Top edge (y=0)
+    for (let ix = 0; ix < w - 1; ix++) {
+      const x1 = x0 + ix * dx;
+      const x2 = x0 + (ix + 1) * dx;
+      const y = y0;
+
+      const zT1 = zTop(normF32[idx(ix, 0)] ?? 0);
+      const zT2 = zTop(normF32[idx(ix + 1, 0)] ?? 0);
+      const zB1 = zBottomOffset(normF32[idx(ix, 0)] ?? 0);
+      const zB2 = zBottomOffset(normF32[idx(ix + 1, 0)] ?? 0);
+
+      pushTri(x1, y, zB1, x2, y, zT2, x1, y, zT1);
+      pushTri(x1, y, zB1, x2, y, zB2, x2, y, zT2);
+    }
+
+    // Bottom edge (y=h-1)
+    for (let ix = 0; ix < w - 1; ix++) {
+      const x1 = x0 + ix * dx;
+      const x2 = x0 + (ix + 1) * dx;
+      const y = y0 - heightMm;
+
+      const zT1 = zTop(normF32[idx(ix, h - 1)] ?? 0);
+      const zT2 = zTop(normF32[idx(ix + 1, h - 1)] ?? 0);
+      const zB1 = zBottomOffset(normF32[idx(ix, h - 1)] ?? 0);
+      const zB2 = zBottomOffset(normF32[idx(ix + 1, h - 1)] ?? 0);
+
+      pushTri(x1, y, zB1, x1, y, zT1, x2, y, zT2);
+      pushTri(x1, y, zB1, x2, y, zT2, x2, y, zB2);
+    }
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
     geometry.computeVertexNormals();
     return geometry;
   }
+
   // --------------------------
-  // NON-OFFSET: qui resta la tua mesh CHIUSA
-  // bottom piatto + fianchi
+  // NON-OFFSET: mesh CHIUSA (bottom piatto + fianchi)
   // --------------------------
   const xL = x0;
   const xR = x0 + widthMm;
   const yT = y0;
-  const yB = y0 - heightMm; // ✅ invert Y (top is +, bottom is -)
+  const yB = y0 - heightMm; // invert Y
 
-// --------------------------
-// BOTTOM (z=0) — GRIGLIA MATCH con TOP
-// (così i bordi coincidono con le SIDES → manifold)
-// winding verso -Z
-// --------------------------
-for (let iy = 0; iy < h - 1; iy++) {
-  for (let ix = 0; ix < w - 1; ix++) {
-    const xA = x0 + ix * dx;
-    const yA = y0 - iy * dy;
-    const xB = x0 + (ix + 1) * dx;
-    const yB2 = yA;
-    const xC = xA;
-    const yC = y0 - (iy + 1) * dy;
-    const xD = xB;
-    const yD = yC;
+  // BOTTOM (z=0) -> normali verso -Z
+  pushTri(xL, yT, 0, xR, yB, 0, xR, yT, 0);
+  pushTri(xL, yT, 0, xL, yB, 0, xR, yB, 0);
 
-    // invert winding rispetto al TOP per puntare in -Z
-    pushTri(xA, yA, 0, xD, yD, 0, xB, yB2, 0);
-    pushTri(xA, yA, 0, xC, yC, 0, xD, yD, 0);
+  // Left side
+  for (let iy = 0; iy < h - 1; iy++) {
+    const y1 = y0 - iy * dy;
+    const y2 = y0 - (iy + 1) * dy;
+    const z1 = zTop(normF32[idx(0, iy)] ?? 0);
+    const z2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
+    pushTri(xL, y1, 0, xL, y1, z1, xL, y2, z2);
+    pushTri(xL, y1, 0, xL, y2, z2, xL, y2, 0);
   }
-}
 
-  // Right
+  // Right side
   for (let iy = 0; iy < h - 1; iy++) {
     const y1 = y0 - iy * dy;
     const y2 = y0 - (iy + 1) * dy;
