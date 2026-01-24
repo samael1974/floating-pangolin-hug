@@ -446,33 +446,28 @@ export default function ReliefWizard() {
 
     <div className="mt-3 flex flex-wrap gap-2">
       <button
-        type="button"
-        onClick={() => {
-          // apri modal / pannello istruzioni (se non hai modal, per ora usa alert o un state)
-          alert(`Converti in PNG Grayscale 16-bit.\n\nGIMP: Immagine→Modalità→Scala di grigi; Immagine→Precisione→Intero 16-bit; Esporta PNG.\n\nIn alternativa passa a Modalità Immagine.`);
-        }}
-        className="rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
-      >
-        🔧 Apri istruzioni conversione
-      </button>
+  type="button"
+  onClick={() => setOpenConversion(true)}
+  className="rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+>
+  🔧 Apri istruzioni conversione
+</button>
 
-      <button
-        type="button"
-        onClick={() => setSourceMode("image")}
-        className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
-      >
-        🖼 Passa a modalità Immagine
-      </button>
+<button
+  type="button"
+  onClick={() => setSourceMode("image")}
+  className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
+>
+  🖼 Passa a modalità Immagine
+</button>
 
-      <button
-        type="button"
-        onClick={() => {
-          alert(`Workflow GPT:\n1) Esporta PNG grayscale 16-bit.\n2) In app usa “Depth map”.\n3) Se errori: usa “Immagine”.`);
-        }}
-        className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
-      >
-        🤖 Come usare il GPT
-      </button>
+<button
+  type="button"
+  onClick={() => setOpenGptHowTo(true)}
+  className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
+>
+  🤖 Come usare il GPT
+</button>
     </div>
   </div>
 )}
