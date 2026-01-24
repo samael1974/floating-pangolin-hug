@@ -1,2 +1,1 @@
-export type OutputMode = "relief" | "mold";
-export type BaseStyle = "flat" | "recessed" | "offset";
+import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
