@@ -169,7 +169,34 @@ export default function ReliefWizard() {
         setHmStatus("idle");
         return;
       }
+            // reset warning ogni run
+      setFileWarning(null);
 
+      // Se sono in depthmap e il file è PNG: controllo IHDR prima di decodificare
+      if (sourceMode === "depthmap") {
+        const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+        if (isPng) {
+          try {
+            const head = new Uint8Array(await file.arrayBuffer());
+            const info = inspectPng(head);
+            const msg = pngCompatibilityMessage(info);
+
+            if (msg) {
+              // Mostra warning e blocca pipeline depthmap (così eviti STL rotti)
+              if (!cancelled) {
+                setFileWarning(
+                  `Depth map non compatibile: ${msg}  |  Soluzione: esporta PNG grayscale 16-bit oppure passa a “Modalità Immagine”.`
+                );
+                setHmState(null);
+                setHmStatus("error");
+              }
+              return;
+            }
+          } catch {
+            // Se fallisce il check, non bloccare: lascia che il decoder gestisca
+          }
+        }
+      }
       setHmStatus("loading");
       const maxSize = 512;
 
