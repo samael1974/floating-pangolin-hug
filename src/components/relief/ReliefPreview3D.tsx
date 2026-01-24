@@ -4,9 +4,9 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
-import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
+import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
 
-type HeightmapState = {
+export type HeightmapState = {
   normF32: Float32Array;
   w: number;
   h: number;
@@ -18,12 +18,12 @@ type Props = {
   decimateStep: number;
   depthMm: number;
   baseMm: number;
-  outputMode: OutputMode;
+  outputMode?: OutputMode; // default "relief"
   baseStyle: BaseStyle;
 };
 
 function decimateHm(hm: HeightmapState, step: number): HeightmapState {
-  const s = Math.max(1, Math.floor(step));
+  const s = Math.max(1, Math.floor(step || 1));
   if (s === 1) return hm;
 
   const w2 = Math.max(2, Math.floor(hm.w / s));
@@ -44,16 +44,15 @@ function decimateHm(hm: HeightmapState, step: number): HeightmapState {
 function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
   return (
     <>
-      {/* luce “leggibile” per bassorilievi */}
-      <ambientLight intensity={0.35} />
-      <directionalLight position={[2, 3, 4]} intensity={1.1} />
-      <directionalLight position={[-3, -2, 2]} intensity={0.55} />
+      {/* luci: qui si capiscono le profondità */}
+      <hemisphereLight intensity={0.55} />
+      <directionalLight position={[3, -4, 6]} intensity={1.2} />
+      <directionalLight position={[-3, 4, 3]} intensity={0.6} />
+      <ambientLight intensity={0.2} />
 
-      <group>
-        <mesh geometry={geometry} castShadow receiveShadow>
-          <meshStandardMaterial roughness={0.85} metalness={0.05} />
-        </mesh>
-      </group>
+      <mesh geometry={geometry}>
+        <meshStandardMaterial roughness={0.85} metalness={0.05} />
+      </mesh>
 
       <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
     </>
@@ -61,7 +60,15 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
 }
 
 export default function ReliefPreview3D(props: Props) {
-  const { hmState, stlWidthMm, decimateStep, depthMm, baseMm, outputMode, baseStyle } = props;
+  const {
+    hmState,
+    stlWidthMm,
+    decimateStep,
+    depthMm,
+    baseMm,
+    outputMode = "relief",
+    baseStyle,
+  } = props;
 
   const geometry = React.useMemo(() => {
     if (!hmState) return null;
@@ -80,7 +87,7 @@ export default function ReliefPreview3D(props: Props) {
         baseStyle,
       });
 
-      // centra e porta a z=0
+      // centra e poggia a Z=0
       geo.computeBoundingBox();
       const bb = geo.boundingBox;
       if (bb) {
