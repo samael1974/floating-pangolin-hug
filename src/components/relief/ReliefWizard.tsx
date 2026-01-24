@@ -419,7 +419,8 @@ export default function ReliefWizard() {
             </div>
           </div>
 
-            <DialogFooter className="gap-2 sm:gap-2">
+
+        <DialogFooter className="gap-2 sm:gap-2">
           <a
             href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5"
             target="_blank"
@@ -439,6 +440,7 @@ export default function ReliefWizard() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </>
 );
+
 
