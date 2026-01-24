@@ -171,30 +171,29 @@ React.useEffect(() => {
       // --------------------------
       // DEPTHMAP MODE (PNG 8/16-bit + fallback canvas)
       // --------------------------
-      if (sourceMode === "depthmap") {
-        const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+            if (sourceMode === "depthmap") {
+          const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
 
-        let hm: HeightmapState;
+          let hm: HeightmapState;
 
-        if (isPng) {
-          // ✅ vero 8/16-bit via parser PNG
-          const buf = new Uint8Array(await file.arrayBuffer());
-          const dec = decodeDepthmapPng(buf);
-          hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
-        } else {
-          // ✅ fallback canvas (8-bit) per JPG/WEBP ecc.
-          hm = await decodeDepthMapToHmStateCanvas(file, invertDepthMap, maxSize);
+          if (isPng) {
+            const buf = new Uint8Array(await file.arrayBuffer());
+            const dec = decodeDepthmapPng(buf);
+            hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
+
+            if (invertDepthMap) invertHmInPlace(hm);
+          } else {
+            // fallback canvas (8-bit)
+            hm = await decodeDepthMapToHmStateCanvas(file, invertDepthMap, maxSize);
+          }
+
+          if (!cancelled) {
+            setHmState(hm);
+            setHmStatus("ready");
+          }
+          return;
         }
-
-        // invert opzionale (se attivo)
-        if (invertDepthMap) invertHmInPlace(hm);
-
-        if (!cancelled) {
-          setHmState(hm);
-          setHmStatus("ready");
-        }
-        return;
- }     
+ 
       // --------------------------
       // IMAGE MODE (tua pipeline)
       // --------------------------
