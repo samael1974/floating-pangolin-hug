@@ -128,7 +128,7 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
         />
       </div>
 
-      <div className="space-y-2">
+            <div className="space-y-2">
         <Label>Spessore base (mm): {v.baseMm.toFixed(1)}</Label>
         <Slider
           disabled={disabled}
@@ -138,6 +138,9 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           step={0.1}
           onValueChange={(arr) => set({ baseMm: clamp(arr[0] ?? 0, 0, 20) })}
         />
+        <p className="text-xs text-slate-600">
+          Se imposti <span className="font-medium text-slate-700">0</span>, ottieni solo il rilievo (senza basetta).
+        </p>
       </div>
 
       <Separator />
