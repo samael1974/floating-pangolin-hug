@@ -414,28 +414,24 @@ downloadReliefStlBinary({
           </div>
 
           {/* STL Options */}
-          <div className="rounded-lg bg-white p-4 shadow space-y-4">
-            <div>
-              <div className="text-sm font-semibold">3) Genera STL</div>
-              <div className="text-xs text-gray-500">STL binario chiuso (stampabile).</div>
-            </div>
-
-            <div className="space-y-2">
+                    <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">Larghezza STL (mm)</span>
-                <span className="tabular-nums text-gray-700">{Math.round(stlWidthMm)} mm</span>
+                <span className="font-medium">Nome file STL</span>
+                <span className="text-xs text-gray-500">.stl</span>
               </div>
               <input
-                type="range"
-                min={30}
-                max={300}
-                step={1}
-                value={stlWidthMm}
-                onChange={(e) => setStlWidthMm(Number(e.target.value))}
-                className="w-full"
+                type="text"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="es. logo_giovanni_v1"
+                className="w-full rounded-md border px-3 py-2 text-sm"
                 disabled={!file}
               />
+              <div className="text-xs text-gray-500">
+                Se vuoto, userò un nome di default.
+              </div>
             </div>
+
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
