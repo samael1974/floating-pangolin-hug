@@ -4,6 +4,8 @@ import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefCon
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
 import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
+
+// ✅ 16-bit PNG support
 import { decodeDepthmapPng } from "@/lib/relief/decodeDepthmapPng";
 import { renderDepthmapToCanvas } from "@/lib/relief/renderDepthmapToCanvas";
 
@@ -56,11 +58,14 @@ function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState
 }
 
 /**
- * Decodifica depthmap via Canvas:
- * - Funziona per JPG/PNG/WEBP 8-bit (e per PNG 16-bit solo se il browser lo “schiaccia” a 8-bit in canvas)
- * - Il “vero 16-bit” lo facciamo dopo con parser PNG
+ * Fallback via Canvas (8-bit) per JPG/WEBP/PNG (se il browser lo “schiaccia”)
+ * Il “vero 16-bit” passa da decodeDepthmapPng() (solo PNG).
  */
-async function decodeDepthMapToHmState(file: File, invert: boolean, maxSize = 512): Promise<HeightmapState> {
+async function decodeDepthMapToHmStateCanvas(
+  file: File,
+  invert: boolean,
+  maxSize = 512
+): Promise<HeightmapState> {
   const img = await loadImageFromFile(file);
   const iw = img.naturalWidth || img.width;
   const ih = img.naturalHeight || img.height;
@@ -81,6 +86,11 @@ async function decodeDepthMapToHmState(file: File, invert: boolean, maxSize = 51
   return imageDataToNormF32(imgData, invert);
 }
 
+function invertHmInPlace(hm: HeightmapState) {
+  const a = hm.normF32;
+  for (let i = 0; i < a.length; i++) a[i] = 1 - clamp01(a[i] ?? 0);
+}
+
 export default function ReliefWizard() {
   // ✅ Preview tab (colonna destra)
   const [previewTab, setPreviewTab] = React.useState<"image" | "depth" | "stl">("stl");
@@ -96,7 +106,7 @@ export default function ReliefWizard() {
   // ✅ Canvas preview depthmap
   const dmCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
-  // ✅ Params (sempre modificabili, anche in depthmap)
+  // ✅ Params
   const [params, setParams] = React.useState<ReliefParams>(() => ({
     projectType: "logo_text",
     depthMm: 3,
@@ -139,7 +149,7 @@ export default function ReliefWizard() {
     if (hmStatus === "ready") setPreviewTab("stl");
   }, [hmStatus]);
 
-  // ✅ pipeline heightmap
+  // ✅ pipeline heightmap (image / depthmap 8-16bit)
   React.useEffect(() => {
     let cancelled = false;
 
@@ -154,8 +164,28 @@ export default function ReliefWizard() {
       const maxSize = 512;
 
       try {
+        // --------------------------
+        // DEPTHMAP MODE (8/16-bit PNG)
+        // --------------------------
         if (sourceMode === "depthmap") {
-          const hm = await decodeDepthMapToHmState(file, invertDepthMap, maxSize);
+          const isPng =
+            file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+
+          let hm: HeightmapState;
+
+          if (isPng) {
+            // ✅ vero 8/16-bit via parser PNG
+            const buf = await file.arrayBuffer();
+            const dec = decodeDepthmapPng(buf);
+            hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
+          } else {
+            // fallback 8-bit via canvas
+            hm = await decodeDepthMapToHmStateCanvas(file, false, maxSize);
+          }
+
+          // invert opzionale (se attivo)
+          if (invertDepthMap) invertHmInPlace(hm);
+
           if (!cancelled) {
             setHmState(hm);
             setHmStatus("ready");
@@ -163,7 +193,9 @@ export default function ReliefWizard() {
           return;
         }
 
-        // IMAGE -> tua pipeline
+        // --------------------------
+        // IMAGE MODE (tua pipeline)
+        // --------------------------
         const img = await loadImageFromFile(file);
         const iw = img.naturalWidth || img.width;
         const ih = img.naturalHeight || img.height;
@@ -236,33 +268,26 @@ export default function ReliefWizard() {
     params.baseStyle,
   ]);
 
-  // ✅ canvas draw (depthmap tab)
+  // ✅ draw canvas: quando hmState cambia (solo se siamo in depthmap mode)
   React.useEffect(() => {
     if (sourceMode !== "depthmap") return;
     if (!hmState) return;
     const c = dmCanvasRef.current;
     if (!c) return;
 
-    c.width = hmState.w;
-    c.height = hmState.h;
-
-    const ctx = c.getContext("2d");
-    if (!ctx) return;
-
-    const img = ctx.createImageData(hmState.w, hmState.h);
-    const d = img.data;
-
-    for (let i = 0; i < hmState.normF32.length; i++) {
-      const v = Math.round(clamp01(hmState.normF32[i]) * 255);
-      const j = i * 4;
-      d[j] = v;
-      d[j + 1] = v;
-      d[j + 2] = v;
-      d[j + 3] = 255;
-    }
-
-    ctx.putImageData(img, 0, 0);
+    renderDepthmapToCanvas(c, hmState.normF32, hmState.w, hmState.h);
   }, [sourceMode, hmState]);
+
+  // ✅ draw canvas: quando apro il tab "Depth map"
+  React.useEffect(() => {
+    if (previewTab !== "depth") return;
+    if (sourceMode !== "depthmap") return;
+    if (!hmState) return;
+    const c = dmCanvasRef.current;
+    if (!c) return;
+
+    renderDepthmapToCanvas(c, hmState.normF32, hmState.w, hmState.h);
+  }, [previewTab, sourceMode, hmState]);
 
   function downloadStl() {
     if (!hmState) return;
@@ -325,7 +350,9 @@ export default function ReliefWizard() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">1) Carica un file</div>
-                <div className="text-xs text-gray-500">JPG/JPEG/PNG/WEBP. Per Depth map: PNG consigliato.</div>
+                <div className="text-xs text-gray-500">
+                  JPG/JPEG/PNG/WEBP. Per Depth map: PNG consigliato.
+                </div>
               </div>
 
               {file && (
@@ -374,7 +401,9 @@ export default function ReliefWizard() {
           <div className="rounded-lg bg-white p-4 shadow space-y-3">
             <div>
               <div className="text-sm font-semibold">2) Parametri bassorilievo</div>
-              <div className="text-xs text-gray-500">I parametri restano attivi anche in modalità Depth map.</div>
+              <div className="text-xs text-gray-500">
+                I parametri restano attivi anche in modalità Depth map.
+              </div>
             </div>
 
             <div className="pt-2">
@@ -421,7 +450,9 @@ export default function ReliefWizard() {
                 className="w-full"
                 disabled={!file}
               />
-              <div className="text-xs text-gray-500">Suggerimento: x2–x3 spesso riduce rumore e alleggerisce lo STL.</div>
+              <div className="text-xs text-gray-500">
+                Suggerimento: x2–x3 spesso riduce rumore e alleggerisce lo STL.
+              </div>
             </div>
 
             <div className="flex flex-col gap-2 pt-2">
@@ -430,7 +461,9 @@ export default function ReliefWizard() {
                 onClick={downloadStl}
                 disabled={!canGenerate}
                 className={`rounded-md px-4 py-2 text-sm font-semibold ${
-                  canGenerate ? "bg-gray-900 text-white hover:bg-gray-800" : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                  canGenerate
+                    ? "bg-gray-900 text-white hover:bg-gray-800"
+                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 }`}
               >
                 Scarica STL
@@ -448,29 +481,39 @@ export default function ReliefWizard() {
           </div>
         </div>
 
-        {/* RIGHT (sticky): preview sempre visibile su desktop */}
+        {/* RIGHT */}
         <div className="md:sticky md:top-4 self-start">
           <div className="rounded-lg bg-white p-4 shadow space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">Anteprime</div>
-                <div className="text-xs text-gray-500">Il 3D resta visibile mentre modifichi i parametri.</div>
+                <div className="text-xs text-gray-500">
+                  Il 3D resta visibile mentre modifichi i parametri.
+                </div>
               </div>
 
               <div className="text-xs">
                 {hmStatus === "ready" ? (
-                  <span className="rounded-full bg-green-100 px-2 py-1 font-medium text-green-800">Heightmap pronta</span>
+                  <span className="rounded-full bg-green-100 px-2 py-1 font-medium text-green-800">
+                    Heightmap pronta
+                  </span>
                 ) : hmStatus === "loading" ? (
-                  <span className="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-800">Calcolo…</span>
+                  <span className="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-800">
+                    Calcolo…
+                  </span>
                 ) : hmStatus === "error" ? (
-                  <span className="rounded-full bg-red-100 px-2 py-1 font-medium text-red-800">Errore</span>
+                  <span className="rounded-full bg-red-100 px-2 py-1 font-medium text-red-800">
+                    Errore
+                  </span>
                 ) : (
-                  <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">In attesa</span>
+                  <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">
+                    In attesa
+                  </span>
                 )}
               </div>
             </div>
 
-            {/* 3D sempre in alto */}
+            {/* 3D */}
             <div className="rounded-md border overflow-hidden">
               <div className="flex items-center justify-between px-3 py-2 border-b bg-gray-50">
                 <div className="text-sm font-medium">Preview 3D</div>
@@ -478,20 +521,21 @@ export default function ReliefWizard() {
               </div>
 
               <div className="h-[420px] lg:h-[520px]">
-                {/* NOTE: adattiamo i props appena mi incolli la signature di ReliefPreview3D */}
-                <ReliefPreview3D {...({
-                  hmState,
-                  stlWidthMm,
-                  decimateStep,
-                  depthMm: params.depthMm,
-                  baseMm: params.baseMm,
-                  outputMode: params.outputMode,
-                  baseStyle: params.baseStyle,
-                } as any)} />
+                <ReliefPreview3D
+                  {...({
+                    hmState,
+                    stlWidthMm,
+                    decimateStep,
+                    depthMm: params.depthMm,
+                    baseMm: params.baseMm,
+                    outputMode: params.outputMode,
+                    baseStyle: params.baseStyle,
+                  } as any)}
+                />
               </div>
             </div>
 
-            {/* Tabs secondari */}
+            {/* Tabs */}
             <div className="rounded-md border overflow-hidden">
               <div className="flex items-center gap-2 px-3 py-2 border-b bg-gray-50">
                 <button
@@ -528,7 +572,11 @@ export default function ReliefWizard() {
                   <div className="space-y-2">
                     <div className="text-xs font-medium text-gray-700">Anteprima immagine</div>
                     {previewUrl ? (
-                      <img src={previewUrl} alt="Anteprima" className="w-full rounded-md border object-contain max-h-[240px]" />
+                      <img
+                        src={previewUrl}
+                        alt="Anteprima"
+                        className="w-full rounded-md border object-contain max-h-[240px]"
+                      />
                     ) : (
                       <div className="text-xs text-gray-500">Carica un file per vedere l’anteprima.</div>
                     )}
@@ -571,7 +619,7 @@ export default function ReliefWizard() {
             </div>
 
             <div className="text-[11px] text-gray-500">
-              Nota: il “vero 16-bit PNG” lo implementiamo dopo (parser PNG), qui la preview depthmap passa da canvas.
+              Nota: in modalità “Depth map”, i PNG vengono letti in vero 8/16-bit (parser PNG) e preview via canvas.
             </div>
           </div>
         </div>
