@@ -565,7 +565,7 @@ export default function ReliefWizard() {
                   type="button"
                   onClick={() => setPreviewTab("image")}
                   className={`rounded px-2 py-1 text-xs font-medium ${
-                    previewTab === "image" ? "bg-gray-900 text-white" : "bg-white text-gray-700 border"
+                    previewTab === "image" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] border hover:bg-gray-50"
                   }`}
                 >
                   Immagine
