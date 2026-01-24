@@ -13,7 +13,7 @@ type HeightmapState = {
 };
 
 type Props =
-<ReliefPreview3D
+ReliefPreview3D
   hmState={hmState}
   stlWidthMm={widthMm}
   decimateStep={previewDecimateStep}
@@ -21,7 +21,6 @@ type Props =
   baseMm={baseMm}
   outputMode="relief"
   baseStyle={baseStyle}
->
 };
 
 function decimateHm(hm: HeightmapState, step: number): HeightmapState {
