@@ -1,22 +1,25 @@
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
 import { geometryToBinaryStl } from "@/lib/stl/binaryStl";
-import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
+import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
 
-type Heightmap = { normF32: Float32Array; w: number; h: number };
+type HeightmapState = { normF32: Float32Array; w: number; h: number };
 
 function downloadArrayBuffer(buffer: ArrayBuffer, filename: string) {
+  const safeName = filename.toLowerCase().endsWith(".stl") ? filename : `${filename}.stl`;
   const blob = new Blob([buffer], { type: "application/octet-stream" });
   const url = URL.createObjectURL(blob);
+
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename;
+  a.download = safeName;
   document.body.appendChild(a);
   a.click();
   a.remove();
+
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function decimateHeightmap(hm: Heightmap, step: number): Heightmap {
+function decimateHeightmap(hm: HeightmapState, step: number): HeightmapState {
   const s = Math.max(1, Math.floor(step));
   if (s === 1) return hm;
 
@@ -29,12 +32,13 @@ function decimateHeightmap(hm: Heightmap, step: number): Heightmap {
     const y = Math.min(h - 1, y2 * s);
     for (let x2 = 0; x2 < w2; x2++) {
       const x = Math.min(w - 1, x2 * s);
-      out[y2 * w2 + x2] = normF32[y * w + x];
+      out[y2 * w2 + x2] = normF32[y * w + x] ?? 0;
     }
   }
 
   return { normF32: out, w: w2, h: h2 };
 }
+
 export function downloadReliefStlBinary(opts: {
   hm: HeightmapState;
   stlWidthMm: number;
@@ -43,7 +47,7 @@ export function downloadReliefStlBinary(opts: {
   baseMm: number;
   outputMode: OutputMode;
   baseStyle: BaseStyle;
-  filename?: string;
+  filename?: string; // ✅ nome custom
 }) {
   const {
     hm,
@@ -53,8 +57,10 @@ export function downloadReliefStlBinary(opts: {
     baseMm,
     outputMode,
     baseStyle,
-  } = args;
+    filename,
+  } = opts;
 
+  if (!hm) throw new Error("STL: hm mancante");
   if (hm.normF32.length !== hm.w * hm.h) {
     throw new Error("Heightmap mismatch: normF32 length != w*h");
   }
@@ -85,21 +91,23 @@ export function downloadReliefStlBinary(opts: {
     throw new Error(`STL corrotto: expected ${expected} bytes, got ${stl.byteLength}`);
   }
 
-  const tag = `${outputMode}_${baseStyle}`;
-  downloadArrayBuffer(stl, `reliefforge_${tag}_${stlWidthMm.toFixed(0)}mm.stl`);
+  const defaultName = `reliefforge_${outputMode}_${baseStyle}_${stlWidthMm.toFixed(0)}mm.stl`;
+  downloadArrayBuffer(stl, filename?.trim() ? filename.trim() : defaultName);
 }
 
 // --- COMPAT LAYER (se qualche file vecchio lo importa)
 export function downloadTextFile(filename: string, text: string) {
+  const safeName = filename.toLowerCase().endsWith(".txt") ? filename : `${filename}.txt`;
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const filename = opts.filename ?? "relief.stl";
-const a = document.createElement("a");
-a.href = URL.createObjectURL(blob);
-a.download = filename;
-a.click();
 
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = safeName;
+  document.body.appendChild(a);
+  a.click();
   a.remove();
+
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
