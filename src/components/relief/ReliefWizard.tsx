@@ -473,7 +473,21 @@ export default function ReliefWizard() {
       <button
         type="button"
         onClick={() => {
-          alert(`Workflow GPT:\n1) Esporta PNG grayscale 16-bit.\n2) In app usa “Depth map”.\n3) Se errori: usa “Immagine”.`);
+          alert(
+  "🤖 Workflow consigliato (GPT → Depth Map → STL):\n\n" +
+  "1) Nel GPT chiedi:\n" +
+  "   • depth map grayscale\n" +
+  "   • PNG 16-bit\n" +
+  "   • superfici lisce, poco rumore\n" +
+  "   • buon contrasto (niente banding)\n\n" +
+  "2) Qui seleziona:\n" +
+  "   Sorgente → Depth map (8/16-bit)\n\n" +
+  "3) Se il rilievo è al contrario:\n" +
+  "   attiva 'Inverti depth map'\n\n" +
+  "4) Se hai errori o dubbi:\n" +
+  "   passa a 'Modalità Immagine' (più tollerante)."
+);
+
         }}
         className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
       >
