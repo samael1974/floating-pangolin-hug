@@ -109,7 +109,6 @@ export default function ReliefWizard() {
   // ✅ Nome file STL (personalizzabile)
   const [customName, setCustomName] = React.useState<string>("reliefforge");
 
-
   // ✅ Params
   const [params, setParams] = React.useState<ReliefParams>(() => ({
     projectType: "logo_text",
@@ -153,25 +152,25 @@ export default function ReliefWizard() {
     if (hmStatus === "ready") setPreviewTab("stl");
   }, [hmStatus]);
 
- // ✅ pipeline heightmap (image / depthmap 8-16bit)
-React.useEffect(() => {
-  let cancelled = false;
+  // ✅ pipeline heightmap (image / depthmap 8-16bit)
+  React.useEffect(() => {
+    let cancelled = false;
 
-  async function run() {
-    if (!file) {
-      setHmState(null);
-      setHmStatus("idle");
-      return;
-    }
+    async function run() {
+      if (!file) {
+        setHmState(null);
+        setHmStatus("idle");
+        return;
+      }
 
-    setHmStatus("loading");
-    const maxSize = 512;
+      setHmStatus("loading");
+      const maxSize = 512;
 
-    try {
-      // --------------------------
-      // DEPTHMAP MODE (PNG 8/16-bit + fallback canvas)
-      // --------------------------
-            if (sourceMode === "depthmap") {
+      try {
+        // --------------------------
+        // DEPTHMAP MODE (PNG 8/16-bit + fallback canvas)
+        // --------------------------
+        if (sourceMode === "depthmap") {
           const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
 
           let hm: HeightmapState;
@@ -180,7 +179,6 @@ React.useEffect(() => {
             const buf = new Uint8Array(await file.arrayBuffer());
             const dec = decodeDepthmapPng(buf);
             hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
-
             if (invertDepthMap) invertHmInPlace(hm);
           } else {
             // fallback canvas (8-bit)
@@ -193,81 +191,81 @@ React.useEffect(() => {
           }
           return;
         }
- 
-      // --------------------------
-      // IMAGE MODE (tua pipeline)
-      // --------------------------
-      const img = await loadImageFromFile(file);
-      const iw = img.naturalWidth || img.width;
-      const ih = img.naturalHeight || img.height;
 
-      const scale = Math.min(1, maxSize / Math.max(iw, ih));
-      const w = Math.max(2, Math.round(iw * scale));
-      const h = Math.max(2, Math.round(ih * scale));
+        // --------------------------
+        // IMAGE MODE (tua pipeline)
+        // --------------------------
+        const img = await loadImageFromFile(file);
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
 
-      const off = document.createElement("canvas");
-      off.width = w;
-      off.height = h;
+        const scale = Math.min(1, maxSize / Math.max(iw, ih));
+        const w = Math.max(2, Math.round(iw * scale));
+        const h = Math.max(2, Math.round(ih * scale));
 
-      const ctx = off.getContext("2d", { willReadFrequently: true });
-      if (!ctx) throw new Error("Canvas 2D non disponibile");
+        const off = document.createElement("canvas");
+        off.width = w;
+        off.height = h;
 
-      ctx.drawImage(img, 0, 0, w, h);
-      const imgData = ctx.getImageData(0, 0, w, h);
+        const ctx = off.getContext("2d", { willReadFrequently: true });
+        if (!ctx) throw new Error("Canvas 2D non disponibile");
 
-      const hmAny: any = buildHeightmapFromImageData(imgData, params, {
-        normalize: true,
-        percentileClip: 0.02,
-      });
+        ctx.drawImage(img, 0, 0, w, h);
+        const imgData = ctx.getImageData(0, 0, w, h);
 
-      const outW = Number(hmAny?.w ?? hmAny?.width ?? w);
-      const outH = Number(hmAny?.h ?? hmAny?.height ?? h);
+        const hmAny: any = buildHeightmapFromImageData(imgData, params, {
+          normalize: true,
+          percentileClip: 0.02,
+        });
 
-      let normF32: Float32Array;
-      if (hmAny?.normF32 instanceof Float32Array) {
-        normF32 = hmAny.normF32;
-      } else if (hmAny?.grayU8 instanceof Uint8Array) {
-        const g = hmAny.grayU8 as Uint8Array;
-        normF32 = new Float32Array(g.length);
-        for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
-      } else {
-        throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
-      }
+        const outW = Number(hmAny?.w ?? hmAny?.width ?? w);
+        const outH = Number(hmAny?.h ?? hmAny?.height ?? h);
 
-      if (normF32.length !== outW * outH) {
-        throw new Error(`Heightmap mismatch: normF32(${normF32.length}) != ${outW}*${outH}`);
-      }
+        let normF32: Float32Array;
+        if (hmAny?.normF32 instanceof Float32Array) {
+          normF32 = hmAny.normF32;
+        } else if (hmAny?.grayU8 instanceof Uint8Array) {
+          const g = hmAny.grayU8 as Uint8Array;
+          normF32 = new Float32Array(g.length);
+          for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
+        } else {
+          throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
+        }
 
-      if (!cancelled) {
-        setHmState({ normF32, w: outW, h: outH });
-        setHmStatus("ready");
-      }
-    } catch (e) {
-      console.error(e);
-      if (!cancelled) {
-        setHmState(null);
-        setHmStatus("error");
+        if (normF32.length !== outW * outH) {
+          throw new Error(`Heightmap mismatch: normF32(${normF32.length}) != ${outW}*${outH}`);
+        }
+
+        if (!cancelled) {
+          setHmState({ normF32, w: outW, h: outH });
+          setHmStatus("ready");
+        }
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          setHmState(null);
+          setHmStatus("error");
+        }
       }
     }
-  }
 
-  run();
-  return () => {
-    cancelled = true;
-  };
-}, [
-  file,
-  sourceMode,
-  invertDepthMap,
-  params.projectType,
-  params.depthMm,
-  params.baseMm,
-  params.detail,
-  params.smooth,
-  params.edge,
-  params.outputMode,
-  params.baseStyle,
-]);
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    file,
+    sourceMode,
+    invertDepthMap,
+    params.projectType,
+    params.depthMm,
+    params.baseMm,
+    params.detail,
+    params.smooth,
+    params.edge,
+    params.outputMode,
+    params.baseStyle,
+  ]);
 
   // ✅ draw canvas: quando apro il tab "Depth map"
   React.useEffect(() => {
@@ -283,8 +281,7 @@ React.useEffect(() => {
   function downloadStl() {
     if (!hmState) return;
 
-    const safe =
-      (customName || "").trim().replace(/[\\/:*?"<>|]+/g, "_") || "reliefforge";
+    const safe = (customName || "").trim().replace(/[\\/:*?"<>|]+/g, "_") || "reliefforge";
 
     downloadReliefStlBinary({
       hm: hmState,
@@ -297,13 +294,6 @@ React.useEffect(() => {
       filename: `${safe}.stl`,
     });
   }
-
-  return (
-    <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
-      {/* TUTTO IL JSX CHE AVEVI PRIMA, IDENTICO */}
-    </div>
-  );
-}
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
@@ -414,7 +404,14 @@ React.useEffect(() => {
           </div>
 
           {/* STL Options */}
-                    <div className="space-y-2">
+          <div className="rounded-lg bg-white p-4 shadow space-y-4">
+            <div>
+              <div className="text-sm font-semibold">3) Genera STL</div>
+              <div className="text-xs text-gray-500">STL binario chiuso (stampabile).</div>
+            </div>
+
+            {/* Nome file */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium">Nome file STL</span>
                 <span className="text-xs text-gray-500">.stl</span>
@@ -427,11 +424,25 @@ React.useEffect(() => {
                 className="w-full rounded-md border px-3 py-2 text-sm"
                 disabled={!file}
               />
-              <div className="text-xs text-gray-500">
-                Se vuoto, userò un nome di default.
-              </div>
+              <div className="text-xs text-gray-500">Se vuoto, userò un nome di default.</div>
             </div>
 
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Larghezza STL (mm)</span>
+                <span className="tabular-nums text-gray-700">{Math.round(stlWidthMm)} mm</span>
+              </div>
+              <input
+                type="range"
+                min={30}
+                max={300}
+                step={1}
+                value={stlWidthMm}
+                onChange={(e) => setStlWidthMm(Number(e.target.value))}
+                className="w-full"
+                disabled={!file}
+              />
+            </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
@@ -485,9 +496,7 @@ React.useEffect(() => {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">Anteprime</div>
-                <div className="text-xs text-gray-500">
-                  Il 3D resta visibile mentre modifichi i parametri.
-                </div>
+                <div className="text-xs text-gray-500">Il 3D resta visibile mentre modifichi i parametri.</div>
               </div>
 
               <div className="text-xs">
@@ -625,4 +634,3 @@ React.useEffect(() => {
     </div>
   );
 }
-
