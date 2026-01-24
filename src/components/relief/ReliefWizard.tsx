@@ -12,16 +12,12 @@ type HeightmapState = {
 
 type HeightmapBuildOutput =
   | { normF32: Float32Array; w: number; h: number }
-  | {
-      grayU8: Uint8Array;
-      w?: number;
-      h?: number;
-      width?: number;
-      height?: number;
-    };
+  | { grayU8: Uint8Array; w?: number; h?: number; width?: number; height?: number };
 
 function clamp01(x: number): number {
-  return x < 0 ? 0 : x > 1 ? 1 : x;
+  if (x < 0) return 0;
+  if (x > 1) return 1;
+  return x;
 }
 
 async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
@@ -63,7 +59,7 @@ function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState
 }
 
 /**
- * Fallback Canvas (8-bit) per JPG/WEBP/PNG
+ * Fallback Canvas (8-bit) per JPG/WEBP/PNG.
  * Il vero 16-bit passa da decodeDepthmapPng (solo PNG).
  */
 async function decodeDepthMapToHmStateCanvas(
@@ -88,11 +84,13 @@ async function decodeDepthMapToHmStateCanvas(
 
   ctx.drawImage(img, 0, 0, w, h);
   const imgData = ctx.getImageData(0, 0, w, h);
+
   return imageDataToNormF32(imgData, invert);
 }
 
 function invertHmInPlace(hm: HeightmapState): void {
   const a = hm.normF32;
-  for (let i = 0; i < a.length; i++) a[i] = 1 - clamp01(a[i] ?? 0);
+  for (let i = 0; i < a.length; i++) {
+    a[i] = 1 - clamp01(a[i] ?? 0);
+  }
 }
-
