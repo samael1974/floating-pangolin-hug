@@ -297,7 +297,7 @@ React.useEffect(() => {
       filename: `${safe}.stl`,
     });
   }
- }
+}
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
