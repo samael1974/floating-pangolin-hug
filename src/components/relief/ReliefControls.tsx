@@ -171,13 +171,18 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
 
       <Separator />
 
-      <div className="flex items-center justify-between">
-        <Label>Bordi arrotondati</Label>
-        <Switch
-          disabled={disabled}
-          checked={v.edge === "round"}
-          onCheckedChange={(checked) => set({ edge: checked ? "round" : "sharp" })}
-        />
+            <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <Label>Bordi arrotondati</Label>
+          <Switch
+            disabled={disabled}
+            checked={v.edge === "round"}
+            onCheckedChange={(checked) => set({ edge: checked ? "round" : "sharp" })}
+          />
+        </div>
+        <p className="text-xs text-slate-600">
+          Attivo = bordi più morbidi. Disattivo = bordi più incisi (più “taglienti”).
+        </p>
       </div>
     </div>
   );
