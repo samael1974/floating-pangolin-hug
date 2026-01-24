@@ -332,15 +332,16 @@ export default function ReliefWizard() {
             </div>
 
             {sourceMode === "depthmap" && (
-              <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={invertDepthMap}
-                  onChange={(e) => setInvertDepthMap(e.target.checked)}
-                />
-                Inverti depth map
-              </label>
-            )}
+  <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
+    <input
+      type="checkbox"
+      checked={invertDepthMap}
+      onChange={(e) => setInvertDepthMap(e.target.checked)}
+    />
+    <span>Inverti depth map</span>
+    <span className="text-xs text-gray-500">(se viene “al contrario”)</span>
+  </label>
+)}
           </div>
 
           {/* Upload */}
