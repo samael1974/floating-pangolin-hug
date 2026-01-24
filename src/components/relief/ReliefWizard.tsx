@@ -419,25 +419,26 @@ export default function ReliefWizard() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-2">
-            <a
-              href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5"
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-            >
-              Apri il GPT
-            </a>
+            <DialogFooter className="gap-2 sm:gap-2">
+          <a
+            href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+          >
+            Apri il GPT
+          </a>
 
-            <button
-              type="button"
-              onClick={() => setOpenGptHowTo(false)}
-              className="rounded-md bg-[#1F4E5F] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
-            >
-              Ok
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
+          <button
+            type="button"
+            onClick={() => setOpenGptHowTo(false)}
+            className="rounded-md bg-[#1F4E5F] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+          >
+            Ok
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </div>
+);
+
