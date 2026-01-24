@@ -10,8 +10,9 @@ export default function Index() {
         <div className="grid items-center gap-8 md:grid-cols-2">
           <div className="space-y-5">
             <div className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs text-slate-600 shadow-sm">
-              Tool gratuito • STL stampabile • Flow rapido
-            </div>
+  Tool gratuito • STL manifold • PNG 16-bit • Nessun account
+</div>
+
 
          <h1 className="text-4xl font-bold tracking-tight text-[#1F4E5F] md:text-5xl">
   Trasforma una foto in un bassorilievo STL stampabile in pochi minuti.
