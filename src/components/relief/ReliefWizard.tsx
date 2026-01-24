@@ -149,129 +149,123 @@ export default function ReliefWizard() {
     if (hmStatus === "ready") setPreviewTab("stl");
   }, [hmStatus]);
 
-  // ✅ pipeline heightmap (image / depthmap 8-16bit)
-  React.useEffect(() => {
-    let cancelled = false;
+ // ✅ pipeline heightmap (image / depthmap 8-16bit)
+React.useEffect(() => {
+  let cancelled = false;
 
-    async function run() {
-      if (!file) {
-        setHmState(null);
-        setHmStatus("idle");
+  async function run() {
+    if (!file) {
+      setHmState(null);
+      setHmStatus("idle");
+      return;
+    }
+
+    setHmStatus("loading");
+    const maxSize = 512;
+
+    try {
+      // --------------------------
+      // DEPTHMAP MODE (PNG 8/16-bit + fallback canvas)
+      // --------------------------
+      if (sourceMode === "depthmap") {
+        const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+
+        let hm: HeightmapState;
+
+        if (isPng) {
+          // ✅ vero 8/16-bit via parser PNG
+          const buf = new Uint8Array(await file.arrayBuffer());
+          const dec = decodeDepthmapPng(buf);
+          hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
+        } else {
+          // ✅ fallback canvas (8-bit) per JPG/WEBP ecc.
+          hm = await decodeDepthMapToHmStateCanvas(file, invertDepthMap, maxSize);
+        }
+
+        // invert opzionale (se attivo)
+        if (invertDepthMap) invertHmInPlace(hm);
+
+        if (!cancelled) {
+          setHmState(hm);
+          setHmStatus("ready");
+        }
         return;
       }
 
-      setHmStatus("loading");
-      const maxSize = 512;
+      // --------------------------
+      // IMAGE MODE (tua pipeline)
+      // --------------------------
+      const img = await loadImageFromFile(file);
+      const iw = img.naturalWidth || img.width;
+      const ih = img.naturalHeight || img.height;
 
-      try {
-        // --------------------------
-        // DEPTHMAP MODE (8/16-bit PNG)
-        // --------------------------
-        if (sourceMode === "depthmap") {
-          const isPng =
-            file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+      const scale = Math.min(1, maxSize / Math.max(iw, ih));
+      const w = Math.max(2, Math.round(iw * scale));
+      const h = Math.max(2, Math.round(ih * scale));
 
-          let hm: HeightmapState;
+      const off = document.createElement("canvas");
+      off.width = w;
+      off.height = h;
 
-          if (isPng) {
-            // ✅ vero 8/16-bit via parser PNG
-        const buf = new Uint8Array(await file.arrayBuffer());
-const dec = decodeDepthmapPng(buf);
-hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
-          // invert opzionale (se attivo)
-          if (invertDepthMap) invertHmInPlace(hm);
+      const ctx = off.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("Canvas 2D non disponibile");
 
-          if (!cancelled) {
-            setHmState(hm);
-            setHmStatus("ready");
-          }
-          return;
-        }
+      ctx.drawImage(img, 0, 0, w, h);
+      const imgData = ctx.getImageData(0, 0, w, h);
 
-        // --------------------------
-        // IMAGE MODE (tua pipeline)
-        // --------------------------
-        const img = await loadImageFromFile(file);
-        const iw = img.naturalWidth || img.width;
-        const ih = img.naturalHeight || img.height;
+      const hmAny: any = buildHeightmapFromImageData(imgData, params, {
+        normalize: true,
+        percentileClip: 0.02,
+      });
 
-        const scale = Math.min(1, maxSize / Math.max(iw, ih));
-        const w = Math.max(2, Math.round(iw * scale));
-        const h = Math.max(2, Math.round(ih * scale));
+      const outW = Number(hmAny?.w ?? hmAny?.width ?? w);
+      const outH = Number(hmAny?.h ?? hmAny?.height ?? h);
 
-        const off = document.createElement("canvas");
-        off.width = w;
-        off.height = h;
+      let normF32: Float32Array;
+      if (hmAny?.normF32 instanceof Float32Array) {
+        normF32 = hmAny.normF32;
+      } else if (hmAny?.grayU8 instanceof Uint8Array) {
+        const g = hmAny.grayU8 as Uint8Array;
+        normF32 = new Float32Array(g.length);
+        for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
+      } else {
+        throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
+      }
 
-        const ctx = off.getContext("2d", { willReadFrequently: true });
-        if (!ctx) throw new Error("Canvas 2D non disponibile");
+      if (normF32.length !== outW * outH) {
+        throw new Error(`Heightmap mismatch: normF32(${normF32.length}) != ${outW}*${outH}`);
+      }
 
-        ctx.drawImage(img, 0, 0, w, h);
-        const imgData = ctx.getImageData(0, 0, w, h);
-
-        const hmAny: any = buildHeightmapFromImageData(imgData, params, {
-          normalize: true,
-          percentileClip: 0.02,
-        });
-
-        const outW = Number(hmAny?.w ?? hmAny?.width ?? w);
-        const outH = Number(hmAny?.h ?? hmAny?.height ?? h);
-
-        let normF32: Float32Array;
-        if (hmAny?.normF32 instanceof Float32Array) {
-          normF32 = hmAny.normF32;
-        } else if (hmAny?.grayU8 instanceof Uint8Array) {
-          const g = hmAny.grayU8 as Uint8Array;
-          normF32 = new Float32Array(g.length);
-          for (let i = 0; i < g.length; i++) normF32[i] = g[i] / 255;
-        } else {
-          throw new Error("Heightmap pipeline: output non valido (manca normF32/grayU8)");
-        }
-
-        if (normF32.length !== outW * outH) {
-          throw new Error(`Heightmap mismatch: normF32(${normF32.length}) != ${outW}*${outH}`);
-        }
-
-        if (!cancelled) {
-          setHmState({ normF32, w: outW, h: outH });
-          setHmStatus("ready");
-        }
-      } catch (e) {
-        console.error(e);
-        if (!cancelled) {
-          setHmState(null);
-          setHmStatus("error");
-        }
+      if (!cancelled) {
+        setHmState({ normF32, w: outW, h: outH });
+        setHmStatus("ready");
+      }
+    } catch (e) {
+      console.error(e);
+      if (!cancelled) {
+        setHmState(null);
+        setHmStatus("error");
       }
     }
+  }
 
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    file,
-    sourceMode,
-    invertDepthMap,
-    params.projectType,
-    params.depthMm,
-    params.baseMm,
-    params.detail,
-    params.smooth,
-    params.edge,
-    params.outputMode,
-    params.baseStyle,
-  ]);
-
-  // ✅ draw canvas: quando hmState cambia (solo se siamo in depthmap mode)
-  React.useEffect(() => {
-    if (sourceMode !== "depthmap") return;
-    if (!hmState) return;
-    const c = dmCanvasRef.current;
-    if (!c) return;
-
-    renderDepthmapToCanvas(c, hmState.normF32, hmState.w, hmState.h);
-  }, [sourceMode, hmState]);
+  run();
+  return () => {
+    cancelled = true;
+  };
+}, [
+  file,
+  sourceMode,
+  invertDepthMap,
+  params.projectType,
+  params.depthMm,
+  params.baseMm,
+  params.detail,
+  params.smooth,
+  params.edge,
+  params.outputMode,
+  params.baseStyle,
+]);
 
   // ✅ draw canvas: quando apro il tab "Depth map"
   React.useEffect(() => {
