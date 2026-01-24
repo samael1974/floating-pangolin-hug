@@ -68,27 +68,6 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
 const set = (patch: Partial<ReliefParams>) =>
   onChange({ ...v, ...patch, outputMode: "relief" });
 
-  return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label>Tipo progetto</Label>
-        <Select
-          disabled={disabled}
-          value={v.projectType}
-          onValueChange={(x) => set({ projectType: x as ProjectType })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Scegli..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="logo_text">Logo / Testo</SelectItem>
-            <SelectItem value="human_face">Volto umano</SelectItem>
-            <SelectItem value="animal">Animale</SelectItem>
-            <SelectItem value="nature_landscape">Natura / Paesaggio</SelectItem>
-            <SelectItem value="decorative_pattern">Pattern decorativo</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
 
       <Separator />
 
