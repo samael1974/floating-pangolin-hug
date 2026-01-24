@@ -195,6 +195,8 @@ React.useEffect(() => {
         }
         return;
       }
+      }
+
 
       // --------------------------
       // IMAGE MODE (tua pipeline)
