@@ -4,6 +4,8 @@ import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefCon
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
 import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
+import { decodeDepthmapPng } from "@/lib/relief/decodeDepthmapPng";
+import { renderDepthmapToCanvas } from "@/lib/relief/renderDepthmapToCanvas";
 
 type SourceMode = "image" | "depthmap";
 
