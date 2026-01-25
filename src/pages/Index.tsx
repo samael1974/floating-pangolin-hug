@@ -20,7 +20,7 @@ export default function Index() {
     aria-hidden="true"
   >
     <img
-      src="/home/reliefforge-logo.svg"
+      src="/home/reliefforge-logo-compasso.svg"
       alt=""
       className="h-7 w-7 text-[#1F4E5F]"
       style={{ color: "#1F4E5F" }}
