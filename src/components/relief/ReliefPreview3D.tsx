@@ -45,31 +45,41 @@ function decimateHm(hm: HeightmapState, step: number): HeightmapState {
  * HeadLight: segue la camera (specular “leggibile” e stabile).
  * Non fa castShadow: evita completamente scintillio/aliasing.
  */
-function HeadLight() {
+function CameraKeyLight({ intensity = 1.6 }: { intensity?: number }) {
   const ref = React.useRef<THREE.DirectionalLight>(null);
   const { camera } = useThree();
 
   useFrame(() => {
     const l = ref.current;
     if (!l) return;
-    // posizione leggermente avanti e sopra la camera
-    const dir = new THREE.Vector3(0.35, -0.6, 0.75).normalize();
-    const pos = camera.position.clone().add(dir.multiplyScalar(600));
+
+    // vettori camera
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+
+    const up = new THREE.Vector3(0, 0, 1);
+
+    // "right" = forward x up (laterale)
+    const right = new THREE.Vector3().crossVectors(forward, up).normalize();
+
+    // posizione: vicino camera ma spostato lateralmente = luce RADENTE costante
+    const pos = camera.position
+      .clone()
+      .add(right.multiplyScalar(650))     // laterale (grazing)
+      .add(up.multiplyScalar(120))        // un filo dall’alto
+      .add(forward.multiplyScalar(-80));  // leggermente dietro la camera
+
     l.position.copy(pos);
     l.target.position.set(0, 0, 0);
     l.target.updateMatrixWorld();
   });
 
   return (
-    <>
-      <directionalLight
-        ref={ref}
-        intensity={0.65}
-        color={"#ffffff"}
-      />
-      {/* target necessario per directionalLight */}
-      <object3D />
-    </>
+    <directionalLight
+      ref={ref}
+      intensity={intensity}
+      color={"#ffffff"}
+    />
   );
 }
 
