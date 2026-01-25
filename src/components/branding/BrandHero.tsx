@@ -24,7 +24,7 @@ export default function BrandHero({ showBackLink = false }: BrandHeroProps) {
               >
   
   <img
-  src="/home/"reliefforge-logo.png"
+  src="/home/reliefforge-logo.png"
   alt="ReliefForge"
   className="h-7 w-4.5"
   loading="eager"
