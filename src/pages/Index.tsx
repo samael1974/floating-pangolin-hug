@@ -28,9 +28,10 @@ export default function Index() {
     />
   </div>
 
-  <h1 className="text-4xl font-extrabold tracking-tight text-[#1F4E5F] md:text-5xl">
-    ReliefForge
-  </h1>
+ <h1 className="text-4xl font-extrabold tracking-tight text-[#1F4E5F] md:text-5xl">
+  <span className="text-[#E26D5C]">R</span>elief
+  <span className="text-[#E26D5C]">F</span>orge
+</h1>
 </div>
 
             <p className="text-sm text-slate-600 md:text-base">
