@@ -774,7 +774,12 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
 
               {/* Pannello istruzioni (inline, no modal) */}
               {showInstructions && (
-                <div className="border-b bg-white px-3 py-3 text-xs text-gray-700">
+                <div
+  id="rf-instructions"
+  role="region"
+  className="border-b bg-white px-3 py-3 text-xs text-gray-700"
+>
+
                   <div className="text-sm font-semibold text-gray-900">Come funziona ReliefForge</div>
                   <div className="mt-1 text-xs text-gray-500">
                     In 3 passaggi trasformi un’immagine (o una depth map) in uno STL chiuso e stampabile.
