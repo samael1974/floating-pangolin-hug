@@ -167,15 +167,21 @@ export default function ReliefPreview3D(props: Props) {
   }
 
   return (
-    <Canvas
-      shadows
-      dpr={[1, 2]}
-      gl={{ antialias: true }}
-      // 📷 Camera più leggibile: inclinazione leggera, niente frontale perfetta (2.3)
-      camera={{ position: [180, -260, 220], fov: 38, near: 0.1, far: 8000 }}
-      style={{ width: "100%", height: "100%" }}
-    >
-      <Scene geometry={geometry} />
-    </Canvas>
-  );
+return (
+  <Canvas
+    shadows
+    dpr={[1, 2]}
+    gl={{ antialias: true, alpha: true }}
+    onCreated={({ gl }) => {
+      gl.toneMapping = THREE.ACESFilmicToneMapping;
+      gl.toneMappingExposure = 1.15;
+      gl.outputColorSpace = THREE.SRGBColorSpace;
+    }}
+    camera={{ position: [180, -260, 220], fov: 38, near: 0.1, far: 8000 }}
+    style={{ width: "100%", height: "100%" }}
+  >
+    <color attach="background" args={["#f6f7fb"]} />
+    <Scene geometry={geometry} />
+  </Canvas>
+);
 }
