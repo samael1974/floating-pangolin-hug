@@ -198,7 +198,7 @@ export default function ReliefPreview3D(props: Props) {
         gl.toneMappingExposure = 1.0;
         gl.outputColorSpace = THREE.SRGBColorSpace;
       }}
-      camera={{ position: [180, -260, 220], fov: 38, near: 0.1, far: 8000 }}
+      camera={{ position: [0, -520, 520], fov: 35, near: 0.1, far: 8000 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#f6f7fb"]} />
