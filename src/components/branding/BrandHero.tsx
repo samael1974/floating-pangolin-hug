@@ -6,6 +6,9 @@ type BrandHeroProps = {
 };
 
 export default function BrandHero({ showBackLink = false }: BrandHeroProps) {
+  // ✅ usa BASE_URL di Vite (robusto anche se cambi base path)
+  const logoSrc = `${import.meta.env.BASE_URL}home/rf-logo.png`;
+
   return (
     <header className="bg-[#ECECEC]">
       <div className="mx-auto w-full max-w-6xl px-4 pt-8 pb-5">
@@ -22,15 +25,22 @@ export default function BrandHero({ showBackLink = false }: BrandHeroProps) {
                 className="grid h-10 w-10 place-items-center rounded-xl bg-white shadow-sm"
                 aria-hidden="true"
               >
-  
-  <img src="/home/rf-logo.png" alt="ReliefForge" className="h-7 w-auto" loading="eager" />
-
+                <img
+                  src={logoSrc}
+                  alt="ReliefForge"
+                  className="h-7 w-auto"
+                  loading="eager"
+                  onError={(e) => {
+                    // fallback: nasconde l’immagine se manca (evita “icona rotta”)
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
+                />
               </div>
 
               <h1 className="text-4xl font-extrabold tracking-tight text-[#1F4E5F] md:text-5xl">
-  <span className="text-[#E26D5C]">R</span>elief
-  <span className="text-[#E26D5C]">F</span>orge
-</h1>
+                <span className="text-[#E26D5C]">R</span>elief
+                <span className="text-[#E26D5C]">F</span>orge
+              </h1>
             </div>
 
             {/* Value proposition */}
@@ -66,3 +76,4 @@ export default function BrandHero({ showBackLink = false }: BrandHeroProps) {
     </header>
   );
 }
+
