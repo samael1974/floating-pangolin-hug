@@ -824,11 +824,7 @@ export default function ReliefWizard() {
 
   const fmt = (n: number, d = 2) => (Number.isFinite(n) ? n.toFixed(d) : "—");
 
-  // --- Dimensioni in pianta (X×Y) + scala mm/px ---
-  // NB: qui ho messo più nomi possibili per la larghezza STL.
-  // Appena mi dici il nome esatto, togliamo i fallback e il cast.
-  const stlWidthMm = Number((params as any)?.widthMm ?? (params as any)?.stlWidthMm ?? (params as any)?.outWidthMm ?? 0);
-
+  // Dimensioni in pianta + scala mm/px (derivate dalla width STL e dalla heightmap)
   const hmW = hmState?.w ?? 0;
   const hmH = hmState?.h ?? 0;
 
