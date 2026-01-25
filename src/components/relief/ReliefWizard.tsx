@@ -766,6 +766,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
                     showInstructions ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                   }`}
                   aria-expanded={showInstructions}
+                  aria-controls="rf-instructions"
                 >
                   {showInstructions ? "Chiudi istruzioni" : "Istruzioni"}
                 </button>
