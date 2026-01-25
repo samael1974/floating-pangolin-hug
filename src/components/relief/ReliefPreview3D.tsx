@@ -202,7 +202,7 @@ export default function ReliefPreview3D(props: Props) {
       gl={{ antialias: true, alpha: true }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 0.7;
+        gl.toneMappingExposure = 0.3;
         gl.outputColorSpace = THREE.SRGBColorSpace;
         // niente shadowMap qui: il tremolio arrivava dalle ombre vere
       }}
