@@ -42,8 +42,27 @@ function decimateHm(hm: HeightmapState, step: number): HeightmapState {
 }
 
 /**
- * HeadLight: segue la camera (specular “leggibile” e stabile).
- * Non fa castShadow: evita completamente scintillio/aliasing.
+ * HeadLight: fill leggero che segue la camera.
+ * Niente ombre: zero shimmer.
+ */
+function HeadLight({ intensity = 0.3 }: { intensity?: number }) {
+  const ref = React.useRef<THREE.DirectionalLight>(null);
+  const { camera } = useThree();
+
+  useFrame(() => {
+    const l = ref.current;
+    if (!l) return;
+    l.position.copy(camera.position);
+    l.target.position.set(0, 0, 0);
+    l.target.updateMatrixWorld();
+  });
+
+  return <directionalLight ref={ref} intensity={intensity} color={"#ffffff"} />;
+}
+
+/**
+ * CameraKeyLight: key radente DINAMICA che segue la camera ma resta laterale.
+ * Serve a mantenere leggibilità simile tra “front” e “back”.
  */
 function CameraKeyLight({ intensity = 1.6 }: { intensity?: number }) {
   const ref = React.useRef<THREE.DirectionalLight>(null);
@@ -53,36 +72,20 @@ function CameraKeyLight({ intensity = 1.6 }: { intensity?: number }) {
     const l = ref.current;
     if (!l) return;
 
-    // vettori camera
     const forward = new THREE.Vector3();
     camera.getWorldDirection(forward);
 
     const up = new THREE.Vector3(0, 0, 1);
-
-    // "right" = forward x up (laterale)
     const right = new THREE.Vector3().crossVectors(forward, up).normalize();
 
-    // posizione: vicino camera ma spostato lateralmente = luce RADENTE costante
+    // luce radente: laterale + un filo dall’alto + leggermente dietro
     const pos = camera.position
       .clone()
-      .add(right.multiplyScalar(650))     // laterale (grazing)
-      .add(up.multiplyScalar(120))        // un filo dall’alto
-      .add(forward.multiplyScalar(-80));  // leggermente dietro la camera
+      .add(right.multiplyScalar(650))
+      .add(up.multiplyScalar(120))
+      .add(forward.multiplyScalar(-80));
 
     l.position.copy(pos);
-    l.target.position.set(0, 0, 0);
-    l.target.updateMatrixWorld();
-  });
-function HeadLight({ intensity = 0.3 }: { intensity?: number }) {
-  const ref = React.useRef<THREE.DirectionalLight>(null);
-  const { camera } = useThree();
-
-  useFrame(() => {
-    const l = ref.current;
-    if (!l) return;
-
-    // segue la camera
-    l.position.copy(camera.position);
     l.target.position.set(0, 0, 0);
     l.target.updateMatrixWorld();
   });
@@ -90,26 +93,16 @@ function HeadLight({ intensity = 0.3 }: { intensity?: number }) {
   return <directionalLight ref={ref} intensity={intensity} color={"#ffffff"} />;
 }
 
-  return (
-    <directionalLight
-      ref={ref}
-      intensity={intensity}
-      color={"#ffffff"}
-    />
-  );
-}
-
 function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
   return (
     <>
-      {/* Environment: ok per micro-riflessi, non “lava” se controlli envMapIntensity */}
       <Environment preset="studio" />
 
-      {/* luce ambiente minima: se esageri, ammazzi il rilievo */}
+      {/* Fill minimo: se lo alzi troppo, appiattisci */}
       <ambientLight intensity={0.08} />
       <hemisphereLight intensity={0.14} groundColor={"#050505"} />
 
-      {/* Key radente (SENZA ombre): è lei che fa uscire il rilievo, stabile */}
+      {/* Key radente dinamica (stabile, senza ombre) */}
       <CameraKeyLight intensity={1.6} />
 
       {/* Rim leggero */}
@@ -119,10 +112,9 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
         color={"#ffffff"}
       />
 
-      {/* Headlight che segue camera */}
-      <HeadLight />
+      {/* Headlight fill */}
+      <HeadLight intensity={0.3} />
 
-      {/* Mesh + materiale: “aragosta” opaco, con specular controllata */}
       <mesh geometry={geometry}>
         <meshPhysicalMaterial
           color={"#E26D5C"}
@@ -135,7 +127,6 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
         />
       </mesh>
 
-      {/* Ombra di contatto: stabile (niente shimmer), morbida e realistica */}
       <ContactShadows
         position={[0, 0, -0.002]}
         opacity={0.30}
@@ -226,7 +217,6 @@ export default function ReliefPreview3D(props: Props) {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = 0.3;
         gl.outputColorSpace = THREE.SRGBColorSpace;
-        // niente shadowMap qui: il tremolio arrivava dalle ombre vere
       }}
       camera={{ position: [180, -260, 220], fov: 38, near: 0.1, far: 8000 }}
       style={{ width: "100%", height: "100%" }}
