@@ -44,48 +44,42 @@ function decimateHm(hm: HeightmapState, step: number): HeightmapState {
 function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
   return (
     <>
-      {/* 🌤 Environment: migliora tantissimo la lettura dei micro-dettagli (render-only) */}
-      <Environment preset="studio" />
+      {/* 🌤 Environment: utile, ma NON deve “lavare” la scena */}
+      <Environment preset="studio" intensity={0.55} />
 
-      {/* 💡 LIGHT RIG (2.1) */}
-      <ambientLight intensity={0.32} />
-      <hemisphereLight intensity={0.35} groundColor={"#111111"} />
+      {/* 💡 LIGHT RIG (2.1) — meno fill, più luce radente */}
+      <ambientLight intensity={0.16} />
+      <hemisphereLight intensity={0.18} groundColor={"#0b0b0b"} />
 
-      {/* Key light: direzionale + ombre morbide ma presenti */}
+      {/* Key light RADENTE: aumenta la lettura delle altezze */}
       <directionalLight
-        position={[320, -420, 560]}
-        intensity={1.2}
+        position={[900, -260, 110]}
+        intensity={2.2}
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-bias={-0.00015}
+        shadow-bias={-0.00012}
         shadow-normalBias={0.02}
+        shadow-radius={6}
       />
 
-      {/* Rim light: leggera, stacca i bordi e fa leggere le altezze */}
-      <directionalLight
-        position={[-420, 260, 180]}
-        intensity={0.35}
-      />
+      {/* Rim light: stacca i bordi senza appiattire */}
+      <directionalLight position={[-520, 260, 260]} intensity={0.28} />
 
       {/* Piano invisibile solo per ricevere ombre (render-only) */}
-      <mesh
-        rotation={[0, 0, 0]}
-        position={[0, 0, -0.001]}
-        receiveShadow
-      >
+      <mesh position={[0, 0, -0.001]} receiveShadow>
         <planeGeometry args={[5000, 5000]} />
-        <shadowMaterial opacity={0.25} />
+        <shadowMaterial opacity={0.35} />
       </mesh>
 
-      {/* 🧱 Mesh + materiale (2.2) */}
+      {/* 🧱 Mesh + materiale (2.2) — “aragosta” opaco leggibile */}
       <mesh geometry={geometry} castShadow receiveShadow>
         <meshPhysicalMaterial
-          color={"#e8e8e8"}          // neutro tipo gesso/plastica chiara
-          metalness={0.05}
-          roughness={0.58}          // satinato
-          clearcoat={0.22}          // specular controllata
-          clearcoatRoughness={0.45} // non “plasticone”
-          reflectivity={0.25}
+          color={"#E26D5C"}
+          metalness={0.02}
+          roughness={0.74}
+          clearcoat={0.08}
+          clearcoatRoughness={0.6}
+          reflectivity={0.12}
         />
       </mesh>
 
@@ -117,70 +111,4 @@ export default function ReliefPreview3D(props: Props) {
   const geometry = React.useMemo(() => {
     if (!hmState) return null;
 
-    const hmDec = decimateHm(hmState, decimateStep);
-
-    try {
-      const geo = buildSolidFromHeightmap({
-        normF32: hmDec.normF32,
-        w: hmDec.w,
-        h: hmDec.h,
-        widthMm: stlWidthMm,
-        depthMm,
-        baseMm,
-        outputMode,
-        baseStyle,
-      });
-
-      // centra e poggia a Z=0
-      geo.computeBoundingBox();
-      const bb = geo.boundingBox;
-      if (bb) {
-        const center = new THREE.Vector3();
-        bb.getCenter(center);
-        geo.translate(-center.x, -center.y, -bb.min.z);
-      }
-
-      // buone pratiche: normal per shading più pulito
-      geo.computeVertexNormals();
-
-      return geo;
-    } catch (e) {
-      console.error("ReliefPreview3D build error:", e);
-      return null;
-    }
-  }, [hmState, stlWidthMm, decimateStep, depthMm, baseMm, outputMode, baseStyle]);
-
-  if (!hmState) {
-    return (
-      <div className="h-full w-full flex items-center justify-center text-sm text-gray-500">
-        Carica un file per vedere il 3D.
-      </div>
-    );
-  }
-
-  if (!geometry) {
-    return (
-      <div className="h-full w-full flex items-center justify-center text-sm text-gray-500">
-        La preview 3D appare dopo la generazione della heightmap.
-      </div>
-    );
-  }
-
-  return (
-  <Canvas
-    shadows
-    dpr={[1, 2]}
-    gl={{ antialias: true, alpha: true }}
-    onCreated={({ gl }) => {
-      gl.toneMapping = THREE.ACESFilmicToneMapping;
-      gl.toneMappingExposure = 1.15;
-      gl.outputColorSpace = THREE.SRGBColorSpace;
-    }}
-    camera={{ position: [180, -260, 220], fov: 38, near: 0.1, far: 8000 }}
-    style={{ width: "100%", height: "100%" }}
-  >
-    <color attach="background" args={["#f6f7fb"]} />
-    <Scene geometry={geometry} />
-  </Canvas>
-);
-}
+    const hmDec = decimateHm(hmState, decim
