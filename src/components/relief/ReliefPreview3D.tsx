@@ -94,11 +94,7 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
       <hemisphereLight intensity={0.14} groundColor={"#050505"} />
 
       {/* Key radente (SENZA ombre): è lei che fa uscire il rilievo, stabile */}
-      <directionalLight
-        position={[900, -260, 110]}
-        intensity={2.2}
-        color={"#ffffff"}
-      />
+      <CameraKeyLight intensity={1.6} />
 
       {/* Rim leggero */}
       <directionalLight
