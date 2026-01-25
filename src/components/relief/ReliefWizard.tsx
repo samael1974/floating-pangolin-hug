@@ -743,7 +743,7 @@ export default function ReliefWizard() {
               </div>
             </div>
 
-            {/* Tabs */}
+                       {/* Tabs */}
             <div className="overflow-hidden rounded-md border">
               <div className="flex items-center gap-2 border-b bg-gray-50 px-3 py-2">
                 <button
@@ -813,41 +813,86 @@ export default function ReliefWizard() {
 
                 {previewTab === "stl" && (() => {
                   const s = estimateStlStats();
+
+                  const baseMm = Number(params.baseMm ?? 0);
+                  const reliefMm = Number(params.depthMm ?? 0);
+                  const totalMm = baseMm + reliefMm;
+
+                  const ratio = reliefMm > 0 ? baseMm / reliefMm : null;
+                  const basePct = totalMm > 0 ? (baseMm / totalMm) * 100 : 0;
+                  const reliefPct = totalMm > 0 ? (reliefMm / totalMm) * 100 : 0;
+
+                  const fmt = (n: number, d = 2) => (Number.isFinite(n) ? n.toFixed(d) : "—");
+
                   return (
                     <div className="space-y-2 text-xs text-gray-600">
-                      <div className="font-medium text-gray-700">Dettagli</div>
+                      <div className="flex items-baseline justify-between">
+                        <div className="font-medium text-gray-700">Dettagli</div>
+                        <div className="text-[11px] text-gray-400">read-only</div>
+                      </div>
 
+                      {/* sorgente */}
                       <div>
                         Sorgente:{" "}
                         <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
                       </div>
 
+                      {/* risoluzione reale */}
                       <div>
-                        Risoluzione hm:{" "}
-                        <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h}` : "—"}</span>
+                        Risoluzione reale heightmap:{" "}
+                        <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h} px` : "—"}</span>
                       </div>
 
+                      {/* output & altezze */}
                       <div>
                         Output:{" "}
                         <span className="font-medium">
-                          {params.outputMode} / {params.baseStyle} — base {params.baseMm.toFixed(1)}mm
+                          {params.outputMode} / {params.baseStyle}
                         </span>
                       </div>
 
+                      <div>
+                        Altezza rilievo (STL): <span className="font-medium">{fmt(reliefMm, 2)} mm</span>
+                      </div>
+
+                      <div>
+                        Spessore base: <span className="font-medium">{fmt(baseMm, 2)} mm</span>
+                      </div>
+
+                      <div>
+                        Altezza totale STL: <span className="font-medium">{fmt(totalMm, 2)} mm</span>
+                      </div>
+
+                      <div>
+                        Rapporto base/rilievo:{" "}
+                        <span className="font-medium">{ratio === null ? "—" : `${fmt(ratio, 2)} : 1`}</span>{" "}
+                        <span className="text-gray-400">(base/relief)</span>
+                      </div>
+
+                      <div>
+                        Distribuzione:{" "}
+                        <span className="font-medium">
+                          {fmt(basePct, 0)}% base / {fmt(reliefPct, 0)}% rilievo
+                        </span>
+                      </div>
+
+                      {/* stima STL */}
                       <div className="border-t pt-2">
-                        <div className="font-medium text-gray-700">Stima STL</div>
+                        <div className="font-medium text-gray-700">Metriche STL</div>
 
                         {s ? (
                           <>
                             <div>
                               Campionamento (post-decimazione):{" "}
                               <span className="font-medium">
-                                {s.effW} × {s.effH}
+                                {s.effW} × {s.effH} px
                               </span>
                             </div>
+
                             <div>
                               Triangoli stimati: <span className="font-medium">{s.triangles.toLocaleString()}</span>
                             </div>
+
                             <div>
                               Peso stimato STL: <span className="font-medium">{s.mb.toFixed(1)} MB</span>
                             </div>
@@ -859,13 +904,6 @@ export default function ReliefWizard() {
                                   Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
                                   <span className="font-semibold">x{s.suggestedDecimate}</span>.
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setDecimateStep(s.suggestedDecimate)}
-                                  className="mt-2 rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
-                                >
-                                  Applica decimazione consigliata
-                                </button>
                               </div>
                             ) : (
                               <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-green-900">
@@ -874,7 +912,7 @@ export default function ReliefWizard() {
                             )}
                           </>
                         ) : (
-                          <div className="text-gray-500">Carica un file per vedere la stima.</div>
+                          <div className="text-gray-500">Carica un file per vedere le metriche.</div>
                         )}
                       </div>
                     </div>
@@ -882,9 +920,3 @@ export default function ReliefWizard() {
                 })()}
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
