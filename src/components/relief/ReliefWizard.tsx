@@ -748,20 +748,29 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
                     Depth map
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setPreviewTab("stl")}
-                    className={`rounded px-2 py-1 text-xs font-medium ${
-                      previewTab === "stl" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
-                    }`}
-                  >
-                    Dettagli
-                  </button>
-                </div>
+  <button
+  type="button"
+  onClick={() => setPreviewTab("stl")}
+  className={`rounded px-2 py-1 text-xs font-medium ${
+    previewTab === "stl" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+  }`}
+>
+  Dettagli
+</button>
+</div>
 
-                <button
-                  <button
-                    <button
+<button
+  type="button"
+  onClick={() => setShowInstructions((v) => !v)}
+  className={`rounded px-2 py-1 text-xs font-semibold ${
+    showInstructions ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+  }`}
+  aria-expanded={showInstructions}
+  aria-controls="rf-instructions"
+>
+  {showInstructions ? "Chiudi istruzioni" : "Istruzioni"}
+</button>
+
   type="button"
   onClick={() => setShowInstructions((v) => !v)}
   className={`rounded px-2 py-1 text-xs font-semibold ${
