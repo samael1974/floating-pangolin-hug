@@ -23,12 +23,7 @@ export default function BrandHero({ showBackLink = false }: BrandHeroProps) {
                 aria-hidden="true"
               >
   
-  <img
-  src="/home//home/rf-logo.png"
-  alt="ReliefForge"
-  className="h-7 w-4.5"
-  loading="eager"
-/>
+  <img src="/home/rf-logo.png" alt="ReliefForge" className="h-7 w-auto" loading="eager" />
 
               </div>
 
