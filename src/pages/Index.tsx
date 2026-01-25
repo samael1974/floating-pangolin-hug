@@ -20,7 +20,7 @@ export default function Index() {
     aria-hidden="true"
   >
  <img
-  src="/home/reliefforge-logo.png"
+  src="/home/rf-logo.png"
   alt="ReliefForge"
   className="h-7 w-4.5"
   loading="eager"
