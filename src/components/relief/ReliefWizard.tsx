@@ -743,7 +743,7 @@ export default function ReliefWizard() {
               </div>
             </div>
 
-                       {/* Tabs */}
+                                  {/* Tabs */}
             <div className="overflow-hidden rounded-md border">
               <div className="flex items-center gap-2 border-b bg-gray-50 px-3 py-2">
                 <button
@@ -831,19 +831,16 @@ export default function ReliefWizard() {
                         <div className="text-[11px] text-gray-400">read-only</div>
                       </div>
 
-                      {/* sorgente */}
                       <div>
                         Sorgente:{" "}
                         <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
                       </div>
 
-                      {/* risoluzione reale */}
                       <div>
                         Risoluzione reale heightmap:{" "}
                         <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h} px` : "—"}</span>
                       </div>
 
-                      {/* output & altezze */}
                       <div>
                         Output:{" "}
                         <span className="font-medium">
@@ -876,7 +873,6 @@ export default function ReliefWizard() {
                         </span>
                       </div>
 
-                      {/* stima STL */}
                       <div className="border-t pt-2">
                         <div className="font-medium text-gray-700">Metriche STL</div>
 
@@ -920,3 +916,9 @@ export default function ReliefWizard() {
                 })()}
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
