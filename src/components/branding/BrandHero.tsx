@@ -23,6 +23,7 @@ export default function BrandHero({ showBackLink = false }: BrandHeroProps) {
                 aria-hidden="true"
               >
                 <img
+  <img
   src="/home/reliefforge-logo.webp"
   alt="ReliefForge"
   className="h-7 w-5"
