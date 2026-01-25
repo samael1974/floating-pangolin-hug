@@ -101,13 +101,14 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
       {/* 🧱 Mesh + materiale (2.2) — “aragosta” opaco leggibile */}
       <mesh geometry={geometry} castShadow receiveShadow>
         <meshPhysicalMaterial
-          color={"#E26D5C"}
-          metalness={0.02}
-          roughness={0.74}
-          clearcoat={0.08}
-          clearcoatRoughness={0.6}
-          reflectivity={0.12}
-        />
+  color={"#E26D5C"}
+  metalness={0.02}
+  roughness={0.78}
+  clearcoat={0.06}
+  clearcoatRoughness={0.65}
+  reflectivity={0.10}
+  envMapIntensity={0.35}
+/>
       </mesh>
 
       {/* 🎥 Controls (2.3) */}
