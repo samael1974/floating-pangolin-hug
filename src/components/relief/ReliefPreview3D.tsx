@@ -73,6 +73,22 @@ function CameraKeyLight({ intensity = 1.6 }: { intensity?: number }) {
     l.target.position.set(0, 0, 0);
     l.target.updateMatrixWorld();
   });
+function HeadLight({ intensity = 0.3 }: { intensity?: number }) {
+  const ref = React.useRef<THREE.DirectionalLight>(null);
+  const { camera } = useThree();
+
+  useFrame(() => {
+    const l = ref.current;
+    if (!l) return;
+
+    // segue la camera
+    l.position.copy(camera.position);
+    l.target.position.set(0, 0, 0);
+    l.target.updateMatrixWorld();
+  });
+
+  return <directionalLight ref={ref} intensity={intensity} color={"#ffffff"} />;
+}
 
   return (
     <directionalLight
