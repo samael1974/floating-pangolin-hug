@@ -62,11 +62,11 @@ function HeadLight() {
   });
 
   return (
-    <directionalLight
-      ref={lightRef}
-      intensity={0.55}
-      color={"#ffffff"}
-    />
+<directionalLight
+  position={[950, -260, 110]}
+  intensity={2.7}
+  castShadow={false}
+/>
   );
 }
 
