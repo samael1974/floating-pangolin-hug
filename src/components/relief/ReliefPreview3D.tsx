@@ -111,4 +111,70 @@ export default function ReliefPreview3D(props: Props) {
   const geometry = React.useMemo(() => {
     if (!hmState) return null;
 
-    const hmDec = decimateHm(hmState, decim
+    const hmDec = decimateHm(hmState, decimateStep);
+
+    try {
+      const geo = buildSolidFromHeightmap({
+        normF32: hmDec.normF32,
+        w: hmDec.w,
+        h: hmDec.h,
+        widthMm: stlWidthMm,
+        depthMm,
+        baseMm,
+        outputMode,
+        baseStyle,
+      });
+
+      // centra e poggia a Z=0
+      geo.computeBoundingBox();
+      const bb = geo.boundingBox;
+      if (bb) {
+        const center = new THREE.Vector3();
+        bb.getCenter(center);
+        geo.translate(-center.x, -center.y, -bb.min.z);
+      }
+
+      // shading più pulito
+      geo.computeVertexNormals();
+
+      return geo;
+    } catch (e) {
+      console.error("ReliefPreview3D build error:", e);
+      return null;
+    }
+  }, [hmState, stlWidthMm, decimateStep, depthMm, baseMm, outputMode, baseStyle]);
+
+  if (!hmState) {
+    return (
+      <div className="h-full w-full flex items-center justify-center text-sm text-gray-500">
+        Carica un file per vedere il 3D.
+      </div>
+    );
+  }
+
+  if (!geometry) {
+    return (
+      <div className="h-full w-full flex items-center justify-center text-sm text-gray-500">
+        La preview 3D appare dopo la generazione della heightmap.
+      </div>
+    );
+  }
+
+  return (
+    <Canvas
+      shadows
+      dpr={[1, 2]}
+      gl={{ antialias: true, alpha: true }}
+      onCreated={({ gl }) => {
+        gl.toneMapping = THREE.ACESFilmicToneMapping;
+        gl.toneMappingExposure = 1.15;
+        gl.outputColorSpace = THREE.SRGBColorSpace;
+      }}
+      camera={{ position: [180, -260, 220], fov: 38, near: 0.1, far: 8000 }}
+      style={{ width: "100%", height: "100%" }}
+    >
+      <color attach="background" args={["#f6f7fb"]} />
+      <Scene geometry={geometry} />
+    </Canvas>
+  );
+}
