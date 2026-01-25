@@ -19,12 +19,13 @@ export default function Index() {
     className="grid h-10 w-10 place-items-center rounded-xl bg-white shadow-sm"
     aria-hidden="true"
   >
-    <img
+ <img
   src="/home/reliefforge-logo.webp"
-  alt=""
+  alt="ReliefForge"
   className="h-7 w-5"
   loading="eager"
 />
+
   </div>
 
  <h1 className="text-4xl font-extrabold tracking-tight text-[#1F4E5F] md:text-5xl">
