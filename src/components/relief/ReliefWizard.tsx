@@ -383,46 +383,66 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
     );
   }, []);
 
-  return (
-    <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
-      {/* Hero / brand (se non vuoi mostrarlo, puoi rimuovere questo blocco) */}
-      <div className="mb-6">
-        <BrandHero />
-      </div>
+ return (
+  <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
+    {/* Hero / brand (se non vuoi mostrarlo, puoi rimuovere questo blocco) */}
+    <div className="mb-6">
+      <BrandHero />
+    </div>
 
-      <div className="grid gap-6 md:grid-cols-[420px_1fr] lg:grid-cols-[460px_1fr]">
-        {/* LEFT */}
-        <div className="space-y-6">
-          {/* Source Mode */}
-          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-white p-4 shadow">
-            <div className="min-w-[220px]">
-              <div className="text-sm font-semibold">Sorgente</div>
-              <div className="text-xs text-gray-500">
-                Usa <span className="font-medium">Immagine</span> per risultati rapidi. Usa{" "}
-                <span className="font-medium">Depth map</span> se hai già una mappa di profondità (meglio PNG 16-bit).
-              </div>
+    <div className="grid gap-6 md:grid-cols-[420px_1fr] lg:grid-cols-[460px_1fr]">
+      {/* LEFT */}
+      <div className="space-y-6">
+        {/* Source Mode */}
+        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-white p-4 shadow">
+          <div className="min-w-[220px]">
+            <div className="text-sm font-semibold">Sorgente</div>
+            <div className="text-xs text-gray-500">
+              Usa <span className="font-medium">Immagine</span> per risultati rapidi. Usa{" "}
+              <span className="font-medium">Depth map</span> se hai già una mappa di profondità (meglio PNG 16-bit).
             </div>
+          </div>
 
-            <div className="inline-flex overflow-hidden rounded-md border">
-              <button
-                type="button"
-                onClick={() => setSourceMode("image")}
-                className={`px-3 py-1.5 text-sm ${
-                  sourceMode === "image" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] hover:bg-gray-50"
-                }`}
-              >
-                Immagine
-              </button>
-              <button
-                type="button"
-                onClick={() => setSourceMode("depthmap")}
-                className={`px-3 py-1.5 text-sm ${
-                  sourceMode === "depthmap" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] hover:bg-gray-50"
-                }`}
-              >
-                Depth map (8/16-bit)
-              </button>
-            </div>
+          <div className="inline-flex overflow-hidden rounded-md border">
+            <button
+              type="button"
+              onClick={() => setSourceMode("image")}
+              className={`px-3 py-1.5 text-sm ${
+                sourceMode === "image"
+                  ? "bg-[#1F4E5F] text-white"
+                  : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+              }`}
+            >
+              Immagine
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSourceMode("depthmap")}
+              className={`px-3 py-1.5 text-sm ${
+                sourceMode === "depthmap"
+                  ? "bg-[#1F4E5F] text-white"
+                  : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+              }`}
+            >
+              Depth map (8/16-bit)
+            </button>
+          </div>
+
+          {sourceMode === "depthmap" && (
+            <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={invertDepthMap}
+                onChange={(e) => setInvertDepthMap(e.target.checked)}
+              />
+              <span>Inverti depth map</span>
+              <span className="text-xs text-gray-500">(se viene “al contrario”)</span>
+            </label>
+          )}
+        </div>
+        {/* /Source Mode */}
+
 
             {sourceMode === "depthmap" && (
               <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
