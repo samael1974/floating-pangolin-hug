@@ -41,6 +41,18 @@ function decimateHm(hm: HeightmapState, step: number): HeightmapState {
   return { normF32: out, w: w2, h: h2 };
 }
 
+function HeadLight() {
+  const { camera } = useThree();
+  return (
+    <pointLight
+      position={camera.position}
+      intensity={0.65}
+      distance={6000}
+      decay={2}
+    />
+  );
+}
+
 function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
   return (
     <>
