@@ -110,7 +110,7 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
       </mesh>
 
       {/* Mesh + materiale: “aragosta” satinato, con specular controllato */}
-      <mesh geometry={geometry} castShadow receiveShadow>
+      <mesh geometry={geometry} castShadow receiveShadow={false}>
         <meshPhysicalMaterial
           color={"#E26D5C"}
           metalness={0.02}
