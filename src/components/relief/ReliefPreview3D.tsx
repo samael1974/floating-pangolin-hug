@@ -43,12 +43,28 @@ function decimateHm(hm: HeightmapState, step: number): HeightmapState {
 
 function HeadLight() {
   const { camera } = useThree();
-  return (
-    <pointLight
-      position={camera.position}
-      intensity={0.65}
-      distance={6000}
-      decay={2}
+<Environment preset="studio" />
+
+{/* Headlight: segue sempre la camera (boost micro-dettagli) */}
+<HeadLight />
+
+{/* Fill minimo: se è alto, ammazza il rilievo */}
+<ambientLight intensity={0.10} />
+<hemisphereLight intensity={0.12} groundColor={"#050505"} />
+
+{/* Grazing/key radente: questo fa “uscire” il bassorilievo */}
+<directionalLight
+  position={[1100, -180, 90]}
+  intensity={3.2}
+  castShadow
+  shadow-mapSize={[2048, 2048]}
+  shadow-bias={-0.00012}
+  shadow-normalBias={0.02}
+  shadow-radius={7}
+/>
+
+{/* Rim leggero */}
+<directionalLight position={[-700, 380, 420]} intensity={0.22} />
     />
   );
 }
