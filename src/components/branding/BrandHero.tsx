@@ -22,7 +22,7 @@ export default function BrandHero({ showBackLink = false }: BrandHeroProps) {
                 className="grid h-10 w-10 place-items-center rounded-xl bg-white shadow-sm"
                 aria-hidden="true"
               >
-                <img
+  
   <img
   src="/home/reliefforge-logo.webp"
   alt="ReliefForge"
