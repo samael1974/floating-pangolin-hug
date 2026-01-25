@@ -26,6 +26,7 @@ export default function Index() {
   loading="eager"
 />
 
+
   </div>
 
  <h1 className="text-4xl font-extrabold tracking-tight text-[#1F4E5F] md:text-5xl">
