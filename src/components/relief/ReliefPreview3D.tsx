@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Environment } from "@react-three/drei";
 import * as THREE from "three";
 
@@ -41,30 +41,31 @@ function decimateHm(hm: HeightmapState, step: number): HeightmapState {
   return { normF32: out, w: w2, h: h2 };
 }
 
+/**
+ * HeadLight: una piccola direzionale “attaccata” alla camera.
+ * Serve solo a NON perdere i micro-dettagli quando ruoti.
+ */
 function HeadLight() {
+  const lightRef = React.useRef<THREE.DirectionalLight | null>(null);
   const { camera } = useThree();
-<Environment preset="studio" />
 
-{/* Headlight: segue sempre la camera (boost micro-dettagli) */}
-<HeadLight />
+  useFrame(() => {
+    const L = lightRef.current;
+    if (!L) return;
 
-{/* Fill minimo: se è alto, ammazza il rilievo */}
-<ambientLight intensity={0.10} />
-<hemisphereLight intensity={0.12} groundColor={"#050505"} />
+    // segue la camera
+    L.position.copy(camera.position);
 
-{/* Grazing/key radente: questo fa “uscire” il bassorilievo */}
-<directionalLight
-  position={[1100, -180, 90]}
-  intensity={3.2}
-  castShadow
-  shadow-mapSize={[2048, 2048]}
-  shadow-bias={-0.00012}
-  shadow-normalBias={0.02}
-  shadow-radius={7}
-/>
+    // punta sempre al centro scena
+    L.target.position.set(0, 0, 0);
+    L.target.updateMatrixWorld();
+  });
 
-{/* Rim leggero */}
-<directionalLight position={[-700, 380, 420]} intensity={0.22} />
+  return (
+    <directionalLight
+      ref={lightRef}
+      intensity={0.55}
+      color={"#ffffff"}
     />
   );
 }
@@ -72,53 +73,62 @@ function HeadLight() {
 function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
   return (
     <>
-      {/* 🌤 Environment: utile, ma NON deve “lavare” la scena */}
+      {/* Environment (NO intensity prop: si controlla tramite envMapIntensity/material + exposure) */}
+      <Environment preset="studio" />
 
-      {/* 💡 LIGHT RIG (2.1) — meno fill, più luce radente */}
-      <ambientLight intensity={0.16} />
-      <hemisphereLight intensity={0.18} groundColor={"#0b0b0b"} />
+      {/* Headlight (micro-dettagli durante orbit) */}
+      <HeadLight />
 
-      {/* Key light RADENTE: aumenta la lettura delle altezze */}
+      {/* Fill minimo: se è alto, “ammazza” il rilievo */}
+      <ambientLight intensity={0.10} />
+      <hemisphereLight intensity={0.12} groundColor={"#050505"} />
+
+      {/* Key radente: è QUELLA che fa “uscire” il bassorilievo */}
       <directionalLight
-        position={[900, -260, 110]}
-        intensity={2.2}
+        position={[950, -260, 110]}
+        intensity={2.7}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.00012}
         shadow-normalBias={0.02}
-        shadow-radius={6}
+        shadow-radius={7}
+        shadow-camera-near={1}
+        shadow-camera-far={5000}
+        shadow-camera-left={-900}
+        shadow-camera-right={900}
+        shadow-camera-top={900}
+        shadow-camera-bottom={-900}
       />
 
       {/* Rim light: stacca i bordi senza appiattire */}
-      <directionalLight position={[-520, 260, 260]} intensity={0.28} />
+      <directionalLight position={[-520, 260, 320]} intensity={0.30} />
 
-      {/* Piano invisibile solo per ricevere ombre (render-only) */}
+      {/* Piano invisibile per ombre */}
       <mesh position={[0, 0, -0.001]} receiveShadow>
-        <planeGeometry args={[5000, 5000]} />
-        <shadowMaterial opacity={0.4} />
+        <planeGeometry args={[6000, 6000]} />
+        <shadowMaterial opacity={0.42} />
       </mesh>
 
-      {/* 🧱 Mesh + materiale (2.2) — “aragosta” opaco leggibile */}
+      {/* Mesh + materiale: “aragosta” satinato, con specular controllato */}
       <mesh geometry={geometry} castShadow receiveShadow>
         <meshPhysicalMaterial
-  color={"#E26D5C"}
-  metalness={0.02}
-  roughness={0.78}
-  clearcoat={0.06}
-  clearcoatRoughness={0.65}
-  reflectivity={0.10}
-  envMapIntensity={0.35}
-/>
+          color={"#E26D5C"}
+          metalness={0.02}
+          roughness={0.68}          // satinato (meno “mattone”)
+          clearcoat={0.18}          // specular controllata
+          clearcoatRoughness={0.55}
+          reflectivity={0.12}
+          envMapIntensity={0.55}    // qui “alzi” o “abbassi” l’effetto Environment
+        />
       </mesh>
 
-      {/* 🎥 Controls (2.3) */}
       <OrbitControls
         makeDefault
         enableDamping
         dampingFactor={0.08}
         enablePan={false}
-        minDistance={120}
-        maxDistance={1500}
+        minDistance={140}
+        maxDistance={1800}
         target={[0, 0, 0]}
       />
     </>
@@ -162,9 +172,7 @@ export default function ReliefPreview3D(props: Props) {
         geo.translate(-center.x, -center.y, -bb.min.z);
       }
 
-      // shading più pulito
       geo.computeVertexNormals();
-
       return geo;
     } catch (e) {
       console.error("ReliefPreview3D build error:", e);
@@ -195,10 +203,11 @@ export default function ReliefPreview3D(props: Props) {
       gl={{ antialias: true, alpha: true }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1.0;
+        gl.toneMappingExposure = 1.08; // leggero boost, senza “lavare”
         gl.outputColorSpace = THREE.SRGBColorSpace;
       }}
-      camera={{ position: [0, -520, 520], fov: 35, near: 0.1, far: 8000 }}
+      // camera leggermente inclinata (no frontale perfetta)
+      camera={{ position: [220, -420, 260], fov: 38, near: 0.1, far: 8000 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#f6f7fb"]} />
