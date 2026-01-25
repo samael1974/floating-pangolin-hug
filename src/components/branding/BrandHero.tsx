@@ -26,9 +26,10 @@ export default function BrandHero({ showBackLink = false }: BrandHeroProps) {
   <img
   src="/home/reliefforge-logo.webp"
   alt="ReliefForge"
-  className="h-7 w-5"
+  className="h-7 w-7"
   loading="eager"
 />
+
               </div>
 
               <h1 className="text-4xl font-extrabold tracking-tight text-[#1F4E5F] md:text-5xl">
