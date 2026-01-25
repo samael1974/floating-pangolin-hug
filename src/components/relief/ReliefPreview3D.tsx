@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Environment } from "@react-three/drei";
 import * as THREE from "three";
 
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
@@ -44,17 +44,61 @@ function decimateHm(hm: HeightmapState, step: number): HeightmapState {
 function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
   return (
     <>
-      {/* luci: qui si capiscono le profondità */}
-      <hemisphereLight intensity={0.55} />
-      <directionalLight position={[3, -4, 6]} intensity={1.2} />
-      <directionalLight position={[-3, 4, 3]} intensity={0.6} />
-      <ambientLight intensity={0.2} />
+      {/* 🌤 Environment: migliora tantissimo la lettura dei micro-dettagli (render-only) */}
+      <Environment preset="studio" />
 
-      <mesh geometry={geometry}>
-        <meshStandardMaterial roughness={0.85} metalness={0.05} />
+      {/* 💡 LIGHT RIG (2.1) */}
+      <ambientLight intensity={0.32} />
+      <hemisphereLight intensity={0.35} groundColor={"#111111"} />
+
+      {/* Key light: direzionale + ombre morbide ma presenti */}
+      <directionalLight
+        position={[320, -420, 560]}
+        intensity={1.2}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.00015}
+        shadow-normalBias={0.02}
+      />
+
+      {/* Rim light: leggera, stacca i bordi e fa leggere le altezze */}
+      <directionalLight
+        position={[-420, 260, 180]}
+        intensity={0.35}
+      />
+
+      {/* Piano invisibile solo per ricevere ombre (render-only) */}
+      <mesh
+        rotation={[0, 0, 0]}
+        position={[0, 0, -0.001]}
+        receiveShadow
+      >
+        <planeGeometry args={[5000, 5000]} />
+        <shadowMaterial opacity={0.25} />
       </mesh>
 
-      <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+      {/* 🧱 Mesh + materiale (2.2) */}
+      <mesh geometry={geometry} castShadow receiveShadow>
+        <meshPhysicalMaterial
+          color={"#e8e8e8"}          // neutro tipo gesso/plastica chiara
+          metalness={0.05}
+          roughness={0.58}          // satinato
+          clearcoat={0.22}          // specular controllata
+          clearcoatRoughness={0.45} // non “plasticone”
+          reflectivity={0.25}
+        />
+      </mesh>
+
+      {/* 🎥 Controls (2.3) */}
+      <OrbitControls
+        makeDefault
+        enableDamping
+        dampingFactor={0.08}
+        enablePan={false}
+        minDistance={120}
+        maxDistance={1500}
+        target={[0, 0, 0]}
+      />
     </>
   );
 }
@@ -96,6 +140,9 @@ export default function ReliefPreview3D(props: Props) {
         geo.translate(-center.x, -center.y, -bb.min.z);
       }
 
+      // buone pratiche: normal per shading più pulito
+      geo.computeVertexNormals();
+
       return geo;
     } catch (e) {
       console.error("ReliefPreview3D build error:", e);
@@ -121,7 +168,11 @@ export default function ReliefPreview3D(props: Props) {
 
   return (
     <Canvas
-      camera={{ position: [0, -220, 180], fov: 45, near: 0.1, far: 5000 }}
+      shadows
+      dpr={[1, 2]}
+      gl={{ antialias: true }}
+      // 📷 Camera più leggibile: inclinazione leggera, niente frontale perfetta (2.3)
+      camera={{ position: [180, -260, 220], fov: 38, near: 0.1, far: 8000 }}
       style={{ width: "100%", height: "100%" }}
     >
       <Scene geometry={geometry} />
