@@ -23,7 +23,7 @@ export default function BrandHero({ showBackLink = false }: BrandHeroProps) {
                 aria-hidden="true"
               >
                 <img
-                  src="/home/reliefforge-logo.svg?v=2"
+                  src="/home/reliefforge-logo-2.svg?v=2"
                   alt=""
                   className="h-7 w-7"
                   style={{ color: "#1F4E5F" }}
