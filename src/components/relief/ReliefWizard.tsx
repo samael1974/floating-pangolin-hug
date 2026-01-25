@@ -7,8 +7,6 @@ import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap
 import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
 import { inspectPng, pngCompatibilityMessage } from "@/lib/relief/inspectPng";
 
-
-
 // ✅ 16-bit PNG support
 import { decodeDepthmapPng } from "@/lib/relief/decodeDepthmapPng";
 import { renderDepthmapToCanvas } from "@/lib/relief/renderDepthmapToCanvas";
@@ -69,11 +67,7 @@ function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState
  * Fallback via Canvas (8-bit) per JPG/WEBP/PNG (se il browser lo “schiaccia”)
  * Il “vero 16-bit” passa da decodeDepthmapPng() (solo PNG).
  */
-async function decodeDepthMapToHmStateCanvas(
-  file: File,
-  invert: boolean,
-  maxSize = 512
-): Promise<HeightmapState> {
+async function decodeDepthMapToHmStateCanvas(file: File, invert: boolean, maxSize = 512): Promise<HeightmapState> {
   const img = await loadImageFromFile(file);
   const iw = img.naturalWidth || img.width;
   const ih = img.naturalHeight || img.height;
@@ -171,7 +165,8 @@ export default function ReliefWizard() {
         setHmStatus("idle");
         return;
       }
-            // reset warning ogni run
+
+      // reset warning ogni run
       setFileWarning(null);
 
       // Se sono in depthmap e il file è PNG: controllo IHDR prima di decodificare
@@ -184,13 +179,11 @@ export default function ReliefWizard() {
             const msg = pngCompatibilityMessage(info);
 
             if (msg) {
-              // Mostra warning e blocca pipeline depthmap (così eviti STL rotti)
               if (!cancelled) {
                 setFileWarning(
-  `Questo file non è una depth map compatibile (probabile 32-bit/float o RGB). 
-  Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità Immagine”.`
-);
-
+                  `Questo file non è una depth map compatibile (probabile 32-bit/float o RGB).
+Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità Immagine”.`
+                );
                 setHmState(null);
                 setHmStatus("error");
               }
@@ -201,6 +194,7 @@ export default function ReliefWizard() {
           }
         }
       }
+
       setHmStatus("loading");
       const maxSize = 512;
 
@@ -219,7 +213,6 @@ export default function ReliefWizard() {
             hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
             if (invertDepthMap) invertHmInPlace(hm);
           } else {
-            // fallback canvas (8-bit)
             hm = await decodeDepthMapToHmStateCanvas(file, invertDepthMap, maxSize);
           }
 
@@ -323,10 +316,8 @@ export default function ReliefWizard() {
     const effH = Math.max(2, Math.floor(hmState.h / Math.max(1, decimateStep)));
 
     const topTris = 2 * (effW - 1) * (effH - 1);
-
     const perimeterQuads = 2 * (effW - 1) + 2 * (effH - 1);
     const sideTris = 2 * perimeterQuads;
-
     const bottomTris = params.baseMm > 0 ? 2 * (effW - 1) * (effH - 1) : 0;
 
     const triangles = topTris + sideTris + bottomTris;
@@ -361,8 +352,44 @@ export default function ReliefWizard() {
     });
   }
 
+  const openConversionHelp = React.useCallback(() => {
+    alert(
+      "✅ Depth map compatibile = PNG in SCALA DI GRIGI (Grayscale) + 16-bit (consigliato)\n\n" +
+        "Se la depth map è 32-bit / float / RGB / HDR → può generare STL rotti o errori.\n\n" +
+        "🔧 Metodo rapido (GIMP – gratis):\n" +
+        "1) Apri immagine\n" +
+        "2) Immagine → Modalità → Scala di grigi\n" +
+        "3) Immagine → Precisione → Intero 16-bit\n" +
+        "4) File → Esporta come… → PNG\n\n" +
+        "🖼 Alternativa semplice:\n" +
+        "Se non vuoi convertire, usa 'Modalità Immagine' nell’app."
+    );
+  }, []);
+
+  const openGptHelp = React.useCallback(() => {
+    alert(
+      "🤖 Workflow consigliato (GPT → Depth Map → STL):\n\n" +
+        "1) Nel GPT chiedi:\n" +
+        "   • depth map grayscale\n" +
+        "   • PNG 16-bit\n" +
+        "   • superfici lisce, poco rumore\n" +
+        "   • buon contrasto (niente banding)\n\n" +
+        "2) Qui seleziona:\n" +
+        "   Sorgente → Depth map (8/16-bit)\n\n" +
+        "3) Se il rilievo è al contrario:\n" +
+        "   attiva 'Inverti depth map'\n\n" +
+        "4) Se hai errori o dubbi:\n" +
+        "   passa a 'Modalità Immagine' (più tollerante)."
+    );
+  }, []);
+
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
+      {/* Hero / brand (se non vuoi mostrarlo, puoi rimuovere questo blocco) */}
+      <div className="mb-6">
+        <BrandHero />
+      </div>
+
       <div className="grid gap-6 md:grid-cols-[420px_1fr] lg:grid-cols-[460px_1fr]">
         {/* LEFT */}
         <div className="space-y-6">
@@ -435,68 +462,39 @@ export default function ReliefWizard() {
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="block w-full text-sm"
             />
+
             {fileWarning && (
-  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-    <div className="font-semibold">Depth map non compatibile</div>
-    <div className="mt-1 text-xs leading-snug">{fileWarning}</div>
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                <div className="font-semibold">Depth map non compatibile</div>
+                <div className="mt-1 text-xs leading-snug whitespace-pre-line">{fileWarning}</div>
 
-    <div className="mt-3 flex flex-wrap gap-2">
-      <button
-        type="button"
-        onClick={() => {
-          // apri modal / pannello istruzioni (se non hai modal, per ora usa alert o un state)
-          alert(
-  "✅ Depth map compatibile = PNG in SCALA DI GRIGI (Grayscale) + 16-bit (consigliato)\n\n" +
-  "Se la depth map è 32-bit / float / RGB / HDR → può generare STL rotti o errori.\n\n" +
-  "🔧 Metodo rapido (GIMP – gratis):\n" +
-  "1) Apri immagine\n" +
-  "2) Immagine → Modalità → Scala di grigi\n" +
-  "3) Immagine → Precisione → Intero 16-bit\n" +
-  "4) File → Esporta come… → PNG\n\n" +
-  "🖼 Alternativa semplice:\n" +
-  "Se non vuoi convertire, usa 'Modalità Immagine' nell’app."
-);
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={openConversionHelp}
+                    className="rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                  >
+                    🔧 Istruzioni conversione
+                  </button>
 
-        }}
-        className="rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
-      >
-        🔧 Apri istruzioni conversione
-      </button>
+                  <button
+                    type="button"
+                    onClick={() => setSourceMode("image")}
+                    className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
+                  >
+                    🖼 Passa a modalità Immagine
+                  </button>
 
-      <button
-        type="button"
-        onClick={() => setSourceMode("image")}
-        className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
-      >
-        🖼 Passa a modalità Immagine
-      </button>
-
-      <button
-        type="button"
-        onClick={() => {
-          alert(
-  "🤖 Workflow consigliato (GPT → Depth Map → STL):\n\n" +
-  "1) Nel GPT chiedi:\n" +
-  "   • depth map grayscale\n" +
-  "   • PNG 16-bit\n" +
-  "   • superfici lisce, poco rumore\n" +
-  "   • buon contrasto (niente banding)\n\n" +
-  "2) Qui seleziona:\n" +
-  "   Sorgente → Depth map (8/16-bit)\n\n" +
-  "3) Se il rilievo è al contrario:\n" +
-  "   attiva 'Inverti depth map'\n\n" +
-  "4) Se hai errori o dubbi:\n" +
-  "   passa a 'Modalità Immagine' (più tollerante)."
-);
-
-        }}
-        className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
-      >
-        🤖 Come usare il GPT
-      </button>
-    </div>
-  </div>
-)}
+                  <button
+                    type="button"
+                    onClick={openGptHelp}
+                    className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
+                  >
+                    🤖 Come usare il GPT
+                  </button>
+                </div>
+              </div>
+            )}
 
             {file && (
               <div className="text-xs text-gray-600">
@@ -681,7 +679,9 @@ export default function ReliefWizard() {
                 onClick={downloadStl}
                 disabled={!canGenerate}
                 className={`rounded-md px-4 py-2 text-sm font-semibold ${
-                  canGenerate ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]" : "cursor-not-allowed bg-gray-200 text-gray-500"
+                  canGenerate
+                    ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]"
+                    : "cursor-not-allowed bg-gray-200 text-gray-500"
                 }`}
               >
                 Scarica STL
@@ -743,7 +743,7 @@ export default function ReliefWizard() {
               </div>
             </div>
 
-                                  {/* Tabs */}
+            {/* Tabs */}
             <div className="overflow-hidden rounded-md border">
               <div className="flex items-center gap-2 border-b bg-gray-50 px-3 py-2">
                 <button
@@ -811,159 +811,163 @@ export default function ReliefWizard() {
                   </div>
                 )}
 
-              {previewTab === "stl" && (() => {
-  const s = estimateStlStats();
+                {previewTab === "stl" &&
+                  (() => {
+                    const s = estimateStlStats();
 
-  const baseMm = Number(params.baseMm ?? 0);
-  const reliefMm = Number(params.depthMm ?? 0);
-  const totalMm = baseMm + reliefMm;
+                    const baseMm = Number(params.baseMm ?? 0);
+                    const reliefMm = Number(params.depthMm ?? 0);
+                    const totalMm = baseMm + reliefMm;
 
-  const ratio = reliefMm > 0 ? baseMm / reliefMm : null;
-  const basePct = totalMm > 0 ? (baseMm / totalMm) * 100 : 0;
-  const reliefPct = totalMm > 0 ? (reliefMm / totalMm) * 100 : 0;
+                    const ratio = reliefMm > 0 ? baseMm / reliefMm : null;
+                    const basePct = totalMm > 0 ? (baseMm / totalMm) * 100 : 0;
+                    const reliefPct = totalMm > 0 ? (reliefMm / totalMm) * 100 : 0;
 
-  const fmt = (n: number, d = 2) => (Number.isFinite(n) ? n.toFixed(d) : "—");
+                    const fmt = (n: number, d = 2) => (Number.isFinite(n) ? n.toFixed(d) : "—");
 
-  // --- Dimensioni in pianta (X×Y) + scala mm/px ---
-  // NB: qui ho messo più nomi possibili per la larghezza STL.
-  // Appena mi dici il nome esatto, togliamo i fallback e il cast.
-  const stlWidthMm = Number((params as any)?.widthMm ?? (params as any)?.stlWidthMm ?? (params as any)?.outWidthMm ?? 0);
+                    const hmW = hmState?.w ?? 0;
+                    const hmH = hmState?.h ?? 0;
 
-  const hmW = hmState?.w ?? 0;
-  const hmH = hmState?.h ?? 0;
+                    const mmPerPx = stlWidthMm > 0 && hmW > 0 ? stlWidthMm / hmW : NaN;
+                    const stlHeightMm = Number.isFinite(mmPerPx) && hmH > 0 ? hmH * mmPerPx : NaN;
 
-  const mmPerPx = stlWidthMm > 0 && hmW > 0 ? stlWidthMm / hmW : NaN;
-  const stlHeightMm = Number.isFinite(mmPerPx) && hmH > 0 ? hmH * mmPerPx : NaN;
+                    const aspectRatio = hmW > 0 && hmH > 0 ? hmW / hmH : NaN;
 
-  const aspectRatio = hmW > 0 && hmH > 0 ? hmW / hmH : NaN;
+                    return (
+                      <div className="space-y-2 text-xs text-gray-600">
+                        <div className="flex items-baseline justify-between">
+                          <div className="font-medium text-gray-700">Dettagli</div>
+                          <div className="text-[11px] text-gray-400">read-only</div>
+                        </div>
 
-  return (
-    <div className="space-y-2 text-xs text-gray-600">
-      <div className="flex items-baseline justify-between">
-        <div className="font-medium text-gray-700">Dettagli</div>
-        <div className="text-[11px] text-gray-400">read-only</div>
-      </div>
+                        {/* DIMENSIONI */}
+                        <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
+                          <div className="font-medium text-gray-700">Dimensioni</div>
 
-      {/* DIMENSIONI */}
-      <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
-        <div className="font-medium text-gray-700">Dimensioni</div>
+                          <div className="mt-1 flex items-baseline justify-between">
+                            <div className="text-gray-600">Pianta (X × Y)</div>
+                            <div className="font-medium text-gray-800">
+                              {fmt(stlWidthMm, 2)} × {fmt(stlHeightMm, 2)} mm
+                            </div>
+                          </div>
 
-        <div className="mt-1 flex items-baseline justify-between">
-          <div className="text-gray-600">Pianta (X × Y)</div>
-          <div className="font-medium text-gray-800">
-            {fmt(stlWidthMm, 2)} × {fmt(stlHeightMm, 2)} mm
+                          <div className="flex items-baseline justify-between">
+                            <div className="text-gray-600">Larghezza (X)</div>
+                            <div className="font-medium text-gray-800">{fmt(stlWidthMm, 2)} mm</div>
+                          </div>
+
+                          <div className="flex items-baseline justify-between">
+                            <div className="text-gray-600">Altezza (Y)</div>
+                            <div className="font-medium text-gray-800">{fmt(stlHeightMm, 2)} mm</div>
+                          </div>
+
+                          <div className="flex items-baseline justify-between">
+                            <div className="text-gray-600">Altezza totale (Z)</div>
+                            <div className="font-medium text-gray-800">{fmt(totalMm, 2)} mm</div>
+                          </div>
+
+                          <div className="flex items-baseline justify-between">
+                            <div className="text-gray-600">Spessore base</div>
+                            <div className="font-medium text-gray-800">{fmt(baseMm, 2)} mm</div>
+                          </div>
+
+                          <div className="flex items-baseline justify-between">
+                            <div className="text-gray-600">Altezza rilievo</div>
+                            <div className="font-medium text-gray-800">{fmt(reliefMm, 2)} mm</div>
+                          </div>
+
+                          <div className="mt-1 flex items-baseline justify-between">
+                            <div className="text-gray-600">Scala</div>
+                            <div className="font-medium text-gray-800">{fmt(mmPerPx, 4)} mm/px</div>
+                          </div>
+
+                          <div className="flex items-baseline justify-between">
+                            <div className="text-gray-600">Aspect ratio</div>
+                            <div className="font-medium text-gray-800">
+                              {hmW && hmH ? `${hmW}:${hmH}` : "—"}{" "}
+                              {Number.isFinite(aspectRatio) ? `(${fmt(aspectRatio, 3)})` : ""}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* SORGENTE */}
+                        <div>
+                          Sorgente:{" "}
+                          <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
+                        </div>
+
+                        <div>
+                          Risoluzione reale heightmap:{" "}
+                          <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h} px` : "—"}</span>
+                        </div>
+
+                        <div>
+                          Output:{" "}
+                          <span className="font-medium">
+                            {params.outputMode} / {params.baseStyle}
+                          </span>
+                        </div>
+
+                        <div>
+                          Rapporto base/rilievo:{" "}
+                          <span className="font-medium">{ratio === null ? "—" : `${fmt(ratio, 2)} : 1`}</span>{" "}
+                          <span className="text-gray-400">(base/relief)</span>
+                        </div>
+
+                        <div>
+                          Distribuzione:{" "}
+                          <span className="font-medium">
+                            {fmt(basePct, 0)}% base / {fmt(reliefPct, 0)}% rilievo
+                          </span>
+                        </div>
+
+                        {/* METRICHE STL */}
+                        <div className="border-t pt-2">
+                          <div className="font-medium text-gray-700">Metriche STL</div>
+
+                          {s ? (
+                            <>
+                              <div>
+                                Campionamento (post-decimazione):{" "}
+                                <span className="font-medium">
+                                  {s.effW} × {s.effH} px
+                                </span>
+                              </div>
+
+                              <div>
+                                Triangoli stimati: <span className="font-medium">{s.triangles.toLocaleString()}</span>
+                              </div>
+
+                              <div>
+                                Peso stimato STL: <span className="font-medium">{s.mb.toFixed(1)} MB</span>
+                              </div>
+
+                              {s.isHeavy ? (
+                                <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
+                                  <div className="font-semibold">⚠️ Mesh pesante</div>
+                                  <div className="mt-1">
+                                    Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
+                                    <span className="font-semibold">x{s.suggestedDecimate}</span>.
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-green-900">
+                                  ✅ Dimensione ok: dovrebbe essere fluido in slicer e in Blender.
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-gray-500">Carica un file per vedere le metriche.</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+              </div>
+            </div>
           </div>
         </div>
-
-        <div className="flex items-baseline justify-between">
-          <div className="text-gray-600">Larghezza (X)</div>
-          <div className="font-medium text-gray-800">{fmt(stlWidthMm, 2)} mm</div>
-        </div>
-
-        <div className="flex items-baseline justify-between">
-          <div className="text-gray-600">Altezza (Y)</div>
-          <div className="font-medium text-gray-800">{fmt(stlHeightMm, 2)} mm</div>
-        </div>
-
-        <div className="flex items-baseline justify-between">
-          <div className="text-gray-600">Altezza totale (Z)</div>
-          <div className="font-medium text-gray-800">{fmt(totalMm, 2)} mm</div>
-        </div>
-
-        <div className="flex items-baseline justify-between">
-          <div className="text-gray-600">Spessore base</div>
-          <div className="font-medium text-gray-800">{fmt(baseMm, 2)} mm</div>
-        </div>
-
-        <div className="flex items-baseline justify-between">
-          <div className="text-gray-600">Altezza rilievo</div>
-          <div className="font-medium text-gray-800">{fmt(reliefMm, 2)} mm</div>
-        </div>
-
-        <div className="mt-1 flex items-baseline justify-between">
-          <div className="text-gray-600">Scala</div>
-          <div className="font-medium text-gray-800">{fmt(mmPerPx, 4)} mm/px</div>
-        </div>
-
-        <div className="flex items-baseline justify-between">
-          <div className="text-gray-600">Aspect ratio</div>
-          <div className="font-medium text-gray-800">
-            {hmW && hmH ? `${hmW}:${hmH}` : "—"}{" "}
-            {Number.isFinite(aspectRatio) ? `(${fmt(aspectRatio, 3)})` : ""}
-          </div>
-        </div>
-      </div>
-
-      {/* SORGENTE */}
-      <div>
-        Sorgente:{" "}
-        <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
-      </div>
-
-      <div>
-        Risoluzione reale heightmap:{" "}
-        <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h} px` : "—"}</span>
-      </div>
-
-      <div>
-        Output:{" "}
-        <span className="font-medium">
-          {params.outputMode} / {params.baseStyle}
-        </span>
-      </div>
-
-      <div>
-        Rapporto base/rilievo:{" "}
-        <span className="font-medium">{ratio === null ? "—" : `${fmt(ratio, 2)} : 1`}</span>{" "}
-        <span className="text-gray-400">(base/relief)</span>
-      </div>
-
-      <div>
-        Distribuzione:{" "}
-        <span className="font-medium">
-          {fmt(basePct, 0)}% base / {fmt(reliefPct, 0)}% rilievo
-        </span>
-      </div>
-
-      {/* METRICHE STL */}
-      <div className="border-t pt-2">
-        <div className="font-medium text-gray-700">Metriche STL</div>
-
-        {s ? (
-          <>
-            <div>
-              Campionamento (post-decimazione):{" "}
-              <span className="font-medium">
-                {s.effW} × {s.effH} px
-              </span>
-            </div>
-
-            <div>
-              Triangoli stimati: <span className="font-medium">{s.triangles.toLocaleString()}</span>
-            </div>
-
-            <div>
-              Peso stimato STL: <span className="font-medium">{s.mb.toFixed(1)} MB</span>
-            </div>
-
-            {s.isHeavy ? (
-              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
-                <div className="font-semibold">⚠️ Mesh pesante</div>
-                <div className="mt-1">
-                  Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
-                  <span className="font-semibold">x{s.suggestedDecimate}</span>.
-                </div>
-              </div>
-            ) : (
-              <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-green-900">
-                ✅ Dimensione ok: dovrebbe essere fluido in slicer e in Blender.
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-gray-500">Carica un file per vedere le metriche.</div>
-        )}
       </div>
     </div>
   );
-})()}
+}
