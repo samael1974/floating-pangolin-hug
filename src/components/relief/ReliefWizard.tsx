@@ -368,24 +368,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
   });
 }, []);
 
-  const openGptHelp = React.useCallback(() => {
-    alert(
-      "🤖 Workflow consigliato (GPT → Depth Map → STL):\n\n" +
-        "1) Nel GPT chiedi:\n" +
-        "   • depth map grayscale\n" +
-        "   • PNG 16-bit\n" +
-        "   • superfici lisce, poco rumore\n" +
-        "   • buon contrasto (niente banding)\n\n" +
-        "2) Qui seleziona:\n" +
-        "   Sorgente → Depth map (8/16-bit)\n\n" +
-        "3) Se il rilievo è al contrario:\n" +
-        "   attiva 'Inverti depth map'\n\n" +
-        "4) Se hai errori o dubbi:\n" +
-        "   passa a 'Modalità Immagine' (più tollerante)."
-    );
-  }, []);
-
-  return (
+    return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
       {/* Hero / brand */}
       <div className="mb-6">
