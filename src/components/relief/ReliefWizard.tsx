@@ -761,7 +761,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
 
                 <button
                   <button
-<button
+                    <button
   type="button"
   onClick={() => setShowInstructions((v) => !v)}
   className={`rounded px-2 py-1 text-xs font-semibold ${
