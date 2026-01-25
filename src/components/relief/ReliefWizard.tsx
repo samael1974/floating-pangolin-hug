@@ -747,7 +747,6 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
                   >
                     Depth map
                   </button>
-
   <button
   type="button"
   onClick={() => setPreviewTab("stl")}
