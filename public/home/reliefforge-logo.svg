@@ -1,1 +1,6 @@
-<img src="/home/reliefforge-logo.svg" alt="" className="h-7 w-7" />
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 234" width="150" height="234">
+  <g fill="none" stroke="#2B1E16" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 226 L75 10 L128 226" />
+    <path d="M38 226 L75 34 L112 226" />
+  </g>
+</svg>
