@@ -193,7 +193,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
               return;
             }
           } catch {
-            // Se fallisce il check, non bloccare: lascia che il decoder gestisca
+            // se fallisce il check, non bloccare: lascia che il decoder gestisca
           }
         }
       }
@@ -355,20 +355,17 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
     });
   }
 
- const openInstructions = React.useCallback(() => {
-  // apre il pannello e poi scrolla
-  setShowInstructions(true);
-
-  // lascia un tick al render prima dello scroll
-  requestAnimationFrame(() => {
-    document.getElementById("rf-instructions")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
+  const openInstructions = React.useCallback(() => {
+    setShowInstructions(true);
+    requestAnimationFrame(() => {
+      document.getElementById("rf-instructions")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     });
-  });
-}, []);
+  }, []);
 
-    return (
+  return (
     <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
       {/* Hero / brand */}
       <div className="mb-6">
@@ -428,21 +425,21 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">1) Carica un file</div>
-<div className="text-xs text-gray-500">
-  <p>
-    JPG/JPEG/PNG/WEBP. Per Depth map:{" "}
-    <span className="font-medium">PNG 16-bit in scala di grigi</span> consigliato.
-  </p>
-  <p className="mt-1">
-    <button
-      type="button"
-      onClick={openInstructions}
-      className="underline underline-offset-4 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-    >
-      Non sai come ottenerlo? Apri Istruzioni → Depth map
-    </button>
-  </p>
-</div>
+                <div className="text-xs text-gray-500">
+                  <p>
+                    JPG/JPEG/PNG/WEBP. Per Depth map:{" "}
+                    <span className="font-medium">PNG 16-bit in scala di grigi</span> consigliato.
+                  </p>
+                  <p className="mt-1">
+                    <button
+                      type="button"
+                      onClick={openInstructions}
+                      className="underline underline-offset-4 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    >
+                      Non sai come ottenerlo? Apri Istruzioni → Depth map
+                    </button>
+                  </p>
+                </div>
               </div>
 
               {file && (
@@ -463,9 +460,33 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
               className="block w-full text-sm"
             />
 
-            
-            
-                        {file && (
+            {/* Warning compatibilità depth map */}
+            {fileWarning && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                <div className="text-xs font-semibold">⚠️ Attenzione</div>
+                <div className="mt-1 whitespace-pre-line text-xs leading-snug">{fileWarning}</div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={openInstructions}
+                    className="rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                  >
+                    📌 Apri istruzioni
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSourceMode("image")}
+                    className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                  >
+                    🖼 Passa a modalità Immagine
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {file && (
               <div className="text-xs text-gray-600">
                 <div className="font-medium">File:</div>
                 <div className="break-all">{file.name}</div>
@@ -637,7 +658,9 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
                 className="w-full"
                 disabled={!file}
               />
-              <div className="text-xs text-gray-500">Suggerimento: x2–x3 è un buon compromesso. Più alto = più leggero, meno dettaglio.</div>
+              <div className="text-xs text-gray-500">
+                Suggerimento: x2–x3 è un buon compromesso. Più alto = più leggero, meno dettaglio.
+              </div>
             </div>
 
             <div className="flex flex-col gap-2 pt-2">
@@ -710,14 +733,16 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
 
             {/* Tabs + Istruzioni */}
             <div className="overflow-hidden rounded-md border">
-              {/* Header */}
+              {/* Header (RIPULITO: qui prima si rompeva tutto) */}
               <div className="flex items-center justify-between gap-2 border-b bg-gray-50 px-3 py-2">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setPreviewTab("image")}
                     className={`rounded px-2 py-1 text-xs font-medium ${
-                      previewTab === "image" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                      previewTab === "image"
+                        ? "bg-[#1F4E5F] text-white"
+                        : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                     }`}
                   >
                     Immagine
@@ -727,55 +752,43 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
                     type="button"
                     onClick={() => setPreviewTab("depth")}
                     className={`rounded px-2 py-1 text-xs font-medium ${
-                      previewTab === "depth" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                      previewTab === "depth"
+                        ? "bg-[#1F4E5F] text-white"
+                        : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                     }`}
                   >
                     Depth map
                   </button>
-  <button
-  type="button"
-  onClick={() => setPreviewTab("stl")}
-  className={`rounded px-2 py-1 text-xs font-medium ${
-    previewTab === "stl" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
-  }`}
->
-  Dettagli
-</button>
-</div>
 
-<button
-  type="button"
-  onClick={() => setShowInstructions((v) => !v)}
-  className={`rounded px-2 py-1 text-xs font-semibold ${
-    showInstructions ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
-  }`}
-  aria-expanded={showInstructions}
-  aria-controls="rf-instructions"
->
-  {showInstructions ? "Chiudi istruzioni" : "Istruzioni"}
-</button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab("stl")}
+                    className={`rounded px-2 py-1 text-xs font-medium ${
+                      previewTab === "stl"
+                        ? "bg-[#1F4E5F] text-white"
+                        : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                    }`}
+                  >
+                    Dettagli
+                  </button>
+                </div>
 
-  type="button"
-  onClick={() => setShowInstructions((v) => !v)}
-  className={`rounded px-2 py-1 text-xs font-semibold ${
-    showInstructions ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
-  }`}
-  aria-expanded={showInstructions}
-  aria-controls="rf-instructions"
->
-  {showInstructions ? "Chiudi istruzioni" : "Istruzioni"}
-</button>
-</div>
+                <button
+                  type="button"
+                  onClick={() => setShowInstructions((v) => !v)}
+                  className={`rounded px-2 py-1 text-xs font-semibold ${
+                    showInstructions ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                  }`}
+                  aria-expanded={showInstructions}
+                  aria-controls="rf-instructions"
+                >
+                  {showInstructions ? "Chiudi istruzioni" : "Istruzioni"}
+                </button>
+              </div>
 
-{/* Pannello istruzioni (inline, no modal) */}
-{showInstructions && (
-  <div
-    id="rf-instructions"
-    role="region"
-    className="border-b bg-white px-3 py-3 text-xs text-gray-700"
-  >
-
-
+              {/* Pannello istruzioni (inline, no modal) */}
+              {showInstructions && (
+                <div id="rf-instructions" role="region" className="border-b bg-white px-3 py-3 text-xs text-gray-700">
                   <div className="text-sm font-semibold text-gray-900">Come funziona ReliefForge</div>
                   <div className="mt-1 text-xs text-gray-500">
                     In 3 passaggi trasformi un’immagine (o una depth map) in uno STL chiuso e stampabile.
@@ -860,11 +873,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
                   <div className="space-y-2">
                     <div className="text-xs font-medium text-gray-700">Anteprima immagine</div>
                     {previewUrl ? (
-                      <img
-                        src={previewUrl}
-                        alt="Anteprima"
-                        className="max-h-[240px] w-full rounded-md border object-contain"
-                      />
+                      <img src={previewUrl} alt="Anteprima" className="max-h-[240px] w-full rounded-md border object-contain" />
                     ) : (
                       <div className="text-xs text-gray-500">Carica un file per vedere l’anteprima.</div>
                     )}
@@ -877,7 +886,9 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
                     {sourceMode === "depthmap" ? (
                       <canvas ref={dmCanvasRef} className="max-h-[240px] w-full rounded-md border" />
                     ) : (
-                      <div className="text-xs text-gray-500">In modalità Immagine, la depthmap è interna alla pipeline (vedi 3D).</div>
+                      <div className="text-xs text-gray-500">
+                        In modalità Immagine, la depthmap è interna alla pipeline (vedi 3D).
+                      </div>
                     )}
                   </div>
                 )}
@@ -942,7 +953,8 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
                           </div>
 
                           <div>
-                            Sorgente: <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
+                            Sorgente:{" "}
+                            <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
                           </div>
 
                           <div>
