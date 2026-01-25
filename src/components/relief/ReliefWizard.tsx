@@ -428,7 +428,19 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">1) Carica un file</div>
-                <div className="text-xs text-gray-500">JPG/JPEG/PNG/WEBP. Per Depth map: PNG consigliato.</div>
+                <div className="text-xs text-gray-500">
+  JPG/JPEG/PNG/WEBP. Per Depth map: <span className="font-medium">PNG 16-bit in scala di grigi</span> consigliato.
+  <div className="mt-1">
+    <button
+      type="button"
+      onClick={openInstructions}
+      className="underline underline-offset-4 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+    >
+      Non sai come ottenerlo? Apri Istruzioni → Depth map
+    </button>
+  </div>
+</div>
+
               </div>
 
               {file && (
