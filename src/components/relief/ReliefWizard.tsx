@@ -867,4 +867,103 @@ export default function ReliefWizard() {
 
         <div className="flex items-baseline justify-between">
           <div className="text-gray-600">Altezza totale (Z)</div>
-          <div className="
+          <div className="font-medium text-gray-800">{fmt(totalMm, 2)} mm</div>
+        </div>
+
+        <div className="flex items-baseline justify-between">
+          <div className="text-gray-600">Spessore base</div>
+          <div className="font-medium text-gray-800">{fmt(baseMm, 2)} mm</div>
+        </div>
+
+        <div className="flex items-baseline justify-between">
+          <div className="text-gray-600">Altezza rilievo</div>
+          <div className="font-medium text-gray-800">{fmt(reliefMm, 2)} mm</div>
+        </div>
+
+        <div className="mt-1 flex items-baseline justify-between">
+          <div className="text-gray-600">Scala</div>
+          <div className="font-medium text-gray-800">{fmt(mmPerPx, 4)} mm/px</div>
+        </div>
+
+        <div className="flex items-baseline justify-between">
+          <div className="text-gray-600">Aspect ratio</div>
+          <div className="font-medium text-gray-800">
+            {hmW && hmH ? `${hmW}:${hmH}` : "—"}{" "}
+            {Number.isFinite(aspectRatio) ? `(${fmt(aspectRatio, 3)})` : ""}
+          </div>
+        </div>
+      </div>
+
+      {/* SORGENTE */}
+      <div>
+        Sorgente:{" "}
+        <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
+      </div>
+
+      <div>
+        Risoluzione reale heightmap:{" "}
+        <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h} px` : "—"}</span>
+      </div>
+
+      <div>
+        Output:{" "}
+        <span className="font-medium">
+          {params.outputMode} / {params.baseStyle}
+        </span>
+      </div>
+
+      <div>
+        Rapporto base/rilievo:{" "}
+        <span className="font-medium">{ratio === null ? "—" : `${fmt(ratio, 2)} : 1`}</span>{" "}
+        <span className="text-gray-400">(base/relief)</span>
+      </div>
+
+      <div>
+        Distribuzione:{" "}
+        <span className="font-medium">
+          {fmt(basePct, 0)}% base / {fmt(reliefPct, 0)}% rilievo
+        </span>
+      </div>
+
+      {/* METRICHE STL */}
+      <div className="border-t pt-2">
+        <div className="font-medium text-gray-700">Metriche STL</div>
+
+        {s ? (
+          <>
+            <div>
+              Campionamento (post-decimazione):{" "}
+              <span className="font-medium">
+                {s.effW} × {s.effH} px
+              </span>
+            </div>
+
+            <div>
+              Triangoli stimati: <span className="font-medium">{s.triangles.toLocaleString()}</span>
+            </div>
+
+            <div>
+              Peso stimato STL: <span className="font-medium">{s.mb.toFixed(1)} MB</span>
+            </div>
+
+            {s.isHeavy ? (
+              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
+                <div className="font-semibold">⚠️ Mesh pesante</div>
+                <div className="mt-1">
+                  Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
+                  <span className="font-semibold">x{s.suggestedDecimate}</span>.
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-green-900">
+                ✅ Dimensione ok: dovrebbe essere fluido in slicer e in Blender.
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-gray-500">Carica un file per vedere le metriche.</div>
+        )}
+      </div>
+    </div>
+  );
+})()}
