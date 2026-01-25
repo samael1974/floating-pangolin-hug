@@ -449,38 +449,24 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
               className="block w-full text-sm"
             />
 
-            {fileWarning && (
-              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                <div className="font-semibold">Depth map non compatibile</div>
-                <div className="mt-1 whitespace-pre-line text-xs leading-snug">{fileWarning}</div>
+            <div className="mt-3 flex flex-wrap gap-2">
+  <button
+    type="button"
+    onClick={openInstructions}
+    className="rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+  >
+    📌 Apri istruzioni
+  </button>
 
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={openConversionHelp}
-                    className="rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
-                  >
-                    🔧 Istruzioni conversione
-                  </button>
+  <button
+    type="button"
+    onClick={() => setSourceMode("image")}
+    className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+  >
+    🖼 Passa a modalità Immagine
+  </button>
+</div>
 
-                  <button
-                    type="button"
-                    onClick={() => setSourceMode("image")}
-                    className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
-                  >
-                    🖼 Passa a modalità Immagine
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={openGptHelp}
-                    className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white"
-                  >
-                    🤖 Come usare il GPT
-                  </button>
-                </div>
-              </div>
-            )}
 
             {file && (
               <div className="text-xs text-gray-600">
