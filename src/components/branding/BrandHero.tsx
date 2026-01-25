@@ -23,12 +23,11 @@ export default function BrandHero({ showBackLink = false }: BrandHeroProps) {
                 aria-hidden="true"
               >
                 <img
-                  src="/home/reliefforge-logo-2.svg?v=2"
-                  alt=""
-                  className="h-7 w-7"
-                  style={{ color: "#1F4E5F" }}
-                  loading="eager"
-                />
+  src="/home/reliefforge-logo-v2.svg"
+  alt="ReliefForge"
+  className="h-7 w-7"
+  loading="eager"
+/>
               </div>
 
               <h1 className="text-4xl font-extrabold tracking-tight text-[#1F4E5F] md:text-5xl">
