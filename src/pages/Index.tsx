@@ -22,7 +22,7 @@ export default function Index() {
     <img
   src="/home/reliefforge-logo.webp"
   alt=""
-  className="h-7 w-7"
+  className="h-7 w-5"
   loading="eager"
 />
   </div>
