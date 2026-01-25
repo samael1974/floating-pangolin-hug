@@ -1,5 +1,6 @@
 import * as React from "react";
 
+import BrandHero from "@/components/branding/BrandHero";
 import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefControls";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
