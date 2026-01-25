@@ -355,19 +355,19 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
     });
   }
 
-  const openInstructions = React.useCallback(() => {
-    alert(
-      "✅ Depth map compatibile = PNG in SCALA DI GRIGI (Grayscale) + 16-bit (consigliato)\n\n" +
-        "Se la depth map è 32-bit / float / RGB / HDR → può generare STL rotti o errori.\n\n" +
-        "🔧 Metodo rapido (GIMP – gratis):\n" +
-        "1) Apri immagine\n" +
-        "2) Immagine → Modalità → Scala di grigi\n" +
-        "3) Immagine → Precisione → Intero 16-bit\n" +
-        "4) File → Esporta come… → PNG\n\n" +
-        "🖼 Alternativa semplice:\n" +
-        "Se non vuoi convertire, usa 'Modalità Immagine' nell’app."
-    );
-  }, []);
+ const openInstructions = React.useCallback(() => {
+  // apre il pannello e poi scrolla
+  setShowInstructions(true);
+
+  // lascia un tick al render prima dello scroll
+  requestAnimationFrame(() => {
+    document.getElementById("rf-instructions")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  });
+}, []);
+
 
   const openGptHelp = React.useCallback(() => {
     alert(
