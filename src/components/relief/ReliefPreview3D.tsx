@@ -167,7 +167,6 @@ export default function ReliefPreview3D(props: Props) {
   }
 
   return (
-return (
   <Canvas
     shadows
     dpr={[1, 2]}
