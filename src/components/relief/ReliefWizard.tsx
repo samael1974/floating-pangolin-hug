@@ -761,24 +761,27 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
 
                 <button
                   <button
+<button
   type="button"
   onClick={() => setShowInstructions((v) => !v)}
-  className={`...`}
+  className={`rounded px-2 py-1 text-xs font-semibold ${
+    showInstructions ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+  }`}
   aria-expanded={showInstructions}
   aria-controls="rf-instructions"
 >
+  {showInstructions ? "Chiudi istruzioni" : "Istruzioni"}
+</button>
+</div>
 
-                  {showInstructions ? "Chiudi istruzioni" : "Istruzioni"}
-                </button>
-              </div>
+{/* Pannello istruzioni (inline, no modal) */}
+{showInstructions && (
+  <div
+    id="rf-instructions"
+    role="region"
+    className="border-b bg-white px-3 py-3 text-xs text-gray-700"
+  >
 
-              {/* Pannello istruzioni (inline, no modal) */}
-              {showInstructions && (
-                <div
-  id="rf-instructions"
-  role="region"
-  className="border-b bg-white px-3 py-3 text-xs text-gray-700"
->
 
                   <div className="text-sm font-semibold text-gray-900">Come funziona ReliefForge</div>
                   <div className="mt-1 text-xs text-gray-500">
