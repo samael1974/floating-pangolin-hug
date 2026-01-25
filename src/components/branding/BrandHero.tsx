@@ -32,8 +32,9 @@ export default function BrandHero({ showBackLink = false }: BrandHeroProps) {
               </div>
 
               <h1 className="text-4xl font-extrabold tracking-tight text-[#1F4E5F] md:text-5xl">
-                ReliefForge
-              </h1>
+  <span className="text-[#E26D5C]">R</span>elief
+  <span className="text-[#E26D5C]">F</span>orge
+</h1>
             </div>
 
             {/* Value proposition */}
