@@ -95,7 +95,7 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
       {/* Piano invisibile solo per ricevere ombre (render-only) */}
       <mesh position={[0, 0, -0.001]} receiveShadow>
         <planeGeometry args={[5000, 5000]} />
-        <shadowMaterial opacity={0.35} />
+        <shadowMaterial opacity={0.4} />
       </mesh>
 
       {/* 🧱 Mesh + materiale (2.2) — “aragosta” opaco leggibile */}
