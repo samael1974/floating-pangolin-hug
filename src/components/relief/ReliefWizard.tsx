@@ -355,7 +355,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
     });
   }
 
-  const openConversionHelp = React.useCallback(() => {
+  const openInstructions = React.useCallback(() => {
     alert(
       "✅ Depth map compatibile = PNG in SCALA DI GRIGI (Grayscale) + 16-bit (consigliato)\n\n" +
         "Se la depth map è 32-bit / float / RGB / HDR → può generare STL rotti o errori.\n\n" +
