@@ -81,7 +81,7 @@ function CameraKeyLight({ intensity = 1.6 }: { intensity?: number }) {
     // luce radente: laterale + un filo dall’alto + leggermente dietro
     const pos = camera.position
       .clone()
-      .add(right.multiplyScalar(650))
+      .add(right.multiplyScalar(850))
       .add(up.multiplyScalar(120))
       .add(forward.multiplyScalar(-80));
 
