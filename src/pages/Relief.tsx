@@ -10,7 +10,6 @@ export default function ReliefPage() {
       <main className="mx-auto w-full max-w-6xl px-4 pb-12">
         <div className="rounded-2xl bg-white shadow-sm">
           <div className="p-4 sm:p-6">
-            {/* Headline secondaria (non H1) + hint operativo */}
             <div className="mb-5">
               <h2 className="text-lg font-semibold text-slate-900">
                 Generatore bassorilievi
