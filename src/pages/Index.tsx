@@ -14,22 +14,24 @@ export default function Index() {
               Tool gratuito • STL manifold • PNG 16-bit • Nessun account
             </div>
 
-            <h1 className="text-4xl font-extrabold tracking-tight text-[#1F4E5F] md:text-5xl">
-              ReliefForge
-            </h1>
+           <div className="flex items-center gap-3">
+  <div
+    className="grid h-10 w-10 place-items-center rounded-xl bg-white shadow-sm"
+    aria-hidden="true"
+  >
+    <img
+      src="/home/reliefforge-logo.svg"
+      alt=""
+      className="h-7 w-7 text-[#1F4E5F]"
+      style={{ color: "#1F4E5F" }}
+      loading="eager"
+    />
+  </div>
 
-            <p className="text-base text-slate-700 md:text-lg">
-              <span className="font-semibold">Da foto a bassorilievo STL</span>{" "}
-              pronto da stampare in pochi minuti.
-            </p>
-
-            <div className="inline-flex items-center rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-slate-700">
-              <span className="font-medium">Preview 3D</span>
-              <span className="mx-2 opacity-50">·</span>
-              <span className="font-medium">Controlli precisi</span>
-              <span className="mx-2 opacity-50">·</span>
-              <span className="font-medium">Export STL</span>
-            </div>
+  <h1 className="text-4xl font-extrabold tracking-tight text-[#1F4E5F] md:text-5xl">
+    ReliefForge
+  </h1>
+</div>
 
             <p className="text-sm text-slate-600 md:text-base">
               Carica un’immagine, regola profondità e dettaglio, scarica uno{" "}
