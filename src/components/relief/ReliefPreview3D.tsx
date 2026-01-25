@@ -45,7 +45,6 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
   return (
     <>
       {/* 🌤 Environment: utile, ma NON deve “lavare” la scena */}
-      <Environment preset="studio" />
 
       {/* 💡 LIGHT RIG (2.1) — meno fill, più luce radente */}
       <ambientLight intensity={0.16} />
