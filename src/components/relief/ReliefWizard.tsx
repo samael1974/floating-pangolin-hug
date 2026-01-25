@@ -463,26 +463,9 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
               className="block w-full text-sm"
             />
 
-            <div className="mt-3 flex flex-wrap gap-2">
-  <button
-    type="button"
-    onClick={openInstructions}
-    className="rounded-md bg-[#1F4E5F] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-  >
-    📌 Apri istruzioni
-  </button>
-
-  <button
-    type="button"
-    onClick={() => setSourceMode("image")}
-    className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-  >
-    🖼 Passa a modalità Immagine
-  </button>
-</div>
-
-
-            {file && (
+            
+            
+                        {file && (
               <div className="text-xs text-gray-600">
                 <div className="font-medium">File:</div>
                 <div className="break-all">{file.name}</div>
