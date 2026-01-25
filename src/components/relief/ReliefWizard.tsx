@@ -97,6 +97,9 @@ export default function ReliefWizard() {
   // ✅ Preview tab (colonna destra)
   const [previewTab, setPreviewTab] = React.useState<"image" | "depth" | "stl">("stl");
 
+  // ✅ Pannello istruzioni (inline)
+  const [showInstructions, setShowInstructions] = React.useState<boolean>(false);
+
   // ✅ Sorgente
   const [sourceMode, setSourceMode] = React.useState<SourceMode>("image");
   const [invertDepthMap, setInvertDepthMap] = React.useState(false);
@@ -383,66 +386,47 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
     );
   }, []);
 
- return (
-  <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
-    {/* Hero / brand (se non vuoi mostrarlo, puoi rimuovere questo blocco) */}
-    <div className="mb-6">
-      <BrandHero />
-    </div>
+  return (
+    <div className="mx-auto w-full max-w-7xl px-4 pb-10 pt-4">
+      {/* Hero / brand */}
+      <div className="mb-6">
+        <BrandHero />
+      </div>
 
-    <div className="grid gap-6 md:grid-cols-[420px_1fr] lg:grid-cols-[460px_1fr]">
-      {/* LEFT */}
-      <div className="space-y-6">
-        {/* Source Mode */}
-        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-white p-4 shadow">
-          <div className="min-w-[220px]">
-            <div className="text-sm font-semibold">Sorgente</div>
-            <div className="text-xs text-gray-500">
-              Usa <span className="font-medium">Immagine</span> per risultati rapidi. Usa{" "}
-              <span className="font-medium">Depth map</span> se hai già una mappa di profondità (meglio PNG 16-bit).
+      <div className="grid gap-6 md:grid-cols-[420px_1fr] lg:grid-cols-[460px_1fr]">
+        {/* LEFT */}
+        <div className="space-y-6">
+          {/* Source Mode */}
+          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-white p-4 shadow">
+            <div className="min-w-[220px]">
+              <div className="text-sm font-semibold">Sorgente</div>
+              <div className="text-xs text-gray-500">
+                Usa <span className="font-medium">Immagine</span> per risultati rapidi. Usa{" "}
+                <span className="font-medium">Depth map</span> se hai già una mappa di profondità (meglio PNG 16-bit).
+              </div>
             </div>
-          </div>
 
-          <div className="inline-flex overflow-hidden rounded-md border">
-            <button
-              type="button"
-              onClick={() => setSourceMode("image")}
-              className={`px-3 py-1.5 text-sm ${
-                sourceMode === "image"
-                  ? "bg-[#1F4E5F] text-white"
-                  : "bg-white text-[#1F4E5F] hover:bg-gray-50"
-              }`}
-            >
-              Immagine
-            </button>
+            <div className="inline-flex overflow-hidden rounded-md border">
+              <button
+                type="button"
+                onClick={() => setSourceMode("image")}
+                className={`px-3 py-1.5 text-sm ${
+                  sourceMode === "image" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                }`}
+              >
+                Immagine
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setSourceMode("depthmap")}
-              className={`px-3 py-1.5 text-sm ${
-                sourceMode === "depthmap"
-                  ? "bg-[#1F4E5F] text-white"
-                  : "bg-white text-[#1F4E5F] hover:bg-gray-50"
-              }`}
-            >
-              Depth map (8/16-bit)
-            </button>
-          </div>
-
-          {sourceMode === "depthmap" && (
-            <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={invertDepthMap}
-                onChange={(e) => setInvertDepthMap(e.target.checked)}
-              />
-              <span>Inverti depth map</span>
-              <span className="text-xs text-gray-500">(se viene “al contrario”)</span>
-            </label>
-          )}
-        </div>
-        {/* /Source Mode */}
-
+              <button
+                type="button"
+                onClick={() => setSourceMode("depthmap")}
+                className={`px-3 py-1.5 text-sm ${
+                  sourceMode === "depthmap" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                }`}
+              >
+                Depth map (8/16-bit)
+              </button>
+            </div>
 
             {sourceMode === "depthmap" && (
               <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
@@ -486,7 +470,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
             {fileWarning && (
               <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                 <div className="font-semibold">Depth map non compatibile</div>
-                <div className="mt-1 text-xs leading-snug whitespace-pre-line">{fileWarning}</div>
+                <div className="mt-1 whitespace-pre-line text-xs leading-snug">{fileWarning}</div>
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
@@ -688,9 +672,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
                 className="w-full"
                 disabled={!file}
               />
-              <div className="text-xs text-gray-500">
-                Suggerimento: x2–x3 è un buon compromesso. Più alto = più leggero, meno dettaglio.
-              </div>
+              <div className="text-xs text-gray-500">Suggerimento: x2–x3 è un buon compromesso. Più alto = più leggero, meno dettaglio.</div>
             </div>
 
             <div className="flex flex-col gap-2 pt-2">
@@ -699,9 +681,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
                 onClick={downloadStl}
                 disabled={!canGenerate}
                 className={`rounded-md px-4 py-2 text-sm font-semibold ${
-                  canGenerate
-                    ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]"
-                    : "cursor-not-allowed bg-gray-200 text-gray-500"
+                  canGenerate ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]" : "cursor-not-allowed bg-gray-200 text-gray-500"
                 }`}
               >
                 Scarica STL
@@ -763,303 +743,299 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
               </div>
             </div>
 
-           {/* Tabs + Istruzioni */}
-{/* Tabs + Istruzioni */}
-<div className="overflow-hidden rounded-md border">
-  {/* Header: Tabs + bottone Istruzioni */}
-  <div className="flex items-center justify-between gap-2 border-b bg-gray-50 px-3 py-2">
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => setPreviewTab("image")}
-        className={`rounded px-2 py-1 text-xs font-medium ${
-          previewTab === "image"
-            ? "bg-[#1F4E5F] text-white"
-            : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
-        }`}
-      >
-        Immagine
-      </button>
+            {/* Tabs + Istruzioni */}
+            <div className="overflow-hidden rounded-md border">
+              {/* Header */}
+              <div className="flex items-center justify-between gap-2 border-b bg-gray-50 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab("image")}
+                    className={`rounded px-2 py-1 text-xs font-medium ${
+                      previewTab === "image" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                    }`}
+                  >
+                    Immagine
+                  </button>
 
-      <button
-        type="button"
-        onClick={() => setPreviewTab("depth")}
-        className={`rounded px-2 py-1 text-xs font-medium ${
-          previewTab === "depth"
-            ? "bg-[#1F4E5F] text-white"
-            : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
-        }`}
-      >
-        Depth map
-      </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab("depth")}
+                    className={`rounded px-2 py-1 text-xs font-medium ${
+                      previewTab === "depth" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                    }`}
+                  >
+                    Depth map
+                  </button>
 
-      <button
-        type="button"
-        onClick={() => setPreviewTab("stl")}
-        className={`rounded px-2 py-1 text-xs font-medium ${
-          previewTab === "stl"
-            ? "bg-[#1F4E5F] text-white"
-            : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
-        }`}
-      >
-        Dettagli
-      </button>
-    </div>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab("stl")}
+                    className={`rounded px-2 py-1 text-xs font-medium ${
+                      previewTab === "stl" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                    }`}
+                  >
+                    Dettagli
+                  </button>
+                </div>
 
-    <button
-      type="button"
-      onClick={() => setShowInstructions((v) => !v)}
-      className={`rounded px-2 py-1 text-xs font-semibold ${
-        showInstructions ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
-      }`}
-      aria-expanded={showInstructions}
-    >
-      {showInstructions ? "Chiudi istruzioni" : "Istruzioni"}
-    </button>
-  </div>
-
-  {/* Pannello istruzioni (inline, no modal) */}
-  {showInstructions && (
-    <div className="border-b bg-white px-3 py-3 text-xs text-gray-700">
-      <div className="text-sm font-semibold text-gray-900">Come funziona ReliefForge</div>
-      <div className="mt-1 text-xs text-gray-500">
-        In 3 passaggi trasformi un’immagine (o una depth map) in uno STL chiuso e stampabile.
-      </div>
-
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <div className="rounded-md border bg-gray-50 p-3">
-          <div className="font-semibold text-gray-900">1) Scegli la sorgente</div>
-          <ul className="mt-2 list-disc space-y-1 pl-4">
-            <li>
-              <span className="font-semibold">Immagine</span>: consigliata per iniziare (più tollerante).
-            </li>
-            <li>
-              <span className="font-semibold">Depth map</span>: usala se hai già una mappa di profondità (più controllo).
-            </li>
-          </ul>
-
-          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
-            <div className="font-semibold">Depth map: formato consigliato</div>
-            <div className="mt-1">
-              PNG <span className="font-semibold">grayscale</span> (scala di grigi){" "}
-              <span className="font-semibold">16-bit</span>. Evita 32-bit/float/HDR o PNG RGB “colorati”.
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-md border bg-gray-50 p-3">
-          <div className="font-semibold text-gray-900">2) Regola i parametri</div>
-          <ul className="mt-2 list-disc space-y-1 pl-4">
-            <li>
-              <span className="font-semibold">Altezza rilievo</span>: quanto “sporge” il bassorilievo (mm).
-            </li>
-            <li>
-              <span className="font-semibold">Spessore base</span>: imposta <span className="font-semibold">0</span> se vuoi solo il modello senza basetta.
-            </li>
-            <li>
-              <span className="font-semibold">Qualità (Decimazione)</span>: x2–x3 consigliato. Più alto = STL più leggero, meno dettaglio.
-            </li>
-          </ul>
-
-          <div className="mt-3 rounded-md border border-gray-200 bg-white p-2">
-            <div className="font-semibold">Tip rapido</div>
-            <div className="mt-1">
-              Se il rilievo viene “al contrario”, attiva <span className="font-semibold">Inverti depth map</span>.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3 rounded-md border bg-white p-3">
-        <div className="font-semibold text-gray-900">3) Scarica lo STL</div>
-        <div className="mt-1">
-          Premi <span className="font-semibold">Scarica STL</span>: otterrai uno STL{" "}
-          <span className="font-semibold">chiuso (manifold)</span> pronto per slicer e stampa 3D.
-        </div>
-
-        <div className="mt-2 flex flex-wrap gap-2">
-          <a
-            href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5"
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-md border px-3 py-1.5 text-xs font-semibold text-[#1F4E5F] hover:bg-gray-50"
-          >
-            Genera Depth Map (GPT)
-          </a>
-          <a
-            href="https://www.paypal.me/federicocordioli72"
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-md border px-3 py-1.5 text-xs font-semibold text-[#1F4E5F] hover:bg-gray-50"
-          >
-            Supporta il progetto (PayPal)
-          </a>
-        </div>
-      </div>
-    </div>
-  )}
-
-  {/* Contenuto tab */}
-  <div className="p-3">
-    {previewTab === "image" && (
-      <div className="space-y-2">
-        <div className="text-xs font-medium text-gray-700">Anteprima immagine</div>
-        {previewUrl ? (
-          <img
-            src={previewUrl}
-            alt="Anteprima"
-            className="max-h-[240px] w-full rounded-md border object-contain"
-          />
-        ) : (
-          <div className="text-xs text-gray-500">Carica un file per vedere l’anteprima.</div>
-        )}
-      </div>
-    )}
-
-    {previewTab === "depth" && (
-      <div className="space-y-2">
-        <div className="text-xs font-medium text-gray-700">Anteprima depth map</div>
-        {sourceMode === "depthmap" ? (
-          <canvas ref={dmCanvasRef} className="max-h-[240px] w-full rounded-md border" />
-        ) : (
-          <div className="text-xs text-gray-500">
-            In modalità Immagine, la depthmap è interna alla pipeline (vedi 3D).
-          </div>
-        )}
-      </div>
-    )}
-
-    {previewTab === "stl" && (
-      <div className="space-y-2 text-xs text-gray-600">
-        {(() => {
-          const s = estimateStlStats();
-
-          const baseMm = Number(params.baseMm ?? 0);
-          const reliefMm = Number(params.depthMm ?? 0);
-          const totalMm = baseMm + reliefMm;
-
-          const ratio = reliefMm > 0 ? baseMm / reliefMm : null;
-          const basePct = totalMm > 0 ? (baseMm / totalMm) * 100 : 0;
-          const reliefPct = totalMm > 0 ? (reliefMm / totalMm) * 100 : 0;
-
-          const hmW = hmState?.w ?? 0;
-          const hmH = hmState?.h ?? 0;
-
-          const mmPerPx = stlWidthMm > 0 && hmW > 0 ? stlWidthMm / hmW : NaN;
-          const stlHeightMm = Number.isFinite(mmPerPx) && hmH > 0 ? hmH * mmPerPx : NaN;
-
-          const fmt = (n: number, d = 2) => (Number.isFinite(n) ? n.toFixed(d) : "—");
-
-          return (
-            <>
-              <div className="flex items-baseline justify-between">
-                <div className="font-medium text-gray-700">Dettagli</div>
-                <div className="text-[11px] text-gray-400">read-only</div>
+                <button
+                  type="button"
+                  onClick={() => setShowInstructions((v) => !v)}
+                  className={`rounded px-2 py-1 text-xs font-semibold ${
+                    showInstructions ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                  }`}
+                  aria-expanded={showInstructions}
+                >
+                  {showInstructions ? "Chiudi istruzioni" : "Istruzioni"}
+                </button>
               </div>
 
-              <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
-                <div className="font-medium text-gray-700">Dimensioni</div>
-
-                <div className="mt-1 flex items-baseline justify-between">
-                  <div className="text-gray-600">Pianta (X × Y)</div>
-                  <div className="font-medium text-gray-800">
-                    {fmt(stlWidthMm, 2)} × {fmt(stlHeightMm, 2)} mm
+              {/* Pannello istruzioni (inline, no modal) */}
+              {showInstructions && (
+                <div className="border-b bg-white px-3 py-3 text-xs text-gray-700">
+                  <div className="text-sm font-semibold text-gray-900">Come funziona ReliefForge</div>
+                  <div className="mt-1 text-xs text-gray-500">
+                    In 3 passaggi trasformi un’immagine (o una depth map) in uno STL chiuso e stampabile.
                   </div>
-                </div>
 
-                <div className="flex items-baseline justify-between">
-                  <div className="text-gray-600">Altezza totale (Z)</div>
-                  <div className="font-medium text-gray-800">{fmt(totalMm, 2)} mm</div>
-                </div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-md border bg-gray-50 p-3">
+                      <div className="font-semibold text-gray-900">1) Scegli la sorgente</div>
+                      <ul className="mt-2 list-disc space-y-1 pl-4">
+                        <li>
+                          <span className="font-semibold">Immagine</span>: consigliata per iniziare (più tollerante).
+                        </li>
+                        <li>
+                          <span className="font-semibold">Depth map</span>: usala se hai già una mappa di profondità (più controllo).
+                        </li>
+                      </ul>
 
-                <div className="flex items-baseline justify-between">
-                  <div className="text-gray-600">Spessore base</div>
-                  <div className="font-medium text-gray-800">{fmt(baseMm, 2)} mm</div>
-                </div>
-
-                <div className="flex items-baseline justify-between">
-                  <div className="text-gray-600">Altezza rilievo</div>
-                  <div className="font-medium text-gray-800">{fmt(reliefMm, 2)} mm</div>
-                </div>
-
-                <div className="mt-1 flex items-baseline justify-between">
-                  <div className="text-gray-600">Scala</div>
-                  <div className="font-medium text-gray-800">{fmt(mmPerPx, 4)} mm/px</div>
-                </div>
-              </div>
-
-              <div>
-                Sorgente:{" "}
-                <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
-              </div>
-
-              <div>
-                Risoluzione reale heightmap:{" "}
-                <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h} px` : "—"}</span>
-              </div>
-
-              <div>
-                Output:{" "}
-                <span className="font-medium">
-                  {params.outputMode} / {params.baseStyle}
-                </span>
-              </div>
-
-              <div>
-                Rapporto base/rilievo:{" "}
-                <span className="font-medium">{ratio === null ? "—" : `${fmt(ratio, 2)} : 1`}</span>{" "}
-                <span className="text-gray-400">(base/relief)</span>
-              </div>
-
-              <div>
-                Distribuzione:{" "}
-                <span className="font-medium">
-                  {fmt(basePct, 0)}% base / {fmt(reliefPct, 0)}% rilievo
-                </span>
-              </div>
-
-              <div className="border-t pt-2">
-                <div className="font-medium text-gray-700">Metriche STL</div>
-
-                {s ? (
-                  <>
-                    <div>
-                      Campionamento (post-decimazione):{" "}
-                      <span className="font-medium">
-                        {s.effW} × {s.effH} px
-                      </span>
-                    </div>
-
-                    <div>
-                      Triangoli stimati: <span className="font-medium">{s.triangles.toLocaleString()}</span>
-                    </div>
-
-                    <div>
-                      Peso stimato STL: <span className="font-medium">{s.mb.toFixed(1)} MB</span>
-                    </div>
-
-                    {s.isHeavy ? (
-                      <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
-                        <div className="font-semibold">⚠️ Mesh pesante</div>
+                      <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
+                        <div className="font-semibold">Depth map: formato consigliato</div>
                         <div className="mt-1">
-                          Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
-                          <span className="font-semibold">x{s.suggestedDecimate}</span>.
+                          PNG <span className="font-semibold">grayscale</span> (scala di grigi){" "}
+                          <span className="font-semibold">16-bit</span>. Evita 32-bit/float/HDR o PNG RGB “colorati”.
                         </div>
                       </div>
-                    ) : (
-                      <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-green-900">
-                        ✅ Dimensione ok: dovrebbe essere fluido in slicer e in Blender.
+                    </div>
+
+                    <div className="rounded-md border bg-gray-50 p-3">
+                      <div className="font-semibold text-gray-900">2) Regola i parametri</div>
+                      <ul className="mt-2 list-disc space-y-1 pl-4">
+                        <li>
+                          <span className="font-semibold">Altezza rilievo</span>: quanto “sporge” il bassorilievo (mm).
+                        </li>
+                        <li>
+                          <span className="font-semibold">Spessore base</span>: imposta <span className="font-semibold">0</span> se vuoi solo il modello senza basetta.
+                        </li>
+                        <li>
+                          <span className="font-semibold">Qualità (Decimazione)</span>: x2–x3 consigliato. Più alto = STL più leggero, meno dettaglio.
+                        </li>
+                      </ul>
+
+                      <div className="mt-3 rounded-md border border-gray-200 bg-white p-2">
+                        <div className="font-semibold">Tip rapido</div>
+                        <div className="mt-1">
+                          Se il rilievo viene “al contrario”, attiva <span className="font-semibold">Inverti depth map</span>.
+                        </div>
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-md border bg-white p-3">
+                    <div className="font-semibold text-gray-900">3) Scarica lo STL</div>
+                    <div className="mt-1">
+                      Premi <span className="font-semibold">Scarica STL</span>: otterrai uno STL{" "}
+                      <span className="font-semibold">chiuso (manifold)</span> pronto per slicer e stampa 3D.
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <a
+                        href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-md border px-3 py-1.5 text-xs font-semibold text-[#1F4E5F] hover:bg-gray-50"
+                      >
+                        Genera Depth Map (GPT)
+                      </a>
+                      <a
+                        href="https://www.paypal.me/federicocordioli72"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-md border px-3 py-1.5 text-xs font-semibold text-[#1F4E5F] hover:bg-gray-50"
+                      >
+                        Supporta il progetto (PayPal)
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Contenuto tab */}
+              <div className="p-3">
+                {previewTab === "image" && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-gray-700">Anteprima immagine</div>
+                    {previewUrl ? (
+                      <img
+                        src={previewUrl}
+                        alt="Anteprima"
+                        className="max-h-[240px] w-full rounded-md border object-contain"
+                      />
+                    ) : (
+                      <div className="text-xs text-gray-500">Carica un file per vedere l’anteprima.</div>
                     )}
-                  </>
-                ) : (
-                  <div className="text-gray-500">Carica un file per vedere le metriche.</div>
+                  </div>
+                )}
+
+                {previewTab === "depth" && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-gray-700">Anteprima depth map</div>
+                    {sourceMode === "depthmap" ? (
+                      <canvas ref={dmCanvasRef} className="max-h-[240px] w-full rounded-md border" />
+                    ) : (
+                      <div className="text-xs text-gray-500">In modalità Immagine, la depthmap è interna alla pipeline (vedi 3D).</div>
+                    )}
+                  </div>
+                )}
+
+                {previewTab === "stl" && (
+                  <div className="space-y-2 text-xs text-gray-600">
+                    {(() => {
+                      const s = estimateStlStats();
+
+                      const baseMm = Number(params.baseMm ?? 0);
+                      const reliefMm = Number(params.depthMm ?? 0);
+                      const totalMm = baseMm + reliefMm;
+
+                      const ratio = reliefMm > 0 ? baseMm / reliefMm : null;
+                      const basePct = totalMm > 0 ? (baseMm / totalMm) * 100 : 0;
+                      const reliefPct = totalMm > 0 ? (reliefMm / totalMm) * 100 : 0;
+
+                      const hmW = hmState?.w ?? 0;
+                      const hmH = hmState?.h ?? 0;
+
+                      const mmPerPx = stlWidthMm > 0 && hmW > 0 ? stlWidthMm / hmW : NaN;
+                      const stlHeightMm = Number.isFinite(mmPerPx) && hmH > 0 ? hmH * mmPerPx : NaN;
+
+                      const fmt = (n: number, d = 2) => (Number.isFinite(n) ? n.toFixed(d) : "—");
+
+                      return (
+                        <>
+                          <div className="flex items-baseline justify-between">
+                            <div className="font-medium text-gray-700">Dettagli</div>
+                            <div className="text-[11px] text-gray-400">read-only</div>
+                          </div>
+
+                          <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
+                            <div className="font-medium text-gray-700">Dimensioni</div>
+
+                            <div className="mt-1 flex items-baseline justify-between">
+                              <div className="text-gray-600">Pianta (X × Y)</div>
+                              <div className="font-medium text-gray-800">
+                                {fmt(stlWidthMm, 2)} × {fmt(stlHeightMm, 2)} mm
+                              </div>
+                            </div>
+
+                            <div className="flex items-baseline justify-between">
+                              <div className="text-gray-600">Altezza totale (Z)</div>
+                              <div className="font-medium text-gray-800">{fmt(totalMm, 2)} mm</div>
+                            </div>
+
+                            <div className="flex items-baseline justify-between">
+                              <div className="text-gray-600">Spessore base</div>
+                              <div className="font-medium text-gray-800">{fmt(baseMm, 2)} mm</div>
+                            </div>
+
+                            <div className="flex items-baseline justify-between">
+                              <div className="text-gray-600">Altezza rilievo</div>
+                              <div className="font-medium text-gray-800">{fmt(reliefMm, 2)} mm</div>
+                            </div>
+
+                            <div className="mt-1 flex items-baseline justify-between">
+                              <div className="text-gray-600">Scala</div>
+                              <div className="font-medium text-gray-800">{fmt(mmPerPx, 4)} mm/px</div>
+                            </div>
+                          </div>
+
+                          <div>
+                            Sorgente: <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
+                          </div>
+
+                          <div>
+                            Risoluzione reale heightmap:{" "}
+                            <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h} px` : "—"}</span>
+                          </div>
+
+                          <div>
+                            Output:{" "}
+                            <span className="font-medium">
+                              {params.outputMode} / {params.baseStyle}
+                            </span>
+                          </div>
+
+                          <div>
+                            Rapporto base/rilievo:{" "}
+                            <span className="font-medium">{ratio === null ? "—" : `${fmt(ratio, 2)} : 1`}</span>{" "}
+                            <span className="text-gray-400">(base/relief)</span>
+                          </div>
+
+                          <div>
+                            Distribuzione:{" "}
+                            <span className="font-medium">
+                              {fmt(basePct, 0)}% base / {fmt(reliefPct, 0)}% rilievo
+                            </span>
+                          </div>
+
+                          <div className="border-t pt-2">
+                            <div className="font-medium text-gray-700">Metriche STL</div>
+
+                            {s ? (
+                              <>
+                                <div>
+                                  Campionamento (post-decimazione):{" "}
+                                  <span className="font-medium">
+                                    {s.effW} × {s.effH} px
+                                  </span>
+                                </div>
+
+                                <div>
+                                  Triangoli stimati: <span className="font-medium">{s.triangles.toLocaleString()}</span>
+                                </div>
+
+                                <div>
+                                  Peso stimato STL: <span className="font-medium">{s.mb.toFixed(1)} MB</span>
+                                </div>
+
+                                {s.isHeavy ? (
+                                  <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
+                                    <div className="font-semibold">⚠️ Mesh pesante</div>
+                                    <div className="mt-1">
+                                      Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
+                                      <span className="font-semibold">x{s.suggestedDecimate}</span>.
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-green-900">
+                                    ✅ Dimensione ok: dovrebbe essere fluido in slicer e in Blender.
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="text-gray-500">Carica un file per vedere le metriche.</div>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
                 )}
               </div>
-            </>
-          );
-        })()}
+            </div>
+          </div>
+        </div>
       </div>
-    )}
-  </div>
-</div>
+    </div>
+  );
+}
