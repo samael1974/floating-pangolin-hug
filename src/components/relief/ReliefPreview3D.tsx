@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Environment } from "@react-three/drei";
+import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
@@ -42,93 +42,94 @@ function decimateHm(hm: HeightmapState, step: number): HeightmapState {
 }
 
 /**
- * HeadLight: una piccola direzionale “attaccata” alla camera.
- * Serve solo a NON perdere i micro-dettagli quando ruoti.
+ * HeadLight: segue la camera (specular “leggibile” e stabile).
+ * Non fa castShadow: evita completamente scintillio/aliasing.
  */
 function HeadLight() {
-  const lightRef = React.useRef<THREE.DirectionalLight | null>(null);
+  const ref = React.useRef<THREE.DirectionalLight>(null);
   const { camera } = useThree();
 
   useFrame(() => {
-    const L = lightRef.current;
-    if (!L) return;
-
-    // segue la camera
-    L.position.copy(camera.position);
-
-    // punta sempre al centro scena
-    L.target.position.set(0, 0, 0);
-    L.target.updateMatrixWorld();
+    const l = ref.current;
+    if (!l) return;
+    // posizione leggermente avanti e sopra la camera
+    const dir = new THREE.Vector3(0.35, -0.6, 0.75).normalize();
+    const pos = camera.position.clone().add(dir.multiplyScalar(600));
+    l.position.copy(pos);
+    l.target.position.set(0, 0, 0);
+    l.target.updateMatrixWorld();
   });
 
   return (
-<directionalLight
-  position={[950, -260, 110]}
-  intensity={2.7}
-  castShadow={false}
-/>
+    <>
+      <directionalLight
+        ref={ref}
+        intensity={0.65}
+        color={"#ffffff"}
+      />
+      {/* target necessario per directionalLight */}
+      <object3D />
+    </>
   );
 }
 
 function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
   return (
     <>
-      {/* Environment (NO intensity prop: si controlla tramite envMapIntensity/material + exposure) */}
+      {/* Environment: ok per micro-riflessi, non “lava” se controlli envMapIntensity */}
       <Environment preset="studio" />
 
-      {/* Headlight (micro-dettagli durante orbit) */}
-      <HeadLight />
+      {/* luce ambiente minima: se esageri, ammazzi il rilievo */}
+      <ambientLight intensity={0.08} />
+      <hemisphereLight intensity={0.14} groundColor={"#050505"} />
 
-      {/* Fill minimo: se è alto, “ammazza” il rilievo */}
-      <ambientLight intensity={0.10} />
-      <hemisphereLight intensity={0.12} groundColor={"#050505"} />
-
-      {/* Key radente: è QUELLA che fa “uscire” il bassorilievo */}
+      {/* Key radente (SENZA ombre): è lei che fa uscire il rilievo, stabile */}
       <directionalLight
-        position={[950, -260, 110]}
-        intensity={2.7}
-        castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-bias={-0.00012}
-        shadow-normalBias={0.02}
-        shadow-radius={7}
-        shadow-camera-near={1}
-        shadow-camera-far={5000}
-        shadow-camera-left={-900}
-        shadow-camera-right={900}
-        shadow-camera-top={900}
-        shadow-camera-bottom={-900}
+        position={[900, -260, 110]}
+        intensity={2.2}
+        color={"#ffffff"}
       />
 
-      {/* Rim light: stacca i bordi senza appiattire */}
-      <directionalLight position={[-520, 260, 320]} intensity={0.30} />
+      {/* Rim leggero */}
+      <directionalLight
+        position={[-520, 260, 260]}
+        intensity={0.28}
+        color={"#ffffff"}
+      />
 
-      {/* Piano invisibile per ombre */}
-      <mesh position={[0, 0, -0.001]} receiveShadow>
-        <planeGeometry args={[6000, 6000]} />
-        <shadowMaterial opacity={0.42} />
-      </mesh>
+      {/* Headlight che segue camera */}
+      <HeadLight />
 
-      {/* Mesh + materiale: “aragosta” satinato, con specular controllato */}
-      <mesh geometry={geometry} castShadow receiveShadow={false}>
+      {/* Mesh + materiale: “aragosta” opaco, con specular controllata */}
+      <mesh geometry={geometry}>
         <meshPhysicalMaterial
           color={"#E26D5C"}
           metalness={0.02}
-          roughness={0.68}          // satinato (meno “mattone”)
-          clearcoat={0.18}          // specular controllata
-          clearcoatRoughness={0.55}
+          roughness={0.78}
+          clearcoat={0.08}
+          clearcoatRoughness={0.65}
           reflectivity={0.12}
-          envMapIntensity={0.55}    // qui “alzi” o “abbassi” l’effetto Environment
+          envMapIntensity={0.40}
         />
       </mesh>
+
+      {/* Ombra di contatto: stabile (niente shimmer), morbida e realistica */}
+      <ContactShadows
+        position={[0, 0, -0.002]}
+        opacity={0.30}
+        scale={1600}
+        blur={2.6}
+        far={1200}
+        resolution={1024}
+      />
 
       <OrbitControls
         makeDefault
         enableDamping
         dampingFactor={0.08}
         enablePan={false}
-        minDistance={140}
-        maxDistance={1800}
+        minDistance={120}
+        maxDistance={1500}
         target={[0, 0, 0]}
       />
     </>
@@ -163,7 +164,6 @@ export default function ReliefPreview3D(props: Props) {
         baseStyle,
       });
 
-      // centra e poggia a Z=0
       geo.computeBoundingBox();
       const bb = geo.boundingBox;
       if (bb) {
@@ -198,16 +198,15 @@ export default function ReliefPreview3D(props: Props) {
 
   return (
     <Canvas
-      shadows
       dpr={[1, 2]}
       gl={{ antialias: true, alpha: true }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1.08; // leggero boost, senza “lavare”
+        gl.toneMappingExposure = 1.0;
         gl.outputColorSpace = THREE.SRGBColorSpace;
+        // niente shadowMap qui: il tremolio arrivava dalle ombre vere
       }}
-      // camera leggermente inclinata (no frontale perfetta)
-      camera={{ position: [220, -420, 260], fov: 38, near: 0.1, far: 8000 }}
+      camera={{ position: [180, -260, 220], fov: 38, near: 0.1, far: 8000 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#f6f7fb"]} />
