@@ -825,100 +825,157 @@ export default function ReliefWizard() {
                   const fmt = (n: number, d = 2) => (Number.isFinite(n) ? n.toFixed(d) : "—");
 
                   return (
-                    <div className="space-y-2 text-xs text-gray-600">
-                      <div className="flex items-baseline justify-between">
-                        <div className="font-medium text-gray-700">Dettagli</div>
-                        <div className="text-[11px] text-gray-400">read-only</div>
-                      </div>
+  <div className="space-y-2 text-xs text-gray-600">
+    <div className="flex items-baseline justify-between">
+      <div className="font-medium text-gray-700">Dettagli</div>
+      <div className="text-[11px] text-gray-400">read-only</div>
+    </div>
 
-                      <div>
-                        Sorgente:{" "}
-                        <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
-                      </div>
+    {/* -------------------------
+        DIMENSIONI (PIANTA + ALTEZZE)
+       ------------------------- */}
+    {(() => {
+      // Width STL (X) — prova a prenderla da params, fallback su 0
+      const stlWidthMm = Number((params as any)?.widthMm ?? (params as any)?.stlWidthMm ?? 0);
 
-                      <div>
-                        Risoluzione reale heightmap:{" "}
-                        <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h} px` : "—"}</span>
-                      </div>
+      const hmW = hmState?.w ?? 0;
+      const hmH = hmState?.h ?? 0;
 
-                      <div>
-                        Output:{" "}
-                        <span className="font-medium">
-                          {params.outputMode} / {params.baseStyle}
-                        </span>
-                      </div>
+      // mm per pixel (derivato dalla larghezza in pianta)
+      const mmPerPx = stlWidthMm > 0 && hmW > 0 ? stlWidthMm / hmW : NaN;
 
-                      <div>
-                        Altezza rilievo (STL): <span className="font-medium">{fmt(reliefMm, 2)} mm</span>
-                      </div>
+      // Altezza in pianta (Y) mantenendo proporzioni heightmap
+      const stlHeightMm = Number.isFinite(mmPerPx) && hmH > 0 ? hmH * mmPerPx : NaN;
 
-                      <div>
-                        Spessore base: <span className="font-medium">{fmt(baseMm, 2)} mm</span>
-                      </div>
+      // Aspect ratio
+      const ar = hmW > 0 && hmH > 0 ? hmW / hmH : NaN;
 
-                      <div>
-                        Altezza totale STL: <span className="font-medium">{fmt(totalMm, 2)} mm</span>
-                      </div>
+      const fmt = (n: number, d = 2) => (Number.isFinite(n) ? n.toFixed(d) : "—");
 
-                      <div>
-                        Rapporto base/rilievo:{" "}
-                        <span className="font-medium">{ratio === null ? "—" : `${fmt(ratio, 2)} : 1`}</span>{" "}
-                        <span className="text-gray-400">(base/relief)</span>
-                      </div>
+      return (
+        <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
+          <div className="font-medium text-gray-700">Dimensioni</div>
 
-                      <div>
-                        Distribuzione:{" "}
-                        <span className="font-medium">
-                          {fmt(basePct, 0)}% base / {fmt(reliefPct, 0)}% rilievo
-                        </span>
-                      </div>
+          <div className="mt-1 flex items-baseline justify-between">
+            <div className="text-gray-600">Pianta (X × Y)</div>
+            <div className="font-medium text-gray-800">
+              {fmt(stlWidthMm, 2)} × {fmt(stlHeightMm, 2)} mm
+            </div>
+          </div>
 
-                      <div className="border-t pt-2">
-                        <div className="font-medium text-gray-700">Metriche STL</div>
+          <div className="flex items-baseline justify-between">
+            <div className="text-gray-600">Larghezza (X)</div>
+            <div className="font-medium text-gray-800">{fmt(stlWidthMm, 2)} mm</div>
+          </div>
 
-                        {s ? (
-                          <>
-                            <div>
-                              Campionamento (post-decimazione):{" "}
-                              <span className="font-medium">
-                                {s.effW} × {s.effH} px
-                              </span>
-                            </div>
+          <div className="flex items-baseline justify-between">
+            <div className="text-gray-600">Altezza (Y)</div>
+            <div className="font-medium text-gray-800">{fmt(stlHeightMm, 2)} mm</div>
+          </div>
 
-                            <div>
-                              Triangoli stimati: <span className="font-medium">{s.triangles.toLocaleString()}</span>
-                            </div>
+          <div className="flex items-baseline justify-between">
+            <div className="text-gray-600">Altezza totale (Z)</div>
+            <div className="font-medium text-gray-800">{fmt(totalMm, 2)} mm</div>
+          </div>
 
-                            <div>
-                              Peso stimato STL: <span className="font-medium">{s.mb.toFixed(1)} MB</span>
-                            </div>
+          <div className="flex items-baseline justify-between">
+            <div className="text-gray-600">Spessore base</div>
+            <div className="font-medium text-gray-800">{fmt(baseMm, 2)} mm</div>
+          </div>
 
-                            {s.isHeavy ? (
-                              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
-                                <div className="font-semibold">⚠️ Mesh pesante</div>
-                                <div className="mt-1">
-                                  Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
-                                  <span className="font-semibold">x{s.suggestedDecimate}</span>.
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-green-900">
-                                ✅ Dimensione ok: dovrebbe essere fluido in slicer e in Blender.
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="text-gray-500">Carica un file per vedere le metriche.</div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
+          <div className="flex items-baseline justify-between">
+            <div className="text-gray-600">Altezza rilievo</div>
+            <div className="font-medium text-gray-800">{fmt(reliefMm, 2)} mm</div>
+          </div>
+
+          <div className="mt-1 flex items-baseline justify-between">
+            <div className="text-gray-600">Scala</div>
+            <div className="font-medium text-gray-800">{fmt(mmPerPx, 4)} mm/px</div>
+          </div>
+
+          <div className="flex items-baseline justify-between">
+            <div className="text-gray-600">Aspect ratio</div>
+            <div className="font-medium text-gray-800">
+              {hmW && hmH ? `${hmW}:${hmH}` : "—"} {Number.isFinite(ar) ? `(${fmt(ar, 3)})` : ""}
             </div>
           </div>
         </div>
-      </div>
+      );
+    })()}
+
+    {/* -------------------------
+        SORGENTE / PARAMETRI
+       ------------------------- */}
+    <div className="pt-1">
+      Sorgente:{" "}
+      <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
     </div>
-  );
-}
+
+    <div>
+      Risoluzione reale heightmap:{" "}
+      <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h} px` : "—"}</span>
+    </div>
+
+    <div>
+      Output:{" "}
+      <span className="font-medium">
+        {params.outputMode} / {params.baseStyle}
+      </span>
+    </div>
+
+    <div>
+      Rapporto base/rilievo:{" "}
+      <span className="font-medium">{ratio === null ? "—" : `${fmt(ratio, 2)} : 1`}</span>{" "}
+      <span className="text-gray-400">(base/relief)</span>
+    </div>
+
+    <div>
+      Distribuzione:{" "}
+      <span className="font-medium">
+        {fmt(basePct, 0)}% base / {fmt(reliefPct, 0)}% rilievo
+      </span>
+    </div>
+
+    {/* -------------------------
+        METRICHE STL
+       ------------------------- */}
+    <div className="border-t pt-2">
+      <div className="font-medium text-gray-700">Metriche STL</div>
+
+      {s ? (
+        <>
+          <div>
+            Campionamento (post-decimazione):{" "}
+            <span className="font-medium">
+              {s.effW} × {s.effH} px
+            </span>
+          </div>
+
+          <div>
+            Triangoli stimati: <span className="font-medium">{s.triangles.toLocaleString()}</span>
+          </div>
+
+          <div>
+            Peso stimato STL: <span className="font-medium">{s.mb.toFixed(1)} MB</span>
+          </div>
+
+          {s.isHeavy ? (
+            <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
+              <div className="font-semibold">⚠️ Mesh pesante</div>
+              <div className="mt-1">
+                Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
+                <span className="font-semibold">x{s.suggestedDecimate}</span>.
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-green-900">
+              ✅ Dimensione ok: dovrebbe essere fluido in slicer e in Blender.
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="text-gray-500">Carica un file per vedere le metriche.</div>
+      )}
+    </div>
+  </div>
+);
