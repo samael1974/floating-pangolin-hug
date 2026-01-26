@@ -62,6 +62,10 @@ const DEFAULTS: ReliefParams = {
   edge: "round",
   outputMode: "relief", // ✅ fisso
   baseStyle: "flat",
+
+  // ✅ CUTOUT default OFF
+  cutoutEnabled: false,
+  cutoutThreshold: 0.18,
 };
 
 export default function ReliefControls({ value, onChange, disabled }: Props) {
