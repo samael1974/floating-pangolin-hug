@@ -1,17 +1,17 @@
 // src/lib/relief/cutout.ts
 import * as THREE from "three";
-import { Brush, Evaluator, INTERSECTION } from "three-bvh-csg";
 
-export type HeightmapState = { normF32: Float32Array; w: number; h: number };
-
-type Args = {
-  geom: THREE.BufferGeometry;
-  hm: HeightmapState;
-  widthMm: number;
-  depthMm: number;
-  baseMm: number;
-  threshold: number; // 0..1
-};
+/**
+ * TEMP: Cutout/CSG disabilitato per evitare dipendenze.
+ * Ritorna la geometria così com'è.
+ * Quando vorrai reintrodurlo, lo rifacciamo con una libreria CSG compatibile.
+ */
+export function applyCutoutToFlatGeometry(
+  geo: THREE.BufferGeometry,
+  _opts?: unknown
+): THREE.BufferGeometry {
+  return geo;
+}
 
 function clamp01(x: number) {
   return x < 0 ? 0 : x > 1 ? 1 : x;
