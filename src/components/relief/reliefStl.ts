@@ -73,6 +73,65 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
   }
 
   const dm = decimateHeightmap(hm, decimateStep);
+    console.time("A_buildSolidFromHeightmap");
+  const geom = buildSolidFromHeightmap({
+    normF32: dm.normF32,
+    w: dm.w,
+    h: dm.h,
+    widthMm: stlWidthMm,
+    depthMm,
+    baseMm,
+    outputMode,
+    baseStyle,
+  });
+  console.timeEnd("A_buildSolidFromHeightmap");
+
+  let finalGeom = geom;
+
+  // 🔥 SAFETY: cutout è super-costoso: lo limitiamo a casi “sicuri”
+  const cutoutRequested = !!opts.cutoutEnabled && baseStyle === "flat";
+
+  // Limite risoluzione: sopra questa soglia CSG può esplodere in tempo
+  const maxCutoutPixels = 220 * 220; // puoi alzare dopo, prima stabilizziamo
+  const pixels = dm.w * dm.h;
+
+  // Forza base minima quando cutout ON (evita degenerazioni e “repair” distruttivo)
+  const minBaseForCutout = 0.8;
+
+  if (cutoutRequested) {
+    // Se baseMm troppo bassa, la alziamo SOLO per il cutout (UX coerente)
+    const baseForCut = Math.max(baseMm, minBaseForCutout);
+
+    if (pixels > maxCutoutPixels) {
+      console.warn("CUTOUT: saltato (troppi pixel)", { dmW: dm.w, dmH: dm.h, pixels });
+      alert(
+        `Cutout disattivato automaticamente: risoluzione troppo alta (${dm.w}×${dm.h}).\n` +
+        `Aumenta la decimazione (xT “Qualità”) e riprova.`
+      );
+    } else {
+      try {
+        console.time("B_applyCutoutToFlatGeometry");
+        finalGeom = applyCutoutToFlatGeometry({
+          geom,
+          hm: dm,
+          widthMm: stlWidthMm,
+          depthMm,
+          baseMm: baseForCut,
+          threshold: 0.18, // fisso per ora, togliamo variabile soglia come vuoi tu
+        });
+        console.timeEnd("B_applyCutoutToFlatGeometry");
+      } catch (e: any) {
+        console.error("CUTOUT ERROR", e);
+        alert(`Errore Cutout: ${e?.message ?? String(e)}\nProcedo senza cutout.`);
+        finalGeom = geom;
+      }
+    }
+  }
+
+  console.time("C_geometryToBinaryStl");
+  const stl = geometryToBinaryStl(finalGeom);
+  console.timeEnd("C_geometryToBinaryStl");
+
 
   // 1) geometry base
   let geom = buildSolidFromHeightmap({
