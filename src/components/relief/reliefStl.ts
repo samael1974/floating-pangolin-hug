@@ -15,9 +15,8 @@ type DownloadOpts = {
   baseStyle: BaseStyle;
   filename?: string;
 
-  // ✅ CUTOUT
+  // ✅ CUTOUT (solo ON/OFF)
   cutoutEnabled?: boolean;
-  cutoutThreshold?: number;
 };
 
 function downloadArrayBuffer(buffer: ArrayBuffer, filename: string) {
@@ -65,7 +64,6 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
     baseStyle,
     filename,
     cutoutEnabled = false,
-    cutoutThreshold,
   } = opts;
 
   if (hm.normF32.length !== hm.w * hm.h) {
@@ -73,8 +71,10 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
   }
 
   const dm = decimateHeightmap(hm, decimateStep);
-    console.time("A_buildSolidFromHeightmap");
-  const geom = buildSolidFromHeightmap({
+
+  // 1) build base geometry
+  console.time("A_buildSolidFromHeightmap");
+  const baseGeom = buildSolidFromHeightmap({
     normF32: dm.normF32,
     w: dm.w,
     h: dm.h,
@@ -86,103 +86,69 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
   });
   console.timeEnd("A_buildSolidFromHeightmap");
 
-  let finalGeom = geom;
+  let finalGeom = baseGeom;
 
-  // 🔥 SAFETY: cutout è super-costoso: lo limitiamo a casi “sicuri”
-  const cutoutRequested = !!opts.cutoutEnabled && baseStyle === "flat";
+  // 2) optional cutout (solo baseStyle="flat")
+  const cutoutRequested = cutoutEnabled && baseStyle === "flat";
 
-  // Limite risoluzione: sopra questa soglia CSG può esplodere in tempo
-  const maxCutoutPixels = 220 * 220; // puoi alzare dopo, prima stabilizziamo
+  // Safety: limita costo cutout (evita freeze/loop)
+  const maxCutoutPixels = 220 * 220;
   const pixels = dm.w * dm.h;
 
-  // Forza base minima quando cutout ON (evita degenerazioni e “repair” distruttivo)
+  // Base minima SOLO per cutout (evita degenerazioni)
   const minBaseForCutout = 0.8;
 
   if (cutoutRequested) {
-    // Se baseMm troppo bassa, la alziamo SOLO per il cutout (UX coerente)
     const baseForCut = Math.max(baseMm, minBaseForCutout);
 
     if (pixels > maxCutoutPixels) {
-      console.warn("CUTOUT: saltato (troppi pixel)", { dmW: dm.w, dmH: dm.h, pixels });
+      console.warn("CUTOUT: skipped (too many pixels)", { dmW: dm.w, dmH: dm.h, pixels });
       alert(
         `Cutout disattivato automaticamente: risoluzione troppo alta (${dm.w}×${dm.h}).\n` +
-        `Aumenta la decimazione (xT “Qualità”) e riprova.`
+          `Aumenta la decimazione (Qualità più bassa) e riprova.`
       );
     } else {
       try {
         console.time("B_applyCutoutToFlatGeometry");
         finalGeom = applyCutoutToFlatGeometry({
-          geom,
+          geom: baseGeom,
           hm: dm,
           widthMm: stlWidthMm,
           depthMm,
           baseMm: baseForCut,
-          threshold: 0.18, // fisso per ora, togliamo variabile soglia come vuoi tu
+          threshold: 0.18, // ✅ fisso: niente slider soglia
         });
         console.timeEnd("B_applyCutoutToFlatGeometry");
       } catch (e: any) {
-        console.error("CUTOUT ERROR", e);
+        console.error("CUTOUT ERROR → fallback geometry originale", e);
         alert(`Errore Cutout: ${e?.message ?? String(e)}\nProcedo senza cutout.`);
-        finalGeom = geom;
+        finalGeom = baseGeom;
       }
     }
   }
 
+  // 3) export STL
   console.time("C_geometryToBinaryStl");
-  const stl = geometryToBinaryStl(finalGeom);
+  const stlBuffer = geometryToBinaryStl(finalGeom);
   console.timeEnd("C_geometryToBinaryStl");
 
-
-  // 1) geometry base
-  let geom = buildSolidFromHeightmap({
-    normF32: dm.normF32,
-    w: dm.w,
-    h: dm.h,
-    widthMm: stlWidthMm,
-    depthMm,
-    baseMm,
-    outputMode,
-    baseStyle,
-  });
-
-  // 2) cutout SOLO per base flat, ma con fallback (non bloccare il download)
-  if (baseStyle === "flat" && cutoutEnabled) {
-    const thr = cutoutThreshold ?? 0.5; // default stabile (0.45–0.65 è il range tipico)
-
-    try {
-      geom = applyCutoutToFlatGeometry({
-        geom,
-        hm: dm,
-        widthMm: stlWidthMm,
-        depthMm,
-        baseMm,
-        threshold: thr,
-      });
-    } catch (err) {
-      console.error("CUTOUT FAILED → fallback geometry originale (download continua)", err);
-      // fallback: lasciamo geom originale
-    }
-  }
-
-  // 3) export STL
-  const stl = geometryToBinaryStl(geom);
-
   // sanity-check STL size
-  const pos = geom.getAttribute("position");
+  const pos = finalGeom.getAttribute("position");
   if (!pos) throw new Error("STL: geometry has no position attribute");
+
   const triCount = pos.count / 3;
   const expected = 84 + 50 * triCount;
 
-  if (stl.byteLength !== expected) {
-    console.error("STL byteLength mismatch", { expected, got: stl.byteLength, triCount });
-    throw new Error(`STL corrotto: expected ${expected} bytes, got ${stl.byteLength}`);
+  if (stlBuffer.byteLength !== expected) {
+    console.error("STL byteLength mismatch", { expected, got: stlBuffer.byteLength, triCount });
+    throw new Error(`STL corrotto: expected ${expected} bytes, got ${stlBuffer.byteLength}`);
   }
 
   const safeName =
     (filename && filename.trim()) ||
     `reliefforge_${outputMode}_${baseStyle}_${Math.round(stlWidthMm)}mm.stl`;
 
-  downloadArrayBuffer(stl, safeName);
+  downloadArrayBuffer(stlBuffer, safeName);
 }
 
 // --- COMPAT LAYER (se qualche file vecchio lo importa)
@@ -203,4 +169,3 @@ export function downloadTextFile(filename: string, text: string) {
 export function heightmapToAsciiStl(..._args: any[]) {
   throw new Error("Deprecated: usa downloadReliefStlBinary (STL binario).");
 }
-
