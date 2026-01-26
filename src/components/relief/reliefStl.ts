@@ -85,6 +85,8 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
 
   const stl = geometryToBinaryStl(geom);
 
+
+
   // sanity-check STL size
   const pos = geom.getAttribute("position");
   if (!pos) throw new Error("STL: geometry has no position attribute");
