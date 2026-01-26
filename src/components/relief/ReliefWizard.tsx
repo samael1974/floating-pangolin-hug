@@ -374,7 +374,7 @@ const baseForExport = cutoutOn ? Math.max(params.baseMm, 0.8) : params.baseMm;
 
 downloadReliefStlBinary({
   hm: hmState,
-  stlWidthMm,
+  widthMm: stlWidthMm,
   decimateStep,
   depthMm: params.depthMm,
   baseMm: baseForExport,
