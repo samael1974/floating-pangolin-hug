@@ -46,7 +46,12 @@ type Props = {
   value: ReliefParams;
   onChange: (next: ReliefParams) => void;
   disabled?: boolean;
+
+  // ✅ CUTOUT guard (calcolato dal wizard)
+  cutoutAllowed?: boolean;
+  cutoutReason?: string;
 };
+
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
