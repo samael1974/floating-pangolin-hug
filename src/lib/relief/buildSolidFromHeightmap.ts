@@ -56,8 +56,8 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     return baseMm + depthMm * h01;
   };
 
-  // --- BOTTOM Z per OFFSET: piano piatto (no "shell che segue il top")
-// Metto il fondo a z=0 per evitare geometrie quasi coincidenti e problemi slicer.
+// --- BOTTOM Z per OFFSET: piano piatto (non "shell che segue il top")
+// Fondo a z=0 => evita self-intersection e repair aggressivo in slicer.
 const zBottomOffset = (_H: number) => 0;
 
   const verts: number[] = [];
