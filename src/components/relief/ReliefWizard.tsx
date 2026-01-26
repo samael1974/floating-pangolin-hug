@@ -367,17 +367,22 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
     cutoutEnabled: params.cutoutEnabled,
   });
 
-  downloadReliefStlBinary({
-    hm: hmState,
-    stlWidthMm,
-    decimateStep,
-    depthMm: params.depthMm,
-    baseMm: params.baseMm,
-    outputMode: params.outputMode,
-    baseStyle: params.baseStyle,
-    cutoutEnabled: params.cutoutEnabled,
-    // NON passiamo cutoutThreshold (lo stai togliendo)
-  });
+  const cutoutOn = !!params.cutoutEnabled && params.baseStyle === "flat";
+
+// Base minima SOLO quando cutout è attivo (evita CSG su “foglio”)
+const baseForExport = cutoutOn ? Math.max(params.baseMm, 0.8) : params.baseMm;
+
+downloadReliefStlBinary({
+  hm: hmState,
+  stlWidthMm,
+  decimateStep,
+  depthMm: params.depthMm,
+  baseMm: baseForExport,
+  outputMode: params.outputMode,
+  baseStyle: params.baseStyle,
+  filename, // se ce l’hai già definito sopra; altrimenti toglilo
+  cutoutEnabled: cutoutOn,
+});
 
   console.timeEnd("STL_DOWNLOAD_TOTAL");
   console.log("STL: downloadReliefStlBinary returned (se non scarica è blocco browser/gesture).");
