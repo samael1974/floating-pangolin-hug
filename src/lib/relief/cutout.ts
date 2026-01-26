@@ -1,3 +1,4 @@
+// src/lib/relief/cutout.ts
 import * as THREE from "three";
 import { Brush, Evaluator, INTERSECTION } from "three-bvh-csg";
 
@@ -17,7 +18,6 @@ function clamp01(x: number) {
 }
 
 // punti su griglia "mezzo pixel": (x2, y2) sono interi.
-// Esempio: un midpoint è sempre .5 px => diventa +1 in x2/y2
 type P2 = { x2: number; y2: number };
 type Seg2 = { a: P2; b: P2 };
 type P = { x: number; y: number };
@@ -52,10 +52,25 @@ function pointInPoly(pt: P, poly: P[]) {
   return inside;
 }
 
+function stats01(arr: Float32Array) {
+  let mn = Number.POSITIVE_INFINITY;
+  let mx = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i] ?? 0;
+    if (v < mn) mn = v;
+    if (v > mx) mx = v;
+  }
+  return { min: mn, max: mx };
+}
+
 /**
  * Guard-rail: se il bordo è "inside" in modo significativo,
  * significa che la silhouette NON è separata (tipico delle foto),
- * quindi il cutout diventerebbe quasi sempre il rettangolo.
+ * quindi il cutout diventa spesso il rettangolo.
+ *
+ * Logica corretta:
+ * - vogliamo che il bordo sia "quasi tutto fuori" => insideBorder/totalBorder < 5%
+ * - se è così -> OK (background presente) => ritorna TRUE
  */
 function borderLooksLikeBackground(hm: HeightmapState, th: number) {
   const { normF32, w, h } = hm;
@@ -78,7 +93,8 @@ function borderLooksLikeBackground(hm: HeightmapState, th: number) {
   }
 
   const frac = totalBorder ? insideBorder / totalBorder : 1;
-  // se > 5% del bordo è inside, in pratica non hai sfondo "vuoto"
+
+  // ✅ TRUE = il bordo sembra background (quasi tutto "fuori")
   return frac < 0.05;
 }
 
@@ -90,14 +106,20 @@ function extractLoopsPx(hm: HeightmapState, threshold: number): P2[][] {
   const { normF32, w, h } = hm;
   const th = clamp01(threshold);
 
-  // se bordo NON sembra background, rifiutiamo il cutout (foto)
-  if (!borderLooksLikeBackground(hm, th)) return [];
+  const bkgOk = borderLooksLikeBackground(hm, th);
+  if (!bkgOk) {
+    console.warn("[CUTOUT] Guard-rail: bordo NON sembra background → cutout SKIP", {
+      w,
+      h,
+      threshold: th,
+    });
+    return [];
+  }
 
   const v = (x: number, y: number) => clamp01(normF32[y * w + x] ?? 0);
   const inside = (x: number, y: number) => v(x, y) > th;
 
   // midpoints in x2/y2 (unità = mezzo pixel)
-  // top edge midpoint: (x+0.5, y) => x2=2x+1, y2=2y
   const eTop = (x: number, y: number): P2 => ({ x2: 2 * x + 1, y2: 2 * y });
   const eRight = (x: number, y: number): P2 => ({ x2: 2 * (x + 1), y2: 2 * y + 1 });
   const eBottom = (x: number, y: number): P2 => ({ x2: 2 * x + 1, y2: 2 * (y + 1) });
@@ -120,19 +142,17 @@ function extractLoopsPx(hm: HeightmapState, threshold: number): P2[][] {
       const bt = eBottom(x, y);
       const l = eLeft(x, y);
 
-      // Asymptotic decider per i casi ambigui 5 e 10
-      // usa il valore al centro cella come discriminante
+      // Asymptotic decider per 5/10
       const center = (v(x, y) + v(x + 1, y) + v(x + 1, y + 1) + v(x, y + 1)) * 0.25;
       const centerIn = center > th;
 
       switch (code) {
-        case 1:  segs.push({ a: l, b: bt }); break;
-        case 2:  segs.push({ a: bt, b: r }); break;
-        case 3:  segs.push({ a: l, b: r }); break;
-        case 4:  segs.push({ a: t, b: r }); break;
+        case 1: segs.push({ a: l, b: bt }); break;
+        case 2: segs.push({ a: bt, b: r }); break;
+        case 3: segs.push({ a: l, b: r }); break;
+        case 4: segs.push({ a: t, b: r }); break;
 
         case 5:
-          // ambiguità: scegli connessione coerente col centro
           if (centerIn) {
             segs.push({ a: t, b: r });
             segs.push({ a: l, b: bt });
@@ -142,10 +162,10 @@ function extractLoopsPx(hm: HeightmapState, threshold: number): P2[][] {
           }
           break;
 
-        case 6:  segs.push({ a: t, b: bt }); break;
-        case 7:  segs.push({ a: t, b: l }); break;
-        case 8:  segs.push({ a: t, b: l }); break;
-        case 9:  segs.push({ a: t, b: bt }); break;
+        case 6: segs.push({ a: t, b: bt }); break;
+        case 7: segs.push({ a: t, b: l }); break;
+        case 8: segs.push({ a: t, b: l }); break;
+        case 9: segs.push({ a: t, b: bt }); break;
 
         case 10:
           if (centerIn) {
@@ -165,7 +185,10 @@ function extractLoopsPx(hm: HeightmapState, threshold: number): P2[][] {
     }
   }
 
-  if (segs.length < 3) return [];
+  if (segs.length < 3) {
+    console.warn("[CUTOUT] Nessun segmento (segs<3) → cutout SKIP");
+    return [];
+  }
 
   // adjacency
   const adj = new Map<string, P2[]>();
@@ -204,7 +227,6 @@ function extractLoopsPx(hm: HeightmapState, threshold: number): P2[][] {
         const options = adj.get(key2(nxt)) ?? [];
         if (options.length === 0) break;
 
-        // scegli il next che non torna indietro
         let nn = options[0]!;
         if (prev && options.length > 1) {
           const cand = options.find((p) => key2(p) !== key2(prev));
@@ -215,7 +237,6 @@ function extractLoopsPx(hm: HeightmapState, threshold: number): P2[][] {
         cur = nxt;
         nxt = nn;
 
-        // closed?
         if (loop.length > 6 && key2(cur) === key2(loop[0]!)) {
           loops.push(loop);
           break;
@@ -224,8 +245,10 @@ function extractLoopsPx(hm: HeightmapState, threshold: number): P2[][] {
     }
   }
 
-  // pulizia minima: loops lunghi
-  return loops.filter((L) => L.length >= 20);
+  const clean = loops.filter((L) => L.length >= 20);
+  console.log("[CUTOUT] loops estratti", { segs: segs.length, loops: clean.length });
+
+  return clean;
 }
 
 function buildShapeFromLoopsPx(
@@ -236,10 +259,10 @@ function buildShapeFromLoopsPx(
   const loops2 = extractLoopsPx(hm, threshold);
   if (loops2.length === 0) return null;
 
-  // converti P2 -> P (px)
+  // P2 -> P (px)
   const loopsPx: P[][] = loops2.map((L) => L.map((p) => ({ x: p.x2 / 2, y: p.y2 / 2 })));
 
-  // scegli outer come area assoluta max
+  // outer = area abs max
   loopsPx.sort((A, B) => Math.abs(polygonArea(B)) - Math.abs(polygonArea(A)));
   const outer = loopsPx[0]!;
   const outerArea = polygonArea(outer);
@@ -261,7 +284,6 @@ function buildShapeFromLoopsPx(
 
   const toMm = (p: P) => new THREE.Vector2(x0 + p.x * dx, y0 - p.y * dy);
 
-  // Three.Shape: outer CCW
   let outerMm = outer.map(toMm);
   if (outerArea < 0) outerMm = outerMm.reverse();
 
@@ -270,28 +292,32 @@ function buildShapeFromLoopsPx(
   for (const H of holes) {
     const a = polygonArea(H);
     let holeMm = H.map(toMm);
-    // holes CW (opposto)
     if (a > 0) holeMm = holeMm.reverse();
     shape.holes.push(new THREE.Path(holeMm));
   }
+
+  console.log("[CUTOUT] shape OK", { holes: shape.holes.length, threshold });
 
   return shape;
 }
 
 /**
- * CSG intersection: geom ∩ extruded(shape with holes)
+ * CSG intersection: geom ∩ extruded(shape)
  * Solo per base flat.
  */
 export function applyCutoutToFlatGeometry(args: Args): THREE.BufferGeometry {
   const { geom, hm, widthMm, depthMm, baseMm, threshold } = args;
 
+  // DEBUG range hm
+  const { min, max } = stats01(hm.normF32);
+  console.log("[CUTOUT] start", { w: hm.w, h: hm.h, threshold, min, max, baseMm, depthMm });
+
   const shape = buildShapeFromLoopsPx(hm, widthMm, threshold);
   if (!shape) {
-    // non idonea (foto), oppure contorno non estraibile
+    console.warn("[CUTOUT] buildShapeFromLoopsPx() => null → cutout SKIP");
     return geom;
   }
 
-  // cutter: estrusione alta che copre tutto lo Z
   const zHeight = Math.max(5, baseMm + depthMm + 20);
 
   const extrude = new THREE.ExtrudeGeometry(shape, {
@@ -301,10 +327,9 @@ export function applyCutoutToFlatGeometry(args: Args): THREE.BufferGeometry {
     steps: 1,
   });
 
-  // porta il cutter a cavallo di z=0, in modo da coprire anche eventuali tolleranze
   extrude.translate(0, 0, -10);
 
-  // IMPORTANT: tre-bvh-csg lavora meglio con geometrie NON indicizzate
+  // tre-bvh-csg: meglio non-indexed
   const aGeom = geom.index ? geom.toNonIndexed() : geom.clone();
   const bGeom = extrude.index ? extrude.toNonIndexed() : extrude;
 
@@ -315,13 +340,18 @@ export function applyCutoutToFlatGeometry(args: Args): THREE.BufferGeometry {
   const A = new Brush(modelMesh);
   const B = new Brush(cutterMesh);
 
+  console.time("[CUTOUT] CSG");
   const result = evaluator.evaluate(A, B, INTERSECTION);
+  console.timeEnd("[CUTOUT] CSG");
 
   const out = result.geometry.clone();
 
-  // pulizia normals (lo slicer impazzisce se sono sporche)
   out.deleteAttribute("normal");
   out.computeVertexNormals();
+
+  console.log("[CUTOUT] DONE", {
+    pos: out.getAttribute("position")?.count ?? 0,
+  });
 
   return out;
 }
