@@ -1,6 +1,6 @@
 import * as React from "react";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
-import type { BaseStyle } from "@/lib/reliefTypes";
+import type { BaseStyle } from "@/lib/relief/reliefTypes";
 
 type HeightmapState = {
   normF32: Float32Array;
