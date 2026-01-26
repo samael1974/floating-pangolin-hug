@@ -12,13 +12,14 @@ export type HeightmapState = {
 };
 
 type DownloadArgs = {
-  hmState: HeightmapState;
+  hmState?: HeightmapState;
+  hm?: HeightmapState; // ✅ compatibilità con ReliefWizard
   widthMm: number;
   depthMm: number;
   baseMm: number;
   outputMode: OutputMode;
   baseStyle: BaseStyle;
-  fileName?: string; // senza .stl va bene lo stesso
+  fileName?: string;
 };
 
 /** STL binary writer (little-endian) */
