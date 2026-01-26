@@ -96,7 +96,7 @@ function CameraKeyLight({ intensity = 1.6 }: { intensity?: number }) {
 function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
   return (
     <>
-      <Environment preset="studio" />
+      {/* <Environment preset="studio" /> */}
 
       {/* Fill minimo: se lo alzi troppo, appiattisci */}
       <ambientLight intensity={0.08} />
