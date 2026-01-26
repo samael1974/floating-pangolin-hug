@@ -3,7 +3,6 @@ import { geometryToBinaryStl } from "@/lib/stl/binaryStl";
 import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
 import { applyCutoutToFlatGeometry } from "@/lib/relief/cutout";
 
-
 export type HeightmapState = { normF32: Float32Array; w: number; h: number };
 
 type DownloadOpts = {
@@ -65,6 +64,8 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
     outputMode,
     baseStyle,
     filename,
+    cutoutEnabled = false,
+    cutoutThreshold,
   } = opts;
 
   if (hm.normF32.length !== hm.w * hm.h) {
@@ -73,7 +74,8 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
 
   const dm = decimateHeightmap(hm, decimateStep);
 
-    const geom = buildSolidFromHeightmap({
+  // 1) geometry base
+  let geom = buildSolidFromHeightmap({
     normF32: dm.normF32,
     w: dm.w,
     h: dm.h,
@@ -84,27 +86,34 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
     baseStyle,
   });
 
-  let finalGeom = geom;
+  // 2) cutout SOLO per base flat, ma con fallback (non bloccare il download)
+  if (baseStyle === "flat" && cutoutEnabled) {
+    const thr = cutoutThreshold ?? 0.5; // default stabile (0.45–0.65 è il range tipico)
 
-  // ✅ Cutout SOLO per base flat
-  if (opts.cutoutEnabled && baseStyle === "flat") {
-    finalGeom = applyCutoutToFlatGeometry({
-      geom,
-      hm: dm,
-      widthMm: stlWidthMm,
-      depthMm,
-      baseMm,
-      threshold: opts.cutoutThreshold ?? 0.18,
-    });
+    try {
+      geom = applyCutoutToFlatGeometry({
+        geom,
+        hm: dm,
+        widthMm: stlWidthMm,
+        depthMm,
+        baseMm,
+        threshold: thr,
+      });
+    } catch (err) {
+      console.error("CUTOUT FAILED → fallback geometry originale (download continua)", err);
+      // fallback: lasciamo geom originale
+    }
   }
 
-  const stl = geometryToBinaryStl(finalGeom);
+  // 3) export STL
+  const stl = geometryToBinaryStl(geom);
 
   // sanity-check STL size
-  const pos = finalGeom.getAttribute("position");
+  const pos = geom.getAttribute("position");
   if (!pos) throw new Error("STL: geometry has no position attribute");
   const triCount = pos.count / 3;
   const expected = 84 + 50 * triCount;
+
   if (stl.byteLength !== expected) {
     console.error("STL byteLength mismatch", { expected, got: stl.byteLength, triCount });
     throw new Error(`STL corrotto: expected ${expected} bytes, got ${stl.byteLength}`);
@@ -115,7 +124,6 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
     `reliefforge_${outputMode}_${baseStyle}_${Math.round(stlWidthMm)}mm.stl`;
 
   downloadArrayBuffer(stl, safeName);
-
 }
 
 // --- COMPAT LAYER (se qualche file vecchio lo importa)
