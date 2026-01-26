@@ -145,6 +145,7 @@ for (let iy = 0; iy < h - 1; iy++) {
   const zL2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
   makeWall(x0, y1, zL1, x0, y2, zL2);
 
+
   // Right (invertiamo per winding esterno coerente)
   const zR1 = zTop(normF32[idx(w - 1, iy)] ?? 0);
   const zR2 = zTop(normF32[idx(w - 1, iy + 1)] ?? 0);
