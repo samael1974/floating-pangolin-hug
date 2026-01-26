@@ -709,6 +709,20 @@ downloadReliefStlBinary({
               >
                 Scarica STL
               </button>
+              if (!hmState) {
+  console.warn("Heightmap non pronta: hmState è null");
+  return;
+}
+
+downloadReliefStlBinary({
+  hm: hmState,
+  widthMm: stlWidthMm,
+  depthMm: params.depthMm,
+  baseMm: params.baseMm,
+  outputMode: params.outputMode,
+  baseStyle: params.baseStyle,
+});
+
 
               <a
                 href="https://www.paypal.me/federicocordioli72"
