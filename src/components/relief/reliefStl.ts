@@ -12,7 +12,11 @@ type DownloadOpts = {
   baseMm: number;
   outputMode: OutputMode;
   baseStyle: BaseStyle;
-  filename?: string; // es. "miofile.stl"
+  filename?: string;
+
+  // ✅ CUTOUT
+  cutoutEnabled?: boolean;
+  cutoutThreshold?: number;
 };
 
 function downloadArrayBuffer(buffer: ArrayBuffer, filename: string) {
