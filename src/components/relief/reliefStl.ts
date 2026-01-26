@@ -93,7 +93,7 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
   const cutoutRequested = cutoutEnabled && baseStyle === "flat";
 
   // STRADA A: se troppo grande, lo disattiviamo (e lo diciamo)
-  const maxCutoutPixels = 220 * 220;
+  const maxCutoutPixels = 320 * 320; // 102.400 px circa: cutout parte anche con 256x256
   const pixels = dm.w * dm.h;
 
   // base minima “fisica” per CSG stabile
