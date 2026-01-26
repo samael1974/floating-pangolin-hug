@@ -373,12 +373,12 @@ const cutoutOn = !!params.cutoutEnabled && params.baseStyle === "flat";
 const baseForExport = cutoutOn ? Math.max(params.baseMm, 0.8) : params.baseMm;
 
 downloadReliefStlBinary({
-  hm: hmDec,
-  widthMm: stlWidthMm,
-  depthMm,
-  baseMm,
-  outputMode,
-  baseStyle,
+  hm: hmState!,                 // ✅ NON hmDec (che non esiste qui)
+  widthMm: stlWidthMm,          // ✅ widthMm è il nome atteso
+  depthMm: params.depthMm,      // ✅ niente shorthand "depthMm,"
+  baseMm: params.baseMm,
+  outputMode: params.outputMode,
+  baseStyle: params.baseStyle,
 });
 
   console.timeEnd("STL_DOWNLOAD_TOTAL");
