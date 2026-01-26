@@ -121,7 +121,41 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           </SelectContent>
         </Select>
       </div>
+      {/* ✅ Cutout (solo base flat) */}
+      {v.baseStyle === "flat" && (
+        <div className="space-y-3 rounded-md border bg-slate-50 p-3">
+          <div className="flex items-center justify-between">
+            <Label>Oggetto scontornato (Cutout)</Label>
+            <Switch
+              disabled={disabled}
+              checked={v.cutoutEnabled}
+              onCheckedChange={(checked) => set({ cutoutEnabled: checked })}
+            />
+          </div>
 
+          <p className="text-xs text-slate-600">
+            Ricava il contorno dalla <span className="font-medium">heightmap</span> (non dall’immagine) e ritaglia lo STL.
+            Ideale per <span className="font-medium">logo/testo</span>. Su foto/paesaggi può tagliare male.
+          </p>
+
+          {v.cutoutEnabled && (
+            <div className="space-y-2">
+              <Label>Soglia contorno: {v.cutoutThreshold.toFixed(2)}</Label>
+              <Slider
+                disabled={disabled}
+                value={[v.cutoutThreshold]}
+                min={0.01}
+                max={0.6}
+                step={0.01}
+                onValueChange={(arr) => set({ cutoutThreshold: clamp(arr[0] ?? 0.18, 0.01, 0.6) })}
+              />
+              <p className="text-xs text-slate-600">
+                Più basso = include più area. Più alto = contorno più stretto.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       <Separator />
 
