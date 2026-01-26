@@ -1,3 +1,4 @@
+// src/components/relief/ReliefWizard.tsx
 import * as React from "react";
 
 import BrandHero from "@/components/branding/BrandHero";
@@ -13,7 +14,7 @@ import { renderDepthmapToCanvas } from "@/lib/relief/renderDepthmapToCanvas";
 
 type SourceMode = "image" | "depthmap";
 
-type HeightmapState = {
+export type HeightmapState = {
   normF32: Float32Array;
   w: number;
   h: number;
@@ -64,7 +65,7 @@ function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState
 }
 
 /**
- * Fallback via Canvas (8-bit) per JPG/WEBP/PNG (se il browser lo “schiaccia”)
+ * Fallback via Canvas (8-bit) per JPG/WEBP/PNG (se il browser lo “schiaccia”).
  * Il “vero 16-bit” passa da decodeDepthmapPng() (solo PNG).
  */
 async function decodeDepthMapToHmStateCanvas(file: File, invert: boolean, maxSize = 512): Promise<HeightmapState> {
@@ -93,6 +94,15 @@ function invertHmInPlace(hm: HeightmapState) {
   for (let i = 0; i < a.length; i++) a[i] = 1 - clamp01(a[i] ?? 0);
 }
 
+/** File-name safe */
+function safeFileName(name: string) {
+  return (name || "")
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "_")
+    .replace(/\s+/g, "_")
+    .slice(0, 64);
+}
+
 export default function ReliefWizard() {
   // ✅ Preview tab (colonna destra)
   const [previewTab, setPreviewTab] = React.useState<"image" | "depth" | "stl">("stl");
@@ -116,19 +126,19 @@ export default function ReliefWizard() {
 
   // ✅ Params
   const [params, setParams] = React.useState<ReliefParams>(() => ({
-  projectType: "logo_text",
-  depthMm: 3,
-  baseMm: 2,
-  detail: 0.55,
-  smooth: 0.15,
-  edge: "sharp",
-  outputMode: "relief",
-  baseStyle: "flat",
-
-  // ✅ CUTOUT
-  cutoutEnabled: false,
-  cutoutThreshold: 0.18,
-}));
+    projectType: "logo_text",
+    depthMm: 3,
+    baseMm: 2,
+    detail: 0.55,
+    smooth: 0.15,
+    edge: "sharp",
+    outputMode: "relief",
+    baseStyle: "flat",
+    // se nel tuo ReliefParams questi campi non esistono, non importa: NON li usiamo in modo tipizzato
+    // e non rompono l'app (li gestiamo via (params as any) quando serve)
+    cutoutEnabled: false as any,
+    cutoutThreshold: 0.18 as any,
+  }));
 
   // ✅ Heightmap state/status
   const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
@@ -157,7 +167,7 @@ export default function ReliefWizard() {
     if (file) setPreviewTab("image");
   }, [file]);
 
-  // ✅ UX: quando hm pronta vai su "STL"
+  // ✅ UX: quando hm pronta vai su "Dettagli"
   React.useEffect(() => {
     if (hmStatus === "ready") setPreviewTab("stl");
   }, [hmStatus]);
@@ -173,7 +183,6 @@ export default function ReliefWizard() {
         return;
       }
 
-      // reset warning ogni run
       setFileWarning(null);
 
       // Se sono in depthmap e il file è PNG: controllo IHDR prima di decodificare
@@ -184,12 +193,11 @@ export default function ReliefWizard() {
             const head = new Uint8Array(await file.arrayBuffer());
             const info = inspectPng(head);
             const msg = pngCompatibilityMessage(info);
-
             if (msg) {
               if (!cancelled) {
                 setFileWarning(
-                  `Questo file non è una depth map compatibile (probabile 32-bit/float o RGB).
-Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità Immagine”.`
+                  `Questo file non è una depth map compatibile (probabile 32-bit/float o RGB).\n` +
+                    `Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità Immagine”.`
                 );
                 setHmState(null);
                 setHmStatus("error");
@@ -197,7 +205,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
               return;
             }
           } catch {
-            // se fallisce il check, non bloccare: lascia che il decoder gestisca
+            // non bloccare: lascia che il decoder gestisca
           }
         }
       }
@@ -231,7 +239,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
         }
 
         // --------------------------
-        // IMAGE MODE (tua pipeline)
+        // IMAGE MODE
         // --------------------------
         const img = await loadImageFromFile(file);
         const iw = img.naturalWidth || img.width;
@@ -325,10 +333,9 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
     const topTris = 2 * (effW - 1) * (effH - 1);
     const perimeterQuads = 2 * (effW - 1) + 2 * (effH - 1);
     const sideTris = 2 * perimeterQuads;
-    const bottomTris = params.baseMm > 0 ? 2 * (effW - 1) * (effH - 1) : 0;
+    const bottomTris = (params.baseMm ?? 0) > 0 ? 2 * (effW - 1) * (effH - 1) : 0;
 
     const triangles = topTris + sideTris + bottomTris;
-
     const bytes = 84 + triangles * 50;
     const mb = bytes / (1024 * 1024);
 
@@ -343,51 +350,40 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
   }
 
   function downloadStl() {
-    if (!hmState) return;
+    try {
+      if (!hmState) {
+        console.warn("Heightmap non pronta: hmState è null");
+        alert("Heightmap non pronta. Carica un file e attendi il calcolo.");
+        return;
+      }
 
-    const safe = (customName || "").trim().replace(/[\\/:*?"<>|]+/g, "_") || "reliefforge";
+      const safe = safeFileName(customName) || "reliefforge";
 
-   try {
-  console.time("STL_DOWNLOAD_TOTAL");
+      const args = {
+        widthMm: stlWidthMm,
+        depthMm: params.depthMm,
+        baseMm: params.baseMm,
+        outputMode: params.outputMode,
+        baseStyle: params.baseStyle,
+        decimateStep,
+        fileName: `${safe}.stl`,
+        // cutout (se poi lo riattivi in reliefStl, i campi sono già pronti)
+        cutoutEnabled: !!(params as any).cutoutEnabled,
+        cutoutThreshold: Number((params as any).cutoutThreshold ?? 0.18),
+      };
 
-  if (!hmState) {
-    console.warn("STL: hmState assente");
-    alert("Heightmap non pronta (hmState assente).");
-    return;
-  }
+      const fn: any = downloadReliefStlBinary;
 
-  console.log("STL: start", {
-    w: hmState.w,
-    h: hmState.h,
-    stlWidthMm,
-    decimateStep,
-    depthMm: params.depthMm,
-    baseMm: params.baseMm,
-    baseStyle: params.baseStyle,
-    cutoutEnabled: params.cutoutEnabled,
-  });
-
-const cutoutOn = !!params.cutoutEnabled && params.baseStyle === "flat";
-
-// Base minima SOLO quando cutout è attivo (evita CSG su “foglio”)
-const baseForExport = cutoutOn ? Math.max(params.baseMm, 0.8) : params.baseMm;
-
-downloadReliefStlBinary({
-  hm: hmState!,                 // ✅ NON hmDec (che non esiste qui)
-  widthMm: stlWidthMm,          // ✅ widthMm è il nome atteso
-  depthMm: params.depthMm,      // ✅ niente shorthand "depthMm,"
-  baseMm: params.baseMm,
-  outputMode: params.outputMode,
-  baseStyle: params.baseStyle,
-});
-
-  console.timeEnd("STL_DOWNLOAD_TOTAL");
-  console.log("STL: downloadReliefStlBinary returned (se non scarica è blocco browser/gesture).");
-} catch (e: any) {
-  console.error("STL: ERROR", e);
-  alert(`Errore export STL: ${e?.message ?? String(e)}`);
-}
-
+      // ✅ auto-adatta firma: (hm, args) oppure ({hm, ...args})
+      if (typeof fn === "function" && fn.length >= 2) {
+        fn(hmState, args);
+      } else {
+        fn({ hm: hmState, ...args });
+      }
+    } catch (e: any) {
+      console.error("STL: ERROR", e);
+      alert(`Errore export STL: ${e?.message ?? String(e)}`);
+    }
   }
 
   const openInstructions = React.useCallback(() => {
@@ -709,20 +705,6 @@ downloadReliefStlBinary({
               >
                 Scarica STL
               </button>
-              if (!hmState) {
-  console.warn("Heightmap non pronta: hmState è null");
-  return;
-}
-
-downloadReliefStlBinary({
-  hm: hmState,
-  widthMm: stlWidthMm,
-  depthMm: params.depthMm,
-  baseMm: params.baseMm,
-  outputMode: params.outputMode,
-  baseStyle: params.baseStyle,
-});
-
 
               <a
                 href="https://www.paypal.me/federicocordioli72"
@@ -782,16 +764,13 @@ downloadReliefStlBinary({
 
             {/* Tabs + Istruzioni */}
             <div className="overflow-hidden rounded-md border">
-              {/* Header (RIPULITO: qui prima si rompeva tutto) */}
               <div className="flex items-center justify-between gap-2 border-b bg-gray-50 px-3 py-2">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setPreviewTab("image")}
                     className={`rounded px-2 py-1 text-xs font-medium ${
-                      previewTab === "image"
-                        ? "bg-[#1F4E5F] text-white"
-                        : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                      previewTab === "image" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                     }`}
                   >
                     Immagine
@@ -801,9 +780,7 @@ downloadReliefStlBinary({
                     type="button"
                     onClick={() => setPreviewTab("depth")}
                     className={`rounded px-2 py-1 text-xs font-medium ${
-                      previewTab === "depth"
-                        ? "bg-[#1F4E5F] text-white"
-                        : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                      previewTab === "depth" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                     }`}
                   >
                     Depth map
@@ -813,9 +790,7 @@ downloadReliefStlBinary({
                     type="button"
                     onClick={() => setPreviewTab("stl")}
                     className={`rounded px-2 py-1 text-xs font-medium ${
-                      previewTab === "stl"
-                        ? "bg-[#1F4E5F] text-white"
-                        : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                      previewTab === "stl" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                     }`}
                   >
                     Dettagli
@@ -835,7 +810,6 @@ downloadReliefStlBinary({
                 </button>
               </div>
 
-              {/* Pannello istruzioni (inline, no modal) */}
               {showInstructions && (
                 <div id="rf-instructions" role="region" className="border-b bg-white px-3 py-3 text-xs text-gray-700">
                   <div className="text-sm font-semibold text-gray-900">Come funziona ReliefForge</div>
@@ -858,8 +832,7 @@ downloadReliefStlBinary({
                       <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
                         <div className="font-semibold">Depth map: formato consigliato</div>
                         <div className="mt-1">
-                          PNG <span className="font-semibold">grayscale</span> (scala di grigi){" "}
-                          <span className="font-semibold">16-bit</span>. Evita 32-bit/float/HDR o PNG RGB “colorati”.
+                          PNG <span className="font-semibold">grayscale</span> <span className="font-semibold">16-bit</span>. Evita 32-bit/float/HDR o PNG RGB.
                         </div>
                       </div>
                     </div>
@@ -871,10 +844,10 @@ downloadReliefStlBinary({
                           <span className="font-semibold">Altezza rilievo</span>: quanto “sporge” il bassorilievo (mm).
                         </li>
                         <li>
-                          <span className="font-semibold">Spessore base</span>: imposta <span className="font-semibold">0</span> se vuoi solo il modello senza basetta.
+                          <span className="font-semibold">Spessore base</span>: imposta <span className="font-semibold">0</span> se vuoi solo il modello.
                         </li>
                         <li>
-                          <span className="font-semibold">Qualità (Decimazione)</span>: x2–x3 consigliato. Più alto = STL più leggero, meno dettaglio.
+                          <span className="font-semibold">Decimazione</span>: x2–x3 consigliato.
                         </li>
                       </ul>
 
@@ -890,8 +863,7 @@ downloadReliefStlBinary({
                   <div className="mt-3 rounded-md border bg-white p-3">
                     <div className="font-semibold text-gray-900">3) Scarica lo STL</div>
                     <div className="mt-1">
-                      Premi <span className="font-semibold">Scarica STL</span>: otterrai uno STL{" "}
-                      <span className="font-semibold">chiuso (manifold)</span> pronto per slicer e stampa 3D.
+                      Premi <span className="font-semibold">Scarica STL</span>: otterrai uno STL <span className="font-semibold">chiuso (manifold)</span>.
                     </div>
 
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -935,9 +907,7 @@ downloadReliefStlBinary({
                     {sourceMode === "depthmap" ? (
                       <canvas ref={dmCanvasRef} className="max-h-[240px] w-full rounded-md border" />
                     ) : (
-                      <div className="text-xs text-gray-500">
-                        In modalità Immagine, la depthmap è interna alla pipeline (vedi 3D).
-                      </div>
+                      <div className="text-xs text-gray-500">In modalità Immagine, la depthmap è interna alla pipeline (vedi 3D).</div>
                     )}
                   </div>
                 )}
@@ -951,10 +921,6 @@ downloadReliefStlBinary({
                       const reliefMm = Number(params.depthMm ?? 0);
                       const totalMm = baseMm + reliefMm;
 
-                      const ratio = reliefMm > 0 ? baseMm / reliefMm : null;
-                      const basePct = totalMm > 0 ? (baseMm / totalMm) * 100 : 0;
-                      const reliefPct = totalMm > 0 ? (reliefMm / totalMm) * 100 : 0;
-
                       const hmW = hmState?.w ?? 0;
                       const hmH = hmState?.h ?? 0;
 
@@ -965,36 +931,18 @@ downloadReliefStlBinary({
 
                       return (
                         <>
-                          <div className="flex items-baseline justify-between">
-                            <div className="font-medium text-gray-700">Dettagli</div>
-                            <div className="text-[11px] text-gray-400">read-only</div>
-                          </div>
-
                           <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
                             <div className="font-medium text-gray-700">Dimensioni</div>
-
                             <div className="mt-1 flex items-baseline justify-between">
                               <div className="text-gray-600">Pianta (X × Y)</div>
                               <div className="font-medium text-gray-800">
                                 {fmt(stlWidthMm, 2)} × {fmt(stlHeightMm, 2)} mm
                               </div>
                             </div>
-
                             <div className="flex items-baseline justify-between">
                               <div className="text-gray-600">Altezza totale (Z)</div>
                               <div className="font-medium text-gray-800">{fmt(totalMm, 2)} mm</div>
                             </div>
-
-                            <div className="flex items-baseline justify-between">
-                              <div className="text-gray-600">Spessore base</div>
-                              <div className="font-medium text-gray-800">{fmt(baseMm, 2)} mm</div>
-                            </div>
-
-                            <div className="flex items-baseline justify-between">
-                              <div className="text-gray-600">Altezza rilievo</div>
-                              <div className="font-medium text-gray-800">{fmt(reliefMm, 2)} mm</div>
-                            </div>
-
                             <div className="mt-1 flex items-baseline justify-between">
                               <div className="text-gray-600">Scala</div>
                               <div className="font-medium text-gray-800">{fmt(mmPerPx, 4)} mm/px</div>
@@ -1002,38 +950,12 @@ downloadReliefStlBinary({
                           </div>
 
                           <div>
-                            Sorgente:{" "}
-                            <span className="font-medium">{sourceMode === "image" ? "Immagine" : "Depth map"}</span>
-                          </div>
-
-                          <div>
-                            Risoluzione reale heightmap:{" "}
+                            Risoluzione heightmap:{" "}
                             <span className="font-medium">{hmState ? `${hmState.w} × ${hmState.h} px` : "—"}</span>
-                          </div>
-
-                          <div>
-                            Output:{" "}
-                            <span className="font-medium">
-                              {params.outputMode} / {params.baseStyle}
-                            </span>
-                          </div>
-
-                          <div>
-                            Rapporto base/rilievo:{" "}
-                            <span className="font-medium">{ratio === null ? "—" : `${fmt(ratio, 2)} : 1`}</span>{" "}
-                            <span className="text-gray-400">(base/relief)</span>
-                          </div>
-
-                          <div>
-                            Distribuzione:{" "}
-                            <span className="font-medium">
-                              {fmt(basePct, 0)}% base / {fmt(reliefPct, 0)}% rilievo
-                            </span>
                           </div>
 
                           <div className="border-t pt-2">
                             <div className="font-medium text-gray-700">Metriche STL</div>
-
                             {s ? (
                               <>
                                 <div>
@@ -1042,11 +964,9 @@ downloadReliefStlBinary({
                                     {s.effW} × {s.effH} px
                                   </span>
                                 </div>
-
                                 <div>
                                   Triangoli stimati: <span className="font-medium">{s.triangles.toLocaleString()}</span>
                                 </div>
-
                                 <div>
                                   Peso stimato STL: <span className="font-medium">{s.mb.toFixed(1)} MB</span>
                                 </div>
@@ -1055,8 +975,7 @@ downloadReliefStlBinary({
                                   <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
                                     <div className="font-semibold">⚠️ Mesh pesante</div>
                                     <div className="mt-1">
-                                      Consiglio: aumenta “Qualità (Decimazione)” almeno a{" "}
-                                      <span className="font-semibold">x{s.suggestedDecimate}</span>.
+                                      Consiglio: aumenta “Decimazione” almeno a <span className="font-semibold">x{s.suggestedDecimate}</span>.
                                     </div>
                                   </div>
                                 ) : (
