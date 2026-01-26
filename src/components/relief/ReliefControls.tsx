@@ -134,10 +134,24 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           <div className="flex items-center justify-between">
             <Label>Oggetto scontornato (Cutout)</Label>
             <Switch
-              disabled={disabled}
-              checked={v.cutoutEnabled}
-              onCheckedChange={(checked) => set({ cutoutEnabled: checked })}
-            />
+  disabled={disabled}
+  checked={v.cutoutEnabled}
+  onCheckedChange={(checked) => {
+    // Cutout richiede base minima per evitare geometrie degeneri / CSG instabile
+    if (checked) {
+      const minBase = 0.8;
+      set({
+        cutoutEnabled: true,
+        baseMm: Math.max(v.baseMm ?? 0, minBase),
+        // (opzionale ma consigliato) forziamo flat, perché cutout è definito solo lì
+        baseStyle: "flat",
+      });
+    } else {
+      set({ cutoutEnabled: false });
+    }
+  }}
+/>
+
           </div>
 
           <p className="text-xs text-slate-600">
