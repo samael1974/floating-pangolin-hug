@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as THREE from "three";
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
-import type { BaseStyle, OutputMode } from "@/lib/reliefTypes";
+import type { BaseStyle, OutputMode } from "@/lib/relief/reliefTypes";
 
 type HeightmapState = { normF32: Float32Array; w: number; h: number };
 
