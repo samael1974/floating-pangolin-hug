@@ -1,6 +1,5 @@
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
 import { geometryToBinaryStl } from "@/lib/stl/binaryStl";
- HEAD
 import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
 
 import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
