@@ -11,39 +11,62 @@ export type HeightmapState = {
   h: number;
 };
 
-type DownloadArgs = {
+export type DownloadArgs = {
+  // ✅ entrambe supportate
+  hm?: HeightmapState;
   hmState?: HeightmapState;
-  hm?: HeightmapState; // ✅ compatibilità con ReliefWizard
+
   widthMm: number;
   depthMm: number;
   baseMm: number;
-  outputMode: OutputMode;
-  baseStyle: BaseStyle;
+
+  outputMode?: OutputMode; // default: "relief"
+  baseStyle?: BaseStyle;   // default: "flat"
+
   fileName?: string;
+
+  // (opzionale) pronto per futuro cutout vero
+  cutout?: unknown;
 };
+
+function isHeightmapState(v: any): v is HeightmapState {
+  return (
+    !!v &&
+    v.normF32 instanceof Float32Array &&
+    typeof v.w === "number" &&
+    typeof v.h === "number"
+  );
+}
+
+function assertFinite(n: number, label: string) {
+  if (!Number.isFinite(n)) throw new Error(`${label} non finito`);
+}
+
+function sanitizeFileName(name: string) {
+  const safe = (name || "").trim().replace(/[\\/:*?"<>|]+/g, "_");
+  return safe.length ? safe : "reliefforge";
+}
 
 /** STL binary writer (little-endian) */
 function geometryToBinaryStl(geom: THREE.BufferGeometry): ArrayBuffer {
+  // assicurati non-indexed
   const g = geom.index ? geom.toNonIndexed() : geom;
   const pos = g.getAttribute("position") as THREE.BufferAttribute | undefined;
   if (!pos) throw new Error("STL: geometry has no position attribute");
 
   const triCount = Math.floor(pos.count / 3);
-
-  // 80 header + 4 triCount + 50 bytes per triangolo
   const buffer = new ArrayBuffer(84 + triCount * 50);
   const view = new DataView(buffer);
 
-  // header 80 bytes (vuoto)
+  // header 80 bytes (zero)
   for (let i = 0; i < 80; i++) view.setUint8(i, 0);
-
   view.setUint32(80, triCount, true);
 
   let o = 84;
 
-  const ax = new THREE.Vector3();
-  const bx = new THREE.Vector3();
-  const cx = new THREE.Vector3();
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
   const ab = new THREE.Vector3();
   const ac = new THREE.Vector3();
   const n = new THREE.Vector3();
@@ -53,16 +76,14 @@ function geometryToBinaryStl(geom: THREE.BufferGeometry): ArrayBuffer {
     const i1 = i0 + 1;
     const i2 = i0 + 2;
 
-    ax.fromBufferAttribute(pos, i0);
-    bx.fromBufferAttribute(pos, i1);
-    cx.fromBufferAttribute(pos, i2);
+    a.fromBufferAttribute(pos, i0);
+    b.fromBufferAttribute(pos, i1);
+    c.fromBufferAttribute(pos, i2);
 
-    // normal = normalize((b-a) x (c-a))
-    ab.subVectors(bx, ax);
-    ac.subVectors(cx, ax);
+    ab.subVectors(b, a);
+    ac.subVectors(c, a);
     n.crossVectors(ab, ac);
 
-    // evita NaN/Infinity
     if (!Number.isFinite(n.x) || !Number.isFinite(n.y) || !Number.isFinite(n.z) || n.lengthSq() < 1e-30) {
       n.set(0, 0, 0);
     } else {
@@ -75,19 +96,19 @@ function geometryToBinaryStl(geom: THREE.BufferGeometry): ArrayBuffer {
     view.setFloat32(o + 8, n.z, true);
 
     // v1
-    view.setFloat32(o + 12, ax.x, true);
-    view.setFloat32(o + 16, ax.y, true);
-    view.setFloat32(o + 20, ax.z, true);
+    view.setFloat32(o + 12, a.x, true);
+    view.setFloat32(o + 16, a.y, true);
+    view.setFloat32(o + 20, a.z, true);
 
     // v2
-    view.setFloat32(o + 24, bx.x, true);
-    view.setFloat32(o + 28, bx.y, true);
-    view.setFloat32(o + 32, bx.z, true);
+    view.setFloat32(o + 24, b.x, true);
+    view.setFloat32(o + 28, b.y, true);
+    view.setFloat32(o + 32, b.z, true);
 
     // v3
-    view.setFloat32(o + 36, cx.x, true);
-    view.setFloat32(o + 40, cx.y, true);
-    view.setFloat32(o + 44, cx.z, true);
+    view.setFloat32(o + 36, c.x, true);
+    view.setFloat32(o + 40, c.y, true);
+    view.setFloat32(o + 44, c.z, true);
 
     // attribute byte count
     view.setUint16(o + 48, 0, true);
@@ -111,10 +132,23 @@ function downloadArrayBuffer(buffer: ArrayBuffer, fileName: string) {
 }
 
 /**
- * ✅ EXPORT che ti manca: ReliefWizard lo importa come named export.
- * Supporta sia firma a oggetto (consigliata) sia firma "vecchia" a parametri.
+ * ✅ Named export (ReliefWizard lo importa così)
+ *
+ * Supporta:
+ * 1) forma consigliata: downloadReliefStlBinary({ hm, widthMm, ... })
+ * 2) forma legacy:      downloadReliefStlBinary(hmState, widthMm, depthMm, ...)
  */
-export async function downloadReliefStlBinary(
+export function downloadReliefStlBinary(arg1: DownloadArgs): void;
+export function downloadReliefStlBinary(
+  hm: HeightmapState,
+  widthMm: number,
+  depthMm?: number,
+  baseMm?: number,
+  outputMode?: OutputMode,
+  baseStyle?: BaseStyle,
+  fileName?: string
+): void;
+export function downloadReliefStlBinary(
   arg1: DownloadArgs | HeightmapState,
   widthMm?: number,
   depthMm?: number,
@@ -123,12 +157,14 @@ export async function downloadReliefStlBinary(
   baseStyle?: BaseStyle,
   fileName?: string
 ) {
-  // normalize args
+  // ---- normalize input ----
   let args: DownloadArgs;
-  if ((arg1 as any)?.normF32 && typeof (arg1 as any)?.w === "number" && typeof (arg1 as any)?.h === "number" && typeof widthMm === "number") {
+
+  // legacy signature: (hm, widthMm, ...)
+  if (isHeightmapState(arg1) && typeof widthMm === "number") {
     args = {
-      hmState: arg1 as HeightmapState,
-      widthMm: widthMm!,
+      hm: arg1,
+      widthMm,
       depthMm: depthMm ?? 3,
       baseMm: baseMm ?? 2,
       outputMode: outputMode ?? "relief",
@@ -139,13 +175,34 @@ export async function downloadReliefStlBinary(
     args = arg1 as DownloadArgs;
   }
 
-  const { hmState, widthMm: W, depthMm: D, baseMm: B, outputMode: OM, baseStyle: BS } = args;
+  const hm = args.hm ?? args.hmState;
 
-  // build geometry
+  // ---- GUARDS (niente più "normF32 of undefined") ----
+  if (!hm) {
+    console.error("downloadReliefStlBinary: hm/hmState mancante", args);
+    throw new Error("Heightmap non passata (hm/hmState mancante).");
+  }
+  if (!isHeightmapState(hm)) {
+    console.error("downloadReliefStlBinary: heightmap invalida", hm);
+    throw new Error("Heightmap invalida (manca normF32/w/h).");
+  }
+
+  assertFinite(args.widthMm, "widthMm");
+  assertFinite(args.depthMm, "depthMm");
+  assertFinite(args.baseMm, "baseMm");
+
+  const W = args.widthMm;
+  const D = args.depthMm;
+  const B = args.baseMm;
+  const OM: OutputMode = args.outputMode ?? "relief";
+  const BS: BaseStyle = args.baseStyle ?? "flat";
+  const outName = sanitizeFileName(args.fileName ?? "reliefforge");
+
+  // ---- build geometry ----
   let geom = buildSolidFromHeightmap({
-    normF32: hmState.normF32,
-    w: hmState.w,
-    h: hmState.h,
+    normF32: hm.normF32,
+    w: hm.w,
+    h: hm.h,
     widthMm: W,
     depthMm: D,
     baseMm: B,
@@ -153,10 +210,11 @@ export async function downloadReliefStlBinary(
     baseStyle: BS,
   });
 
-  // (cutout MVP safe = no-op per ora)
-  geom = applyCutoutToFlatGeometry(geom);
+  // ---- cutout MVP safe (no-op oggi) ----
+  // se domani passi args.cutout, la firma regge già
+  geom = applyCutoutToFlatGeometry(geom, args.cutout);
 
-  // sanity check positions
+  // ---- sanity check: vertici finiti ----
   const pos = geom.getAttribute("position") as THREE.BufferAttribute | undefined;
   if (!pos) throw new Error("STL: missing position");
   for (let i = 0; i < pos.count; i++) {
@@ -167,5 +225,5 @@ export async function downloadReliefStlBinary(
   }
 
   const bin = geometryToBinaryStl(geom);
-  downloadArrayBuffer(bin, args.fileName ?? "reliefforge");
+  downloadArrayBuffer(bin, outName);
 }
