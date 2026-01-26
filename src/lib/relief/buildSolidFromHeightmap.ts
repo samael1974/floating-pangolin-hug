@@ -101,20 +101,14 @@ const zBottomOffset = (_H: number) => 0;
   }
 
   // --------------------------
-  // OFFSET (SHELL CHIUSO): bottom offset + pareti laterali
+  // OFFSET (CHIUSO): bottom PIATTO + pareti laterali
   // --------------------------
   if (baseStyle === "offset") {
-    if (baseMm < 0.2) {
-  // sotto 0.2mm è praticamente zero: evitiamo degenerazioni e repair aggressivo dello slicer
-  // fallback: comportati come "flat" (mesh chiusa classica) oppure forza baseMm minimo
-  // Qui scelgo fallback "flat": esci dal ramo offset.
-  // (Se preferisci, posso farti la variante "clamp a 0.8mm")
-}
-    // Nota: per un shell sensato baseMm dovrebbe essere > 0 (anche 0.8–1mm).
-    // Se baseMm=0 top e bottom coincidono e puoi avere triangoli degeneri.
-    // Non blocco l'export, ma è bene saperlo.
+    // In offset, se lo spessore è troppo basso, molti slicer fanno "repair"
+    // e possono mangiare dettagli/pareti sottili. Clampiamo a un minimo sensato.
+    const effBaseMm = Math.max(baseMm, 0.8);
 
-    // 1) bottom offset surface
+    // 1) bottom surface (PIATTO)
     for (let iy = 0; iy < h - 1; iy++) {
       for (let ix = 0; ix < w - 1; ix++) {
         const xA = x0 + ix * dx;
@@ -126,16 +120,104 @@ const zBottomOffset = (_H: number) => 0;
         const xD = xB;
         const yD = yC;
 
-        const zA = zBottomOffset(normF32[idx(ix, iy)] ?? 0);
-        const zB = zBottomOffset(normF32[idx(ix + 1, iy)] ?? 0);
-        const zC = zBottomOffset(normF32[idx(ix, iy + 1)] ?? 0);
-        const zD = zBottomOffset(normF32[idx(ix + 1, iy + 1)] ?? 0);
+        // bottom PIATTO a z=0
+        const zA = 0;
+        const zB = 0;
+        const zC = 0;
+        const zD = 0;
 
         // winding verso -Z
         pushTri(xA, yA, zA, xD, yD, zD, xB, yB, zB);
         pushTri(xA, yA, zA, xC, yC, zC, xD, yD, zD);
       }
     }
+
+    // 2) SIDE WALLS: collega top e bottom (z=0) lungo tutto il bordo
+    // Left edge (x=0)
+    for (let iy = 0; iy < h - 1; iy++) {
+      const x = x0;
+      const y1 = y0 - iy * dy;
+      const y2 = y0 - (iy + 1) * dy;
+
+      const zT1 = zTop(normF32[idx(0, iy)] ?? 0);
+      const zT2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
+
+      // bottom piatto
+      const zB1 = 0;
+      const zB2 = 0;
+
+      // Se il top scende sotto 0 (caso recessed/mold), garantiamo chiusura verso l'esterno:
+      // spostiamo il bottom sotto al minimo tra top e 0 usando effBaseMm.
+      // (Questo evita pareti "invertite" quando zTop < 0)
+      const b1 = Math.min(zB1, zT1 - effBaseMm);
+      const b2 = Math.min(zB2, zT2 - effBaseMm);
+
+      pushTri(x, y1, b1, x, y1, zT1, x, y2, zT2);
+      pushTri(x, y1, b1, x, y2, zT2, x, y2, b2);
+    }
+
+    // Right edge (x=w-1)
+    for (let iy = 0; iy < h - 1; iy++) {
+      const x = x0 + widthMm;
+      const y1 = y0 - iy * dy;
+      const y2 = y0 - (iy + 1) * dy;
+
+      const zT1 = zTop(normF32[idx(w - 1, iy)] ?? 0);
+      const zT2 = zTop(normF32[idx(w - 1, iy + 1)] ?? 0);
+
+      const zB1 = 0;
+      const zB2 = 0;
+
+      const b1 = Math.min(zB1, zT1 - effBaseMm);
+      const b2 = Math.min(zB2, zT2 - effBaseMm);
+
+      pushTri(x, y1, b1, x, y2, zT2, x, y1, zT1);
+      pushTri(x, y1, b1, x, y2, b2, x, y2, zT2);
+    }
+
+    // Top edge (y=0)
+    for (let ix = 0; ix < w - 1; ix++) {
+      const x1 = x0 + ix * dx;
+      const x2 = x0 + (ix + 1) * dx;
+      const y = y0;
+
+      const zT1 = zTop(normF32[idx(ix, 0)] ?? 0);
+      const zT2 = zTop(normF32[idx(ix + 1, 0)] ?? 0);
+
+      const zB1 = 0;
+      const zB2 = 0;
+
+      const b1 = Math.min(zB1, zT1 - effBaseMm);
+      const b2 = Math.min(zB2, zT2 - effBaseMm);
+
+      pushTri(x1, y, b1, x2, y, zT2, x1, y, zT1);
+      pushTri(x1, y, b1, x2, y, b2, x2, y, zT2);
+    }
+
+    // Bottom edge (y=h-1)
+    for (let ix = 0; ix < w - 1; ix++) {
+      const x1 = x0 + ix * dx;
+      const x2 = x0 + (ix + 1) * dx;
+      const y = y0 - heightMm;
+
+      const zT1 = zTop(normF32[idx(ix, h - 1)] ?? 0);
+      const zT2 = zTop(normF32[idx(ix + 1, h - 1)] ?? 0);
+
+      const zB1 = 0;
+      const zB2 = 0;
+
+      const b1 = Math.min(zB1, zT1 - effBaseMm);
+      const b2 = Math.min(zB2, zT2 - effBaseMm);
+
+      pushTri(x1, y, b1, x1, y, zT1, x2, y, zT2);
+      pushTri(x1, y, b1, x2, y, zT2, x2, y, b2);
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+    geometry.computeVertexNormals();
+    return geometry;
+  }
 
     // 2) SIDE WALLS: collega top e bottomOffset lungo tutto il bordo
 
