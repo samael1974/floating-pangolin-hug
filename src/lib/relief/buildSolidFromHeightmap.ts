@@ -89,75 +89,85 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     }
   }
 
-  // =====================================================
-  // OFFSET MODE → BOTTOM PIATTO z=0 + PARETI CHIUSE su z=0
-  // (FIX: niente bottom sotto zero, altrimenti restano lacune)
+   // =====================================================
+  // OFFSET (CAD-like) → base "allargata" in XY + bottom a z=0
   // =====================================================
   if (baseStyle === "offset") {
-    // ---- BOTTOM PIATTO (z = 0)
-    for (let iy = 0; iy < h - 1; iy++) {
-      for (let ix = 0; ix < w - 1; ix++) {
-        const xA = x0 + ix * dx;
-        const yA = y0 - iy * dy;
-        const xB = x0 + (ix + 1) * dx;
-        const yB = yA;
-        const xC = xA;
-        const yC = y0 - (iy + 1) * dy;
-        const xD = xB;
-        const yD = yC;
+    // base minima “stampabile” senza inventare quote sotto lo zero
+    const effBaseMm = Math.max(baseMm, 0.8);
 
-        // winding verso -Z
-        pushTri(xA, yA, 0, xD, yD, 0, xB, yB, 0);
-        pushTri(xA, yA, 0, xC, yC, 0, xD, yD, 0);
-      }
-    }
+    // Offset CAD-like in XY (visibile nello slicer)
+    // 0.8 mm funziona bene con nozzle 0.6; puoi alzare a 1.2 se vuoi più "cornice"
+    const off = 0.8;
 
-    // ---- PARETI LATERALI: bottom SEMPRE a z=0 (chiusura watertight)
-    const makeWall = (x1: number, y1: number, zT1: number, x2: number, y2: number, zT2: number) => {
-      const zB = 0;
-      pushTri(x1, y1, zB, x1, y1, zT1, x2, y2, zT2);
-      pushTri(x1, y1, zB, x2, y2, zT2, x2, y2, zB);
+    const xL0 = x0;
+    const xR0 = x0 + widthMm;
+    const yT0 = y0;
+    const yB0 = y0 - heightMm;
+
+    // rettangolo "offsettato" esterno (base più grande)
+    const xL1 = xL0 - off;
+    const xR1 = xR0 + off;
+    const yT1 = yT0 + off;
+    const yB1 = yB0 - off;
+
+    // ---- BOTTOM (rettangolo offset) a z=0, winding verso -Z
+    pushTri(xL1, yT1, 0, xR1, yB1, 0, xR1, yT1, 0);
+    pushTri(xL1, yT1, 0, xL1, yB1, 0, xR1, yB1, 0);
+
+    // ---- WALLS: collegano il bordo TOP (rettangolo originale) al bordo BOTTOM (rettangolo offset)
+    // chiusura SEMPRE su z=0 → watertight
+    const wallLeft = (y1: number, zT1: number, y2: number, zT2: number) => {
+      // esterno verso -X
+      pushTri(xL1, y1, 0, xL0, y1, zT1, xL0, y2, zT2);
+      pushTri(xL1, y1, 0, xL0, y2, zT2, xL1, y2, 0);
     };
 
-    const xL = x0;
-    const xR = x0 + widthMm;
-    const yT = y0;
-    const yB = y0 - heightMm;
+    const wallRight = (y1: number, zT1: number, y2: number, zT2: number) => {
+      // esterno verso +X (invertiamo winding)
+      pushTri(xR1, y2, 0, xR0, y2, zT2, xR0, y1, zT1);
+      pushTri(xR1, y2, 0, xR0, y1, zT1, xR1, y1, 0);
+    };
 
-    // LEFT / RIGHT
+    const wallTop = (x1: number, zT1: number, x2: number, zT2: number) => {
+      // esterno verso +Y
+      pushTri(x1, yT1, 0, x1, yT0, zT1, x2, yT0, zT2);
+      pushTri(x1, yT1, 0, x2, yT0, zT2, x2, yT1, 0);
+    };
+
+    const wallBottom = (x1: number, zT1: number, x2: number, zT2: number) => {
+      // esterno verso -Y (invertiamo winding)
+      pushTri(x2, yB1, 0, x2, yB0, zT2, x1, yB0, zT1);
+      pushTri(x2, yB1, 0, x1, yB0, zT1, x1, yB1, 0);
+    };
+
+    // LEFT / RIGHT walls (segmentate lungo Y con Z variabile)
     for (let iy = 0; iy < h - 1; iy++) {
       const y1 = y0 - iy * dy;
       const y2 = y0 - (iy + 1) * dy;
 
-      makeWall(xL, y1, zTop(normF32[idx(0, iy)] ?? 0), xL, y2, zTop(normF32[idx(0, iy + 1)] ?? 0));
+      // zTop deve stare sopra una base minima "effettiva"
+      const zT1L = Math.max(zTop(normF32[idx(0, iy)] ?? 0), effBaseMm);
+      const zT2L = Math.max(zTop(normF32[idx(0, iy + 1)] ?? 0), effBaseMm);
+      wallLeft(y1, zT1L, y2, zT2L);
 
-      // invertiamo l'ordine per winding esterno coerente
-      makeWall(
-        xR,
-        y2,
-        zTop(normF32[idx(w - 1, iy + 1)] ?? 0),
-        xR,
-        y1,
-        zTop(normF32[idx(w - 1, iy)] ?? 0)
-      );
+      const zT1R = Math.max(zTop(normF32[idx(w - 1, iy)] ?? 0), effBaseMm);
+      const zT2R = Math.max(zTop(normF32[idx(w - 1, iy + 1)] ?? 0), effBaseMm);
+      wallRight(y1, zT1R, y2, zT2R);
     }
 
-    // TOP / BOTTOM
+    // TOP / BOTTOM walls (segmentate lungo X con Z variabile)
     for (let ix = 0; ix < w - 1; ix++) {
       const x1 = x0 + ix * dx;
       const x2 = x0 + (ix + 1) * dx;
 
-      makeWall(x1, yT, zTop(normF32[idx(ix, 0)] ?? 0), x2, yT, zTop(normF32[idx(ix + 1, 0)] ?? 0));
+      const zT1T = Math.max(zTop(normF32[idx(ix, 0)] ?? 0), effBaseMm);
+      const zT2T = Math.max(zTop(normF32[idx(ix + 1, 0)] ?? 0), effBaseMm);
+      wallTop(x1, zT1T, x2, zT2T);
 
-      // invertiamo l'ordine per winding esterno coerente
-      makeWall(
-        x2,
-        yB,
-        zTop(normF32[idx(ix + 1, h - 1)] ?? 0),
-        x1,
-        yB,
-        zTop(normF32[idx(ix, h - 1)] ?? 0)
-      );
+      const zT1B = Math.max(zTop(normF32[idx(ix, h - 1)] ?? 0), effBaseMm);
+      const zT2B = Math.max(zTop(normF32[idx(ix + 1, h - 1)] ?? 0), effBaseMm);
+      wallBottom(x1, zT1B, x2, zT2B);
     }
 
     const g = new THREE.BufferGeometry();
@@ -165,6 +175,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     g.computeVertexNormals();
     return g;
   }
+
 
   // =====================================================
   // NON-OFFSET → BASE PIATTA CLASSICA (come prima)
