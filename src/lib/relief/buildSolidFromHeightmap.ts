@@ -103,10 +103,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     const zTopOffset = (H: number) => {
       const h01 = clamp01(H);
       if (outputMode === "mold") return depthMm * (1 - h01);
-      // recessed in offset non ha molto senso "con base", ma lo gestiamo comunque:
-      if (baseStyle === "recessed") return depthMm * (1 - h01);
-      return depthMm * h01;
-    };
+         };
 
     const zTopGrid = new Float32Array(w * h);
     const zBotGrid = new Float32Array(w * h);
