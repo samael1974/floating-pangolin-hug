@@ -351,7 +351,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   }
 
   // BOTTOM (z=0)
-=======
+
   // =====================================================
   // NON-OFFSET → base classica chiusa (bottom + 4 lati)
   // =====================================================
