@@ -96,46 +96,49 @@ function CameraKeyLight({ intensity = 1.6 }: { intensity?: number }) {
 function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
   return (
     <>
-      {/* <Environment preset="studio" /> */}
+      {/* ✅ Environment è async e può causare canvas bianco senza Suspense */}
+      <React.Suspense fallback={null}>
+        {/* Se vuoi riattivarlo, togli il commento */}
+        {/* <Environment preset="studio" /> */}
+      </React.Suspense>
 
-      {/* Fill minimo: se lo alzi troppo, appiattisci */}
+      {/* Luci: setup “premium” stabile (no shadow shimmer) */}
       <ambientLight intensity={0.08} />
-      <hemisphereLight intensity={0.14} groundColor={"#050505"} />
+      <hemisphereLight intensity={0.14} groundColor="#050505" />
 
-      {/* Key radente dinamica (stabile, senza ombre) */}
+      {/* Key radente dinamica */}
       <CameraKeyLight intensity={1.6} />
 
-      {/* Rim leggero */}
-      <directionalLight
-        position={[-520, 260, 260]}
-        intensity={0.28}
-        color={"#ffffff"}
-      />
+      {/* Rim */}
+      <directionalLight position={[-520, 260, 260]} intensity={0.28} color="#ffffff" />
 
-      {/* Headlight fill */}
+      {/* Headlight */}
       <HeadLight intensity={0.3} />
 
+      {/* Mesh */}
       <mesh geometry={geometry}>
         <meshPhysicalMaterial
-          color={"#E26D5C"}
+          color="#E26D5C"
           metalness={0.02}
           roughness={0.78}
           clearcoat={0.08}
           clearcoatRoughness={0.65}
           reflectivity={0.12}
-          envMapIntensity={0.40}
+          envMapIntensity={0.4}
         />
       </mesh>
 
+      {/* Ombre a contatto (soft) */}
       <ContactShadows
         position={[0, 0, -0.002]}
-        opacity={0.30}
+        opacity={0.3}
         scale={1600}
         blur={2.6}
         far={1200}
         resolution={1024}
       />
 
+      {/* Controlli */}
       <OrbitControls
         makeDefault
         enableDamping
@@ -148,6 +151,7 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
     </>
   );
 }
+
 
 export default function ReliefPreview3D(props: Props) {
   const {
