@@ -163,7 +163,9 @@ export default function ReliefPreview3D(props: Props) {
   const geometry = React.useMemo(() => {
     if (!hmState) return null;
 
-    const hmDec = decimateHm(hmState, decimateStep);
+    const previewStep = baseStyle === "offset" ? Math.max(decimateStep, 6) : decimateStep;
+const hmDec = decimateHm(hmState, previewStep);
+
 
     try {
       const geo = buildSolidFromHeightmap({
