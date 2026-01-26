@@ -143,7 +143,6 @@ const y2 = y0 - (iy + 1) * dy;
 
 const zL1 = zTop(normF32[idx(0, iy)] ?? 0);
 const zL2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
-
 makeWall(x0, y1, zL1, x0, y2, zL2);
 
 
