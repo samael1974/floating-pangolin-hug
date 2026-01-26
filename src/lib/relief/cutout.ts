@@ -1,15 +1,9 @@
-// src/lib/relief/cutout.ts
 import * as THREE from "three";
 
-/**
- * TEMP: Cutout/CSG disabilitato per evitare dipendenze.
- * Ritorna la geometria così com'è.
- * Quando vorrai reintrodurlo, lo rifacciamo con una libreria CSG compatibile.
- */
 export function applyCutoutToFlatGeometry(
-  geo: THREE.BufferGeometry,
-  _opts?: unknown
+  geo: THREE.BufferGeometry
 ): THREE.BufferGeometry {
+  // Cutout disabilitato: per ora ritorna la geometria così com'è.
   return geo;
 }
 
