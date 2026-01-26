@@ -37,6 +37,10 @@ export type ReliefParams = {
   outputMode: OutputMode;
 
   baseStyle: BaseStyle;
+
+  // ✅ CUTOUT (solo baseStyle="flat")
+  cutoutEnabled: boolean;
+  cutoutThreshold: number; // 0..1 (soglia su heightmap)
 };
 
 type Props = {
