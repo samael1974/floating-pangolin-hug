@@ -96,6 +96,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   // - offXY (lip) = distanza offset in XY (CAD) -> qui uguale a baseMm
   // =====================================================
   if (baseStyle === "offset") {
+    verts.length = 0;
     const t = Math.max(baseMm, 0.6);     // spessore guscio
     const offXY = t;                     // offset CAD in XY (lip) -> costante come in immagine
 
