@@ -1,10 +1,11 @@
+// src/components/relief/ReliefPreview3D.tsx
 import * as React from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
-import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
+import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
 
 export type HeightmapState = {
   normF32: Float32Array;
@@ -57,12 +58,11 @@ function HeadLight({ intensity = 0.3 }: { intensity?: number }) {
     l.target.updateMatrixWorld();
   });
 
-  return <directionalLight ref={ref} intensity={intensity} color={"#ffffff"} />;
+  return <directionalLight ref={ref} intensity={intensity} color="#ffffff" />;
 }
 
 /**
- * CameraKeyLight: key radente DINAMICA che segue la camera ma resta laterale.
- * Serve a mantenere leggibilità simile tra “front” e “back”.
+ * CameraKeyLight: key radente dinamica che segue la camera ma resta laterale.
  */
 function CameraKeyLight({ intensity = 1.6 }: { intensity?: number }) {
   const ref = React.useRef<THREE.DirectionalLight>(null);
@@ -78,7 +78,6 @@ function CameraKeyLight({ intensity = 1.6 }: { intensity?: number }) {
     const up = new THREE.Vector3(0, 0, 1);
     const right = new THREE.Vector3().crossVectors(forward, up).normalize();
 
-    // luce radente: laterale + un filo dall’alto + leggermente dietro
     const pos = camera.position
       .clone()
       .add(right.multiplyScalar(850))
@@ -90,7 +89,7 @@ function CameraKeyLight({ intensity = 1.6 }: { intensity?: number }) {
     l.target.updateMatrixWorld();
   });
 
-  return <directionalLight ref={ref} intensity={intensity} color={"#ffffff"} />;
+  return <directionalLight ref={ref} intensity={intensity} color="#ffffff" />;
 }
 
 function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
@@ -98,38 +97,30 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
     <>
       <Environment preset="studio" />
 
-      {/* Fill minimo: se lo alzi troppo, appiattisci */}
       <ambientLight intensity={0.08} />
-      <hemisphereLight intensity={0.14} groundColor={"#050505"} />
+      <hemisphereLight intensity={0.14} groundColor="#050505" />
 
-      {/* Key radente dinamica (stabile, senza ombre) */}
       <CameraKeyLight intensity={1.6} />
 
-      {/* Rim leggero */}
-      <directionalLight
-        position={[-520, 260, 260]}
-        intensity={0.28}
-        color={"#ffffff"}
-      />
+      <directionalLight position={[-520, 260, 260]} intensity={0.28} color="#ffffff" />
 
-      {/* Headlight fill */}
       <HeadLight intensity={0.3} />
 
       <mesh geometry={geometry}>
         <meshPhysicalMaterial
-          color={"#E26D5C"}
+          color="#E26D5C"
           metalness={0.02}
           roughness={0.78}
           clearcoat={0.08}
           clearcoatRoughness={0.65}
           reflectivity={0.12}
-          envMapIntensity={0.40}
+          envMapIntensity={0.4}
         />
       </mesh>
 
       <ContactShadows
         position={[0, 0, -0.002]}
-        opacity={0.30}
+        opacity={0.3}
         scale={1600}
         blur={2.6}
         far={1200}
@@ -149,18 +140,17 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
   );
 }
 
-export default function ReliefPreview3D(props: Props) {
-  const {
-    hmState,
-    stlWidthMm,
-    decimateStep,
-    depthMm,
-    baseMm,
-    outputMode = "relief",
-    baseStyle,
-  } = props;
-
-  const geometry = React.useMemo(() => {
+export default function ReliefPreview3D({
+  hmState,
+  stlWidthMm,
+  decimateStep,
+  depthMm,
+  baseMm,
+  outputMode = "relief",
+  baseStyle,
+}: Props) {
+  // ✅ Guardia hard: se non c’è heightmap, niente calcoli 3D
+  const geometry = React.useMemo<THREE.BufferGeometry | null>(() => {
     if (!hmState) return null;
 
     const hmDec = decimateHm(hmState, decimateStep);
@@ -182,6 +172,7 @@ export default function ReliefPreview3D(props: Props) {
       if (bb) {
         const center = new THREE.Vector3();
         bb.getCenter(center);
+        // centra XY e appoggia Z a 0
         geo.translate(-center.x, -center.y, -bb.min.z);
       }
 
@@ -193,9 +184,16 @@ export default function ReliefPreview3D(props: Props) {
     }
   }, [hmState, stlWidthMm, decimateStep, depthMm, baseMm, outputMode, baseStyle]);
 
+  // ✅ Evita memory leak: dispose quando cambia geometria o unmount
+  React.useEffect(() => {
+    return () => {
+      geometry?.dispose();
+    };
+  }, [geometry]);
+
   if (!hmState) {
     return (
-      <div className="h-full w-full flex items-center justify-center text-sm text-gray-500">
+      <div className="flex h-full w-full items-center justify-center text-sm text-gray-500">
         Carica un file per vedere il 3D.
       </div>
     );
@@ -203,7 +201,7 @@ export default function ReliefPreview3D(props: Props) {
 
   if (!geometry) {
     return (
-      <div className="h-full w-full flex items-center justify-center text-sm text-gray-500">
+      <div className="flex h-full w-full items-center justify-center text-sm text-gray-500">
         La preview 3D appare dopo la generazione della heightmap.
       </div>
     );
