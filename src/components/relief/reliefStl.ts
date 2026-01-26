@@ -5,7 +5,7 @@ import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
 
 import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
 import { applyCutoutToFlatGeometry } from "@/lib/relief/cutout";
- 95f93e0df9e7d64c58f74a7e62a128e20290278f
+ 
 
 export type HeightmapState = { normF32: Float32Array; w: number; h: number };
 
