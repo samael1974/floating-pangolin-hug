@@ -58,7 +58,9 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
 
 // --- BOTTOM Z per OFFSET: piano piatto (non "shell che segue il top")
 // Fondo a z=0 => evita self-intersection e repair aggressivo in slicer.
+// --- BOTTOM Z per OFFSET: piano piatto a z=0 (riduce repair aggressivo slicer)
 const zBottomOffset = (_H: number) => 0;
+
 
   const verts: number[] = [];
   const pushTri = (
