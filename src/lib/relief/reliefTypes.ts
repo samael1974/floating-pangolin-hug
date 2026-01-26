@@ -1,3 +1,3 @@
 // src/lib/relief/reliefTypes.ts
-import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
+export type OutputMode = "relief" | "mold";
 export type BaseStyle = "flat" | "recessed" | "offset";
