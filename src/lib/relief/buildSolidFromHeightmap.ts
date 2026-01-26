@@ -199,8 +199,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   // =====================================================
 
   // BOTTOM (z=0) -> normali verso -Z
-  pushTri(xL, yT, 0, xR, yB, 0, xR, yT, 0);
-  pushTri(xL, yT, 0, xL, yB, 0, xR, yB, 0);
+  pushTri(xL, yy1, 0, xL, yy1, z1, xL, yy2, z2);
 
   // Left side
   for (let iy = 0; iy < h - 1; iy++) {
