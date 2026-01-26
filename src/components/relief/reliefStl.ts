@@ -3,6 +3,7 @@ import { geometryToBinaryStl } from "@/lib/stl/binaryStl";
 import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
 import { applyCutoutToFlatGeometry } from "@/lib/relief/cutout";
 
+
 export type HeightmapState = { normF32: Float32Array; w: number; h: number };
 
 type DownloadOpts = {
