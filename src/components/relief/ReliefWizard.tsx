@@ -357,7 +357,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
   baseStyle: params.baseStyle as any,
 
   cutoutEnabled: params.cutoutEnabled,
-  cutoutThreshold: params.cutoutThreshold,
+  cutoutEnabled: params.cutoutEnabled,
 
   filename: `${safe}.stl`,
 });
