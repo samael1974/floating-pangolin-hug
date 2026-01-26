@@ -7,7 +7,8 @@ import * as THREE from "three";
  * Questa funzione lascia invariata la geometria così la build torna verde.
  */
 export function applyCutoutToFlatGeometry(
-  geom: THREE.BufferGeometry
+  geom: THREE.BufferGeometry,
+  _args?: unknown
 ): THREE.BufferGeometry {
   return geom;
 }
