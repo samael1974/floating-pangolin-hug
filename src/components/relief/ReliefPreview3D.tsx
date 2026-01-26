@@ -185,7 +185,6 @@ export default function ReliefPreview3D(props: Props) {
         geo.translate(-center.x, -center.y, -bb.min.z);
       }
 
-      geo.computeVertexNormals();
       return geo;
     } catch (e) {
       console.error("ReliefPreview3D build error:", e);
