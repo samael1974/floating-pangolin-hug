@@ -145,17 +145,21 @@ export default function ReliefWizard() {
   // ✅ Nome file STL (personalizzabile)
   const [customName, setCustomName] = React.useState<string>("reliefforge");
 
-  // ✅ Params (SOLO campi validi di ReliefParams)
-  const [params, setParams] = React.useState<ReliefParams>(() => ({
-    projectType: "logo_text",
-    depthMm: 3,
-    baseMm: 2,
-    detail: 0.55,
-    smooth: 0.15,
-    edge: "sharp",
-    outputMode: "relief",
-    baseStyle: "flat",
-  }));
+// ✅ Params (allineati a ReliefParams: include cutoutEnabled REQUIRED)
+const [params, setParams] = React.useState<ReliefParams>(() => ({
+  projectType: "logo_text",
+  depthMm: 3,
+  baseMm: 2,
+  detail: 0.55,
+  smooth: 0.15,
+  edge: "sharp",
+  outputMode: "relief",
+  baseStyle: "flat",
+
+  // ✅ richiesto dal tuo tipo ReliefParams
+  cutoutEnabled: false,
+}));
+
 
   // ✅ Heightmap state/status
   const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
