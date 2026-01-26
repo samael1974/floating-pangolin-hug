@@ -106,6 +106,7 @@ const zBottomOffset = (_H: number) => 0;
   // OFFSET (CHIUSO): bottom PIATTO + pareti laterali
   // --------------------------
   if (baseStyle === "offset") {
+        const effBaseMm = Math.max(baseMm, 0.8);
     // In offset, se lo spessore è troppo basso, molti slicer fanno "repair"
     // e possono mangiare dettagli/pareti sottili. Clampiamo a un minimo sensato.
     const effBaseMm = Math.max(baseMm, 0.8);
