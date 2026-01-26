@@ -72,7 +72,7 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
 
   const dm = decimateHeightmap(hm, decimateStep);
 
-  const geom = buildSolidFromHeightmap({
+    const geom = buildSolidFromHeightmap({
     normF32: dm.normF32,
     w: dm.w,
     h: dm.h,
@@ -82,8 +82,6 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
     outputMode,
     baseStyle,
   });
-
-  const stl = geometryToBinaryStl(geom);
 
   let finalGeom = geom;
 
@@ -103,10 +101,6 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
 
   // sanity-check STL size
   const pos = finalGeom.getAttribute("position");
-
-
-  // sanity-check STL size
-  const pos = geom.getAttribute("position");
   if (!pos) throw new Error("STL: geometry has no position attribute");
   const triCount = pos.count / 3;
   const expected = 84 + 50 * triCount;
@@ -120,6 +114,7 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
     `reliefforge_${outputMode}_${baseStyle}_${Math.round(stlWidthMm)}mm.stl`;
 
   downloadArrayBuffer(stl, safeName);
+
 }
 
 // --- COMPAT LAYER (se qualche file vecchio lo importa)
