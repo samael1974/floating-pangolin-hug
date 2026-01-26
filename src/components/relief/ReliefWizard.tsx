@@ -116,15 +116,19 @@ export default function ReliefWizard() {
 
   // ✅ Params
   const [params, setParams] = React.useState<ReliefParams>(() => ({
-    projectType: "logo_text",
-    depthMm: 3,
-    baseMm: 2,
-    detail: 0.55,
-    smooth: 0.15,
-    edge: "sharp",
-    outputMode: "relief",
-    baseStyle: "flat",
-  }));
+  projectType: "logo_text",
+  depthMm: 3,
+  baseMm: 2,
+  detail: 0.55,
+  smooth: 0.15,
+  edge: "sharp",
+  outputMode: "relief",
+  baseStyle: "flat",
+
+  // ✅ CUTOUT
+  cutoutEnabled: false,
+  cutoutThreshold: 0.18,
+}));
 
   // ✅ Heightmap state/status
   const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
