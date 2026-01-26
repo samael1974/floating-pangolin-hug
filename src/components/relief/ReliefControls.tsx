@@ -73,7 +73,14 @@ const DEFAULTS: ReliefParams = {
   cutoutEnabled: false,
 };
 
-export default function ReliefControls({ value, onChange, disabled }: Props) {
+export default function ReliefControls({
+  value,
+  onChange,
+  disabled,
+  cutoutAllowed = true,
+  cutoutReason,
+}: Props) {
+
   const v = { ...DEFAULTS, ...value, outputMode: "relief" as const };
 
   // ✅ Normalizzazione anti-conflitto: se cutout è ON -> base flat + baseMm >= 0.8
