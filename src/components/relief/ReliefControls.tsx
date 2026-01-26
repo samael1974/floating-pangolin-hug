@@ -28,7 +28,7 @@ export type EdgeMode = "round" | "sharp";
 export type ReliefParams = {
   projectType: ProjectType;
   depthMm: number;
-  baseMm: number; // can be 0 (MA non con cutout)
+  baseMm: number; // can be 0
   detail: number; // 0..1
   smooth: number; // 0..1
   edge: EdgeMode;
@@ -46,18 +46,11 @@ type Props = {
   value: ReliefParams;
   onChange: (next: ReliefParams) => void;
   disabled?: boolean;
-
-  // ✅ CUTOUT guard (calcolato dal wizard)
-  cutoutAllowed?: boolean;
-  cutoutReason?: string;
 };
-
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
-
-const CUTOUT_MIN_BASE = 0.8;
 
 const DEFAULTS: ReliefParams = {
   projectType: "logo_text",
@@ -73,30 +66,15 @@ const DEFAULTS: ReliefParams = {
   cutoutEnabled: false,
 };
 
-export default function ReliefControls({
-  value,
-  onChange,
-  disabled,
-  cutoutAllowed = true,
-  cutoutReason,
-}: Props) {
-
+export default function ReliefControls({ value, onChange, disabled }: Props) {
   const v = { ...DEFAULTS, ...value, outputMode: "relief" as const };
 
-  // ✅ Normalizzazione anti-conflitto: se cutout è ON -> base flat + baseMm >= 0.8
-  const set = (patch: Partial<ReliefParams>) => {
-    let next: ReliefParams = { ...v, ...patch, outputMode: "relief" };
-
-    if (next.cutoutEnabled) {
-      if (next.baseStyle !== "flat") next.baseStyle = "flat";
-      if (next.baseMm < CUTOUT_MIN_BASE) next.baseMm = CUTOUT_MIN_BASE;
-    }
-
-    onChange(next);
-  };
+  const set = (patch: Partial<ReliefParams>) =>
+    onChange({ ...v, ...patch, outputMode: "relief" });
 
   return (
     <div className="space-y-4">
+      {/* Tipo progetto */}
       <div className="space-y-2">
         <Label>Tipo progetto</Label>
         <Select
@@ -131,6 +109,7 @@ export default function ReliefControls({
 
       <Separator />
 
+      {/* Base style */}
       <div className="space-y-2">
         <Label>Base</Label>
         <Select
@@ -164,23 +143,22 @@ export default function ReliefControls({
           <p className="text-xs text-slate-600">
             Ricava il contorno dalla{" "}
             <span className="font-medium">heightmap</span> (non dall’immagine) e
-            ritaglia lo STL. Supporta anche buchi interni (O, A, R). Ideale per{" "}
+            ritaglia lo STL. Ideale per{" "}
             <span className="font-medium">logo/testo</span>. Su foto/paesaggi può
             tagliare male.
           </p>
 
-          {v.cutoutEnabled && (
-            <p className="text-xs text-amber-700">
-              Cutout richiede{" "}
-              <span className="font-medium">spessore base ≥ 0.8 mm</span>. Se
-              imposti 0, verrà corretto automaticamente.
-            </p>
-          )}
+          <p className="text-xs text-slate-600">
+            Cutout richiede spessore base ≥{" "}
+            <span className="font-medium">0.8 mm</span>. Se imposti 0, verrà
+            corretto automaticamente.
+          </p>
         </div>
       )}
 
       <Separator />
 
+      {/* Profondità */}
       <div className="space-y-2">
         <Label>Profondità rilievo (mm): {v.depthMm.toFixed(1)}</Label>
         <Slider
@@ -189,12 +167,11 @@ export default function ReliefControls({
           min={0}
           max={20}
           step={0.1}
-          onValueChange={(arr) =>
-            set({ depthMm: clamp(arr[0] ?? 0, 0, 20) })
-          }
+          onValueChange={(arr) => set({ depthMm: clamp(arr[0] ?? 0, 0, 20) })}
         />
       </div>
 
+      {/* Base mm */}
       <div className="space-y-2">
         <Label>Spessore base (mm): {v.baseMm.toFixed(1)}</Label>
         <Slider
@@ -213,6 +190,7 @@ export default function ReliefControls({
 
       <Separator />
 
+      {/* Dettaglio */}
       <div className="space-y-2">
         <Label>Dettaglio: {v.detail.toFixed(2)}</Label>
         <Slider
@@ -225,6 +203,7 @@ export default function ReliefControls({
         />
       </div>
 
+      {/* Smussatura */}
       <div className="space-y-2">
         <Label>Smussatura: {v.smooth.toFixed(2)}</Label>
         <Slider
@@ -239,6 +218,7 @@ export default function ReliefControls({
 
       <Separator />
 
+      {/* Bordi arrotondati */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
           <Label>Bordi arrotondati</Label>
@@ -250,8 +230,10 @@ export default function ReliefControls({
             }
           />
         </div>
-
         <p className="text-xs text-slate-600">
           Attivo = bordi più morbidi. Disattivo = bordi più incisi (più “taglienti”).
         </p>
       </div>
+    </div>
+  );
+}
