@@ -202,15 +202,16 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   pushTri(xL, yy1, 0, xL, yy1, z1, xL, yy2, z2);
 
   // Left side
-  for (let iy = 0; iy < h - 1; iy++) {
-    const yy1 = y0 - iy * dy;
-    const yy2 = y0 - (iy + 1) * dy;
-    const z1 = zTop(normF32[idx(0, iy)] ?? 0);
-    const z2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
+for (let iy = 0; iy < h - 1; iy++) {
+  const y1 = y0 - iy * dy;
+  const y2 = y0 - (iy + 1) * dy;
+  const z1 = zTop(normF32[idx(0, iy)] ?? 0);
+  const z2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
 
-    pushTri(xL, yy1, 0, xL, yy1, z1, xL, yyyy2, z2);
-    pushTri(xL, yy1, 0, xL, yy2, z2, xL, yy2, 0);
-  }
+  pushTri(xL, y1, 0, xL, y1, z1, xL, y2, z2);
+  pushTri(xL, y1, 0, xL, y2, z2, xL, y2, 0);
+}
+
 
   // Right side
   for (let iy = 0; iy < h - 1; iy++) {
