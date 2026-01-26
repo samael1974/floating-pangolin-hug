@@ -186,21 +186,44 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
       </div>
 
       {/* Base mm */}
-      <div className="space-y-2">
+            <div className="space-y-2">
         <Label>Spessore base (mm): {v.baseMm.toFixed(1)}</Label>
-        <Slider
-          disabled={disabled}
-          value={[v.baseMm]}
-          min={0}
-          max={20}
-          step={0.1}
-          onValueChange={(arr) => set({ baseMm: clamp(arr[0] ?? 0, 0, 20) })}
-        />
-        <p className="text-xs text-slate-600">
-          Se imposti <span className="font-medium text-slate-700">0</span>,
-          ottieni solo il rilievo (senza basetta).
-        </p>
+
+        {(() => {
+          const cutoutLocksBase = v.baseStyle === "flat" && v.cutoutEnabled;
+          const minBase = cutoutLocksBase ? 0.8 : 0;
+
+          return (
+            <>
+              <Slider
+                disabled={disabled}
+                value={[v.baseMm]}
+                min={minBase}
+                max={20}
+                step={0.1}
+                onValueChange={(arr) => {
+                  const next = clamp(arr[0] ?? 0, minBase, 20);
+                  set({ baseMm: next });
+                }}
+              />
+
+              <p className="text-xs text-slate-600">
+                {cutoutLocksBase ? (
+                  <>
+                    Cutout richiede <span className="font-medium text-slate-700">spessore base ≥ 0.8 mm</span>.
+                    Lo spessore minimo viene applicato automaticamente.
+                  </>
+                ) : (
+                  <>
+                    Se imposti <span className="font-medium text-slate-700">0</span>, ottieni solo il rilievo (senza basetta).
+                  </>
+                )}
+              </p>
+            </>
+          );
+        })()}
       </div>
+
 
       <Separator />
 
