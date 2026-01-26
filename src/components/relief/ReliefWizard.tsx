@@ -347,20 +347,18 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
 
     const safe = (customName || "").trim().replace(/[\\/:*?"<>|]+/g, "_") || "reliefforge";
 
-    downloadReliefStlBinary({
-  hm: hmState,
-  stlWidthMm,
-  decimateStep,
-  depthMm: params.depthMm,
-  baseMm: params.baseMm,
-  outputMode: params.outputMode as any,
-  baseStyle: params.baseStyle as any,
-
+     downloadReliefStlBinary({
+    hm: hmState,
+    stlWidthMm,
+    decimateStep,
+   depthMm: params.depthMm,
+   baseMm: params.baseMm,
+      outputMode: params.outputMode,
+  baseStyle: params.baseStyle,
+  filename,
   cutoutEnabled: params.cutoutEnabled,
-  cutoutEnabled: params.cutoutEnabled,
-
-  filename: `${safe}.stl`,
 });
+
 
   }
 
