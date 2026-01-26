@@ -11,10 +11,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 
-import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
+import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
 
 // (Compat: se qualche file importava i tipi da qui)
-export type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
+export type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
 
 export type ProjectType =
   | "logo_text"
