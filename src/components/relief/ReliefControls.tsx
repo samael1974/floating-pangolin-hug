@@ -250,11 +250,8 @@ export default function ReliefControls({
             }
           />
         </div>
+
         <p className="text-xs text-slate-600">
-          Attivo = bordi più morbidi. Disattivo = bordi più incisi (più
-          “taglienti”).
+          Attivo = bordi più morbidi. Disattivo = bordi più incisi (più “taglienti”).
         </p>
       </div>
-    </div>
-  );
-}
