@@ -144,3 +144,4 @@ export function downloadTextFile(filename: string, text: string) {
 export function heightmapToAsciiStl(..._args: any[]) {
   throw new Error("Deprecated: usa downloadReliefStlBinary (STL binario).");
 }
+
