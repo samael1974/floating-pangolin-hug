@@ -347,17 +347,44 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
 
     const safe = (customName || "").trim().replace(/[\\/:*?"<>|]+/g, "_") || "reliefforge";
 
-    downloadReliefStlBinary({
-  hm: hmState,
-  stlWidthMm,
-  decimateStep,
-  depthMm: params.depthMm,
-  baseMm: params.baseMm,
-  outputMode: params.outputMode,
-  baseStyle: params.baseStyle,
-  cutoutEnabled: params.cutoutEnabled,
-});
+   try {
+  console.time("STL_DOWNLOAD_TOTAL");
 
+  if (!hmState) {
+    console.warn("STL: hmState assente");
+    alert("Heightmap non pronta (hmState assente).");
+    return;
+  }
+
+  console.log("STL: start", {
+    w: hmState.w,
+    h: hmState.h,
+    stlWidthMm,
+    decimateStep,
+    depthMm: params.depthMm,
+    baseMm: params.baseMm,
+    baseStyle: params.baseStyle,
+    cutoutEnabled: params.cutoutEnabled,
+  });
+
+  downloadReliefStlBinary({
+    hm: hmState,
+    stlWidthMm,
+    decimateStep,
+    depthMm: params.depthMm,
+    baseMm: params.baseMm,
+    outputMode: params.outputMode,
+    baseStyle: params.baseStyle,
+    cutoutEnabled: params.cutoutEnabled,
+    // NON passiamo cutoutThreshold (lo stai togliendo)
+  });
+
+  console.timeEnd("STL_DOWNLOAD_TOTAL");
+  console.log("STL: downloadReliefStlBinary returned (se non scarica è blocco browser/gesture).");
+} catch (e: any) {
+  console.error("STL: ERROR", e);
+  alert(`Errore export STL: ${e?.message ?? String(e)}`);
+}
 
   }
 
