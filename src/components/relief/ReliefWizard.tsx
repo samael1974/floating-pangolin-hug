@@ -367,7 +367,7 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
     cutoutEnabled: params.cutoutEnabled,
   });
 
-  const cutoutOn = !!params.cutoutEnabled && params.baseStyle === "flat";
+const cutoutOn = !!params.cutoutEnabled && params.baseStyle === "flat";
 
 // Base minima SOLO quando cutout è attivo (evita CSG su “foglio”)
 const baseForExport = cutoutOn ? Math.max(params.baseMm, 0.8) : params.baseMm;
@@ -380,7 +380,6 @@ downloadReliefStlBinary({
   baseMm: baseForExport,
   outputMode: params.outputMode,
   baseStyle: params.baseStyle,
-  filename, // se ce l’hai già definito sopra; altrimenti toglilo
   cutoutEnabled: cutoutOn,
 });
 
