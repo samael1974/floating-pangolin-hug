@@ -153,7 +153,7 @@ export async function downloadReliefStlBinary(
   });
 
   // (cutout MVP safe = no-op per ora)
-  geom = applyCutoutToFlatGeometry(geom, {});
+  geom = applyCutoutToFlatGeometry(geom);
 
   // sanity check positions
   const pos = geom.getAttribute("position") as THREE.BufferAttribute | undefined;
