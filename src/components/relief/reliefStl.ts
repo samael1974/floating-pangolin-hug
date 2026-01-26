@@ -85,6 +85,24 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
 
   const stl = geometryToBinaryStl(geom);
 
+  let finalGeom = geom;
+
+  // ✅ Cutout SOLO per base flat
+  if (opts.cutoutEnabled && baseStyle === "flat") {
+    finalGeom = applyCutoutToFlatGeometry({
+      geom,
+      hm: dm,
+      widthMm: stlWidthMm,
+      depthMm,
+      baseMm,
+      threshold: opts.cutoutThreshold ?? 0.18,
+    });
+  }
+
+  const stl = geometryToBinaryStl(finalGeom);
+
+  // sanity-check STL size
+  const pos = finalGeom.getAttribute("position");
 
 
   // sanity-check STL size
