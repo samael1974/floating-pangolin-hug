@@ -373,14 +373,12 @@ const cutoutOn = !!params.cutoutEnabled && params.baseStyle === "flat";
 const baseForExport = cutoutOn ? Math.max(params.baseMm, 0.8) : params.baseMm;
 
 downloadReliefStlBinary({
-  hm: hmState,
+  hm: hmDec,
   widthMm: stlWidthMm,
-  decimateStep,
-  depthMm: params.depthMm,
-  baseMm: baseForExport,
-  outputMode: params.outputMode,
-  baseStyle: params.baseStyle,
-  cutoutEnabled: cutoutOn,
+  depthMm,
+  baseMm,
+  outputMode,
+  baseStyle,
 });
 
   console.timeEnd("STL_DOWNLOAD_TOTAL");
