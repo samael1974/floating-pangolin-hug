@@ -137,20 +137,19 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     };
 
     // LEFT / RIGHT
-for (let iy = 0; iy < h - 1; iy++) {
-  const y1 = y0 - iy * dy;
-  const y2 = y0 - (iy + 1) * dy;
+    for (let iy = 0; iy < h - 1; iy++) {
+      const yy1 = y0 - iy * dy;
+      const yy2 = y0 - (iy + 1) * dy;
 
-  const zL1 = zTop(normF32[idx(0, iy)] ?? 0);
-  const zL2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
-  makeWall(x0, y1, zL1, x0, y2, zL2);
-
-  // Right (invertiamo per winding esterno coerente)
-  const zR1 = zTop(normF32[idx(w - 1, iy)] ?? 0);
-  const zR2 = zTop(normF32[idx(w - 1, iy + 1)] ?? 0);
-  makeWall(x0 + widthMm, y2, zR2, x0 + widthMm, y1, zR1);
-}
-
+      // left
+      makeWall(
+        xL,
+        yy1,
+        zTop(normF32[idx(0, iy)] ?? 0),
+        xL,
+        yy2,
+        zTop(normF32[idx(0, iy + 1)] ?? 0)
+      );
 
       // right (ordine invertito per winding esterno)
       makeWall(
