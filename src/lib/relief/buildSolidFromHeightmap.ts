@@ -1,3 +1,17 @@
+import * as THREE from "three";
+import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
+
+type BuildSolidArgs = {
+  normF32: Float32Array;
+  w: number;
+  h: number;
+  widthMm: number;
+  depthMm: number;
+  baseMm: number;
+  outputMode: OutputMode;
+  baseStyle: BaseStyle;
+};
+
 export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeometry {
   const { normF32, w, h, widthMm, depthMm, baseMm, outputMode, baseStyle } = args;
 
@@ -35,9 +49,15 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
 
   const verts: number[] = [];
   const pushTri = (
-    ax: number, ay: number, az: number,
-    bx: number, by: number, bz: number,
-    cx: number, cy: number, cz: number
+    ax: number,
+    ay: number,
+    az: number,
+    bx: number,
+    by: number,
+    bz: number,
+    cx: number,
+    cy: number,
+    cz: number
   ) => {
     verts.push(ax, ay, az, bx, by, bz, cx, cy, cz);
   };
@@ -90,10 +110,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     }
 
     // ---- PARETI LATERALI
-    const makeWall = (
-      x1: number, y1: number, zT1: number,
-      x2: number, y2: number, zT2: number
-    ) => {
+    const makeWall = (x1: number, y1: number, zT1: number, x2: number, y2: number, zT2: number) => {
       const zB1 = Math.min(0, zT1 - effBaseMm);
       const zB2 = Math.min(0, zT2 - effBaseMm);
       pushTri(x1, y1, zB1, x1, y1, zT1, x2, y2, zT2);
@@ -105,14 +122,16 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
       const y1 = y0 - iy * dy;
       const y2 = y0 - (iy + 1) * dy;
 
-      makeWall(
-        x0, y1, zTop(normF32[idx(0, iy)] ?? 0),
-        x0, y2, zTop(normF32[idx(0, iy + 1)] ?? 0)
-      );
+      makeWall(x0, y1, zTop(normF32[idx(0, iy)] ?? 0), x0, y2, zTop(normF32[idx(0, iy + 1)] ?? 0));
 
+      // invertiamo l'ordine per mantenere winding esterno coerente
       makeWall(
-        x0 + widthMm, y2, zTop(normF32[idx(w - 1, iy + 1)] ?? 0),
-        x0 + widthMm, y1, zTop(normF32[idx(w - 1, iy)] ?? 0)
+        x0 + widthMm,
+        y2,
+        zTop(normF32[idx(w - 1, iy + 1)] ?? 0),
+        x0 + widthMm,
+        y1,
+        zTop(normF32[idx(w - 1, iy)] ?? 0)
       );
     }
 
@@ -121,14 +140,16 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
       const x1 = x0 + ix * dx;
       const x2 = x0 + (ix + 1) * dx;
 
-      makeWall(
-        x1, y0, zTop(normF32[idx(ix, 0)] ?? 0),
-        x2, y0, zTop(normF32[idx(ix + 1, 0)] ?? 0)
-      );
+      makeWall(x1, y0, zTop(normF32[idx(ix, 0)] ?? 0), x2, y0, zTop(normF32[idx(ix + 1, 0)] ?? 0));
 
+      // invertiamo l'ordine per mantenere winding esterno coerente
       makeWall(
-        x2, y0 - heightMm, zTop(normF32[idx(ix + 1, h - 1)] ?? 0),
-        x1, y0 - heightMm, zTop(normF32[idx(ix, h - 1)] ?? 0)
+        x2,
+        y0 - heightMm,
+        zTop(normF32[idx(ix + 1, h - 1)] ?? 0),
+        x1,
+        y0 - heightMm,
+        zTop(normF32[idx(ix, h - 1)] ?? 0)
       );
     }
 
@@ -139,15 +160,56 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   }
 
   // =====================================================
-  // NON-OFFSET → BASE PIATTA CLASSICA
+  // NON-OFFSET → BASE PIATTA CLASSICA (come prima)
   // =====================================================
   const xL = x0;
   const xR = x0 + widthMm;
   const yT = y0;
   const yB = y0 - heightMm;
 
+  // BOTTOM (z=0) -> normali verso -Z
   pushTri(xL, yT, 0, xR, yB, 0, xR, yT, 0);
   pushTri(xL, yT, 0, xL, yB, 0, xR, yB, 0);
+
+  // Left side
+  for (let iy = 0; iy < h - 1; iy++) {
+    const y1 = y0 - iy * dy;
+    const y2 = y0 - (iy + 1) * dy;
+    const z1 = zTop(normF32[idx(0, iy)] ?? 0);
+    const z2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
+    pushTri(xL, y1, 0, xL, y1, z1, xL, y2, z2);
+    pushTri(xL, y1, 0, xL, y2, z2, xL, y2, 0);
+  }
+
+  // Right side
+  for (let iy = 0; iy < h - 1; iy++) {
+    const y1 = y0 - iy * dy;
+    const y2 = y0 - (iy + 1) * dy;
+    const z1 = zTop(normF32[idx(w - 1, iy)] ?? 0);
+    const z2 = zTop(normF32[idx(w - 1, iy + 1)] ?? 0);
+    pushTri(xR, y1, 0, xR, y2, z2, xR, y1, z1);
+    pushTri(xR, y1, 0, xR, y2, 0, xR, y2, z2);
+  }
+
+  // Top edge (yT)
+  for (let ix = 0; ix < w - 1; ix++) {
+    const x1 = x0 + ix * dx;
+    const x2 = x0 + (ix + 1) * dx;
+    const z1 = zTop(normF32[idx(ix, 0)] ?? 0);
+    const z2 = zTop(normF32[idx(ix + 1, 0)] ?? 0);
+    pushTri(x1, yT, 0, x2, yT, z2, x1, yT, z1);
+    pushTri(x1, yT, 0, x2, yT, 0, x2, yT, z2);
+  }
+
+  // Bottom edge (yB)
+  for (let ix = 0; ix < w - 1; ix++) {
+    const x1 = x0 + ix * dx;
+    const x2 = x0 + (ix + 1) * dx;
+    const z1 = zTop(normF32[idx(ix, h - 1)] ?? 0);
+    const z2 = zTop(normF32[idx(ix + 1, h - 1)] ?? 0);
+    pushTri(x1, yB, 0, x1, yB, z1, x2, yB, z2);
+    pushTri(x1, yB, 0, x2, yB, z2, x2, yB, 0);
+  }
 
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
