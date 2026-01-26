@@ -181,7 +181,7 @@ export default function ReliefWizard() {
         const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
         if (isPng) {
           try {
-            const head = new Uint8Array(await file.arrayBuffer());
+            const = new Uint8Array(await file.arrayBuffer());
             const info = inspectPng(head);
             const msg = pngCompatibilityMessage(info);
 
