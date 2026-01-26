@@ -212,7 +212,6 @@ for (let iy = 0; iy < h - 1; iy++) {
   pushTri(xL, y1, 0, xL, y2, z2, xL, y2, 0);
 }
 
-
   // Right side
   for (let iy = 0; iy < h - 1; iy++) {
     const yy1 = y0 - iy * dy;
