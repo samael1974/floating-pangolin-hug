@@ -96,11 +96,32 @@ function invertHmInPlace(hm: HeightmapState) {
 
 /** File-name safe */
 function safeFileName(name: string) {
-  return (name || "")
+  const s = (name || "")
     .trim()
     .replace(/[\\/:*?"<>|]+/g, "_")
     .replace(/\s+/g, "_")
     .slice(0, 64);
+  return s.length ? s : "reliefforge";
+}
+
+/** Decimazione heightmap (stesso concetto della preview) */
+function decimateHm(hm: HeightmapState, step: number): HeightmapState {
+  const s = Math.max(1, Math.floor(step || 1));
+  if (s === 1) return hm;
+
+  const w2 = Math.max(2, Math.floor(hm.w / s));
+  const h2 = Math.max(2, Math.floor(hm.h / s));
+  const out = new Float32Array(w2 * h2);
+
+  for (let y = 0; y < h2; y++) {
+    const sy = Math.min(hm.h - 1, y * s);
+    for (let x = 0; x < w2; x++) {
+      const sx = Math.min(hm.w - 1, x * s);
+      out[y * w2 + x] = hm.normF32[sy * hm.w + sx] ?? 0;
+    }
+  }
+
+  return { normF32: out, w: w2, h: h2 };
 }
 
 export default function ReliefWizard() {
@@ -124,7 +145,7 @@ export default function ReliefWizard() {
   // ✅ Nome file STL (personalizzabile)
   const [customName, setCustomName] = React.useState<string>("reliefforge");
 
-  // ✅ Params
+  // ✅ Params (SOLO campi validi di ReliefParams)
   const [params, setParams] = React.useState<ReliefParams>(() => ({
     projectType: "logo_text",
     depthMm: 3,
@@ -134,10 +155,6 @@ export default function ReliefWizard() {
     edge: "sharp",
     outputMode: "relief",
     baseStyle: "flat",
-    // se nel tuo ReliefParams questi campi non esistono, non importa: NON li usiamo in modo tipizzato
-    // e non rompono l'app (li gestiamo via (params as any) quando serve)
-    cutoutEnabled: false as any,
-    cutoutThreshold: 0.18 as any,
   }));
 
   // ✅ Heightmap state/status
@@ -185,7 +202,7 @@ export default function ReliefWizard() {
 
       setFileWarning(null);
 
-      // Se sono in depthmap e il file è PNG: controllo IHDR prima di decodificare
+      // Depthmap PNG compatibility check
       if (sourceMode === "depthmap") {
         const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
         if (isPng) {
@@ -205,7 +222,7 @@ export default function ReliefWizard() {
               return;
             }
           } catch {
-            // non bloccare: lascia che il decoder gestisca
+            // non bloccare
           }
         }
       }
@@ -214,12 +231,9 @@ export default function ReliefWizard() {
       const maxSize = 512;
 
       try {
-        // --------------------------
-        // DEPTHMAP MODE (PNG 8/16-bit + fallback canvas)
-        // --------------------------
+        // DEPTHMAP MODE
         if (sourceMode === "depthmap") {
           const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
-
           let hm: HeightmapState;
 
           if (isPng) {
@@ -238,9 +252,7 @@ export default function ReliefWizard() {
           return;
         }
 
-        // --------------------------
         // IMAGE MODE
-        // --------------------------
         const img = await loadImageFromFile(file);
         const iw = img.naturalWidth || img.width;
         const ih = img.naturalHeight || img.height;
@@ -357,29 +369,21 @@ export default function ReliefWizard() {
         return;
       }
 
-      const safe = safeFileName(customName) || "reliefforge";
+      const name = safeFileName(customName);
 
-      const args = {
+      // ✅ decimazione coerente con slider (export e preview allineati)
+      const hmForExport = decimateStep > 1 ? decimateHm(hmState, decimateStep) : hmState;
+
+      // ✅ FIRMA CORRETTA: oggetto con { hm: ... }
+      downloadReliefStlBinary({
+        hm: hmForExport,
         widthMm: stlWidthMm,
         depthMm: params.depthMm,
         baseMm: params.baseMm,
         outputMode: params.outputMode,
         baseStyle: params.baseStyle,
-        decimateStep,
-        fileName: `${safe}.stl`,
-        // cutout (se poi lo riattivi in reliefStl, i campi sono già pronti)
-        cutoutEnabled: !!(params as any).cutoutEnabled,
-        cutoutThreshold: Number((params as any).cutoutThreshold ?? 0.18),
-      };
-
-      const fn: any = downloadReliefStlBinary;
-
-      // ✅ auto-adatta firma: (hm, args) oppure ({hm, ...args})
-      if (typeof fn === "function" && fn.length >= 2) {
-        fn(hmState, args);
-      } else {
-        fn({ hm: hmState, ...args });
-      }
+        fileName: name, // senza .stl: ci pensa reliefStl.ts
+      });
     } catch (e: any) {
       console.error("STL: ERROR", e);
       alert(`Errore export STL: ${e?.message ?? String(e)}`);
@@ -749,15 +753,13 @@ export default function ReliefWizard() {
 
               <div className="h-[420px] lg:h-[520px]">
                 <ReliefPreview3D
-                  {...({
-                    hmState,
-                    stlWidthMm,
-                    decimateStep,
-                    depthMm: params.depthMm,
-                    baseMm: params.baseMm,
-                    outputMode: params.outputMode,
-                    baseStyle: params.baseStyle,
-                  } as any)}
+                  hmState={hmState}
+                  stlWidthMm={stlWidthMm}
+                  decimateStep={decimateStep}
+                  depthMm={params.depthMm}
+                  baseMm={params.baseMm}
+                  outputMode={params.outputMode}
+                  baseStyle={params.baseStyle}
                 />
               </div>
             </div>
