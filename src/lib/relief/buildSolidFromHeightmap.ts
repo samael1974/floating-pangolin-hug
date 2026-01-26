@@ -33,6 +33,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   const x0 = -widthMm / 2;
   const y0 = heightMm / 2;
 
+ HEAD
   const verts: number[] = [];
   const pushTri = (
     ax: number, ay: number, az: number,
@@ -49,6 +50,16 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   };
 
   // ---------- TOP Z (flat/recessed/mold) ----------
+
+  // ✅ bordi coerenti con la griglia
+  const xL = x0;
+  const xR = x0 + (w - 1) * dx;
+  const yT = y0;
+  const yB = y0 - (h - 1) * dy;
+
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+ 95f93e0df9e7d64c58f74a7e62a128e20290278f
   const zTop = (H: number) => {
     const h01 = clamp01(H);
 
@@ -65,9 +76,22 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     return baseMm + depthMm * h01;
   };
 
+ HEAD
+
+  const verts: number[] = [];
+  const pushTri = (
+    ax: number, ay: number, az: number,
+    bx: number, by: number, bz: number,
+    cx: number, cy: number, cz: number
+  ) => {
+    verts.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+  };
+
+ 95f93e0df9e7d64c58f74a7e62a128e20290278f
   // ==========================
   // OFFSET MODE (guscio + ring XY)
   // ==========================
+ HEAD
   if (baseStyle === "offset") {
     const t = Math.max(baseMm, 0.6);     // spessore guscio (min)
     const offXY = t;                     // ring in XY
@@ -99,17 +123,53 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     const zB = (ix: number, iy: number) => zBotGrid[idx(ix, iy)] + zShift;
 
     // --- TOP surface
+
+  for (let iy = 0; iy < h - 1; iy++) {
+    for (let ix = 0; ix < w - 1; ix++) {
+      const xA = x0 + ix * dx;
+      const yA = y0 - iy * dy;
+      const xB = x0 + (ix + 1) * dx;
+      const yBcell = yA;
+      const xC = xA;
+      const yC = y0 - (iy + 1) * dy;
+      const xD = xB;
+      const yD = yC;
+
+      const zA = zTop(normF32[idx(ix, iy)] ?? 0);
+      const zB = zTop(normF32[idx(ix + 1, iy)] ?? 0);
+      const zC = zTop(normF32[idx(ix, iy + 1)] ?? 0);
+      const zD = zTop(normF32[idx(ix + 1, iy + 1)] ?? 0);
+
+      pushTri(xA, yA, zA, xB, yBcell, zB, xD, yD, zD);
+      pushTri(xA, yA, zA, xD, yD, zD, xC, yC, zC);
+    }
+  }
+
+  // =====================================================
+  // OFFSET → bottom piatto + pareti (mesh chiusa)
+  // =====================================================
+  if (baseStyle === "offset") {
+    // base minima "fisica" quando usi offset
+    const effBaseMm = Math.max(baseMm, 0.8);
+
+    // BOTTOM surface (z=0)
+ 95f93e0df9e7d64c58f74a7e62a128e20290278f
     for (let iy = 0; iy < h - 1; iy++) {
       for (let ix = 0; ix < w - 1; ix++) {
         const xA = x0 + ix * dx;
         const yA = y0 - iy * dy;
         const xB = x0 + (ix + 1) * dx;
+ HEAD
         const yBv = yA;
+
+        const yBcell = yA;
+ 95f93e0df9e7d64c58f74a7e62a128e20290278f
         const xC = xA;
         const yC = y0 - (iy + 1) * dy;
         const xD = xB;
         const yD = yC;
 
+ HEAD
         const zA = zT(ix, iy);
         const zB1 = zT(ix + 1, iy);
         const zC1 = zT(ix, iy + 1);
@@ -149,6 +209,33 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     ) => {
       pushTri(x1, y1, zb1, x1, y1, zt1, x2, y2, zt2);
       pushTri(x1, y1, zb1, x2, y2, zt2, x2, y2, zb2);
+
+        // winding verso -Z
+        pushTri(xA, yA, 0, xD, yD, 0, xB, yBcell, 0);
+        pushTri(xA, yA, 0, xC, yC, 0, xD, yD, 0);
+      }
+    }
+
+    // walls: bottom=0, top=zTop(...)
+    const makeWall = (
+      x1: number, y1: number, zT1: number,
+      x2: number, y2: number, zT2: number,
+      flip: boolean
+    ) => {
+      // Se vuoi usare effBaseMm per “spingere sotto” in recessed/mold, fallo qui,
+      // ma NON staccarti dal fondo. Il fondo resta 0 per evitare fessure.
+      const b1 = 0;
+      const b2 = 0;
+
+      if (!flip) {
+        pushTri(x1, y1, b1, x1, y1, zT1, x2, y2, zT2);
+        pushTri(x1, y1, b1, x2, y2, zT2, x2, y2, b2);
+      } else {
+        // inverti winding
+        pushTri(x1, y1, b1, x2, y2, zT2, x1, y1, zT1);
+        pushTri(x1, y1, b1, x2, y2, b2, x2, y2, zT2);
+      }
+ 95f93e0df9e7d64c58f74a7e62a128e20290278f
     };
 
     const xL = x0, xR = x0 + widthMm;
@@ -156,6 +243,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
 
     // left
     for (let iy = 0; iy < h - 1; iy++) {
+ HEAD
       const yy1 = y0 - iy * dy;
       const yy2 = y0 - (iy + 1) * dy;
       wall(xL, yy1, zT(0, iy), zB(0, iy), xL, yy2, zT(0, iy + 1), zB(0, iy + 1));
@@ -171,6 +259,32 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
       const xx1 = x0 + ix * dx;
       const xx2 = x0 + (ix + 1) * dx;
       wall(xx1, yT0, zT(ix, 0), zB(ix, 0), xx2, yT0, zT(ix + 1, 0), zB(ix + 1, 0));
+
+      const y1 = y0 - iy * dy;
+      const y2 = y0 - (iy + 1) * dy;
+
+      const zL1 = zTop(normF32[idx(0, iy)] ?? 0);
+      const zL2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
+      makeWall(xL, y1, zL1, xL, y2, zL2, false);
+
+      const zR1 = zTop(normF32[idx(w - 1, iy)] ?? 0);
+      const zR2 = zTop(normF32[idx(w - 1, iy + 1)] ?? 0);
+      makeWall(xR, y1, zR1, xR, y2, zR2, true);
+    }
+
+    // TOP / BOTTOM edges
+    for (let ix = 0; ix < w - 1; ix++) {
+      const x1 = x0 + ix * dx;
+      const x2 = x0 + (ix + 1) * dx;
+
+      const zT1 = zTop(normF32[idx(ix, 0)] ?? 0);
+      const zT2 = zTop(normF32[idx(ix + 1, 0)] ?? 0);
+      makeWall(x1, yT, zT1, x2, yT, zT2, false);
+
+      const zB1 = zTop(normF32[idx(ix, h - 1)] ?? 0);
+      const zB2 = zTop(normF32[idx(ix + 1, h - 1)] ?? 0);
+      makeWall(x1, yB, zB1, x2, yB, zB2, true);
+ 95f93e0df9e7d64c58f74a7e62a128e20290278f
     }
     // bottom (invertito)
     for (let ix = 0; ix < w - 1; ix++) {
@@ -205,6 +319,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     return g;
   }
 
+ HEAD
   // ==========================
   // NON-OFFSET → base piatta classica
   // ==========================
@@ -236,6 +351,13 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   }
 
   // BOTTOM (z=0)
+=======
+  // =====================================================
+  // NON-OFFSET → base classica chiusa (bottom + 4 lati)
+  // =====================================================
+
+  // BOTTOM rectangle (z=0), winding verso -Z
+ 95f93e0df9e7d64c58f74a7e62a128e20290278f
   pushTri(xL, yT, 0, xR, yB, 0, xR, yT, 0);
   pushTri(xL, yT, 0, xL, yB, 0, xR, yB, 0);
 
@@ -245,6 +367,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     const y2 = y0 - (iy + 1) * dy;
     const z1 = zTop(normF32[idx(0, iy)] ?? 0);
     const z2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
+
     pushTri(xL, y1, 0, xL, y1, z1, xL, y2, z2);
     pushTri(xL, y1, 0, xL, y2, z2, xL, y2, 0);
   }
@@ -255,26 +378,37 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     const y2 = y0 - (iy + 1) * dy;
     const z1 = zTop(normF32[idx(w - 1, iy)] ?? 0);
     const z2 = zTop(normF32[idx(w - 1, iy + 1)] ?? 0);
+
     pushTri(xR, y1, 0, xR, y2, z2, xR, y1, z1);
     pushTri(xR, y1, 0, xR, y2, 0, xR, y2, z2);
   }
 
+ HEAD
   // top edge
+
+  // Top edge
+ 95f93e0df9e7d64c58f74a7e62a128e20290278f
   for (let ix = 0; ix < w - 1; ix++) {
     const x1 = x0 + ix * dx;
     const x2 = x0 + (ix + 1) * dx;
     const z1 = zTop(normF32[idx(ix, 0)] ?? 0);
     const z2 = zTop(normF32[idx(ix + 1, 0)] ?? 0);
+
     pushTri(x1, yT, 0, x2, yT, z2, x1, yT, z1);
     pushTri(x1, yT, 0, x2, yT, 0, x2, yT, z2);
   }
 
+ HEAD
   // bottom edge
+
+  // Bottom edge
+ 95f93e0df9e7d64c58f74a7e62a128e20290278f
   for (let ix = 0; ix < w - 1; ix++) {
     const x1 = x0 + ix * dx;
     const x2 = x0 + (ix + 1) * dx;
     const z1 = zTop(normF32[idx(ix, h - 1)] ?? 0);
     const z2 = zTop(normF32[idx(ix + 1, h - 1)] ?? 0);
+
     pushTri(x1, yB, 0, x1, yB, z1, x2, yB, z2);
     pushTri(x1, yB, 0, x2, yB, z2, x2, yB, 0);
   }

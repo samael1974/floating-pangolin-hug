@@ -116,15 +116,19 @@ export default function ReliefWizard() {
 
   // ✅ Params
   const [params, setParams] = React.useState<ReliefParams>(() => ({
-    projectType: "logo_text",
-    depthMm: 3,
-    baseMm: 2,
-    detail: 0.55,
-    smooth: 0.15,
-    edge: "sharp",
-    outputMode: "relief",
-    baseStyle: "flat",
-  }));
+  projectType: "logo_text",
+  depthMm: 3,
+  baseMm: 2,
+  detail: 0.55,
+  smooth: 0.15,
+  edge: "sharp",
+  outputMode: "relief",
+  baseStyle: "flat",
+
+  // ✅ CUTOUT
+  cutoutEnabled: false,
+  cutoutThreshold: 0.18,
+}));
 
   // ✅ Heightmap state/status
   const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
@@ -343,16 +347,49 @@ Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità I
 
     const safe = (customName || "").trim().replace(/[\\/:*?"<>|]+/g, "_") || "reliefforge";
 
-    downloadReliefStlBinary({
-      hm: hmState,
-      stlWidthMm,
-      decimateStep,
-      depthMm: params.depthMm,
-      baseMm: params.baseMm,
-      outputMode: params.outputMode as any,
-      baseStyle: params.baseStyle as any,
-      filename: `${safe}.stl`,
-    });
+   try {
+  console.time("STL_DOWNLOAD_TOTAL");
+
+  if (!hmState) {
+    console.warn("STL: hmState assente");
+    alert("Heightmap non pronta (hmState assente).");
+    return;
+  }
+
+  console.log("STL: start", {
+    w: hmState.w,
+    h: hmState.h,
+    stlWidthMm,
+    decimateStep,
+    depthMm: params.depthMm,
+    baseMm: params.baseMm,
+    baseStyle: params.baseStyle,
+    cutoutEnabled: params.cutoutEnabled,
+  });
+
+const cutoutOn = !!params.cutoutEnabled && params.baseStyle === "flat";
+
+// Base minima SOLO quando cutout è attivo (evita CSG su “foglio”)
+const baseForExport = cutoutOn ? Math.max(params.baseMm, 0.8) : params.baseMm;
+
+downloadReliefStlBinary({
+  hm: hmState,
+  stlWidthMm,
+  decimateStep,
+  depthMm: params.depthMm,
+  baseMm: baseForExport,
+  outputMode: params.outputMode,
+  baseStyle: params.baseStyle,
+  cutoutEnabled: cutoutOn,
+});
+
+  console.timeEnd("STL_DOWNLOAD_TOTAL");
+  console.log("STL: downloadReliefStlBinary returned (se non scarica è blocco browser/gesture).");
+} catch (e: any) {
+  console.error("STL: ERROR", e);
+  alert(`Errore export STL: ${e?.message ?? String(e)}`);
+}
+
   }
 
   const openInstructions = React.useCallback(() => {

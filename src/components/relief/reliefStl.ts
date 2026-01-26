@@ -1,6 +1,11 @@
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
 import { geometryToBinaryStl } from "@/lib/stl/binaryStl";
+ HEAD
 import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
+
+import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
+import { applyCutoutToFlatGeometry } from "@/lib/relief/cutout";
+ 95f93e0df9e7d64c58f74a7e62a128e20290278f
 
 export type HeightmapState = { normF32: Float32Array; w: number; h: number };
 
@@ -12,7 +17,10 @@ type DownloadOpts = {
   baseMm: number;
   outputMode: OutputMode;
   baseStyle: BaseStyle;
-  filename?: string; // es. "miofile.stl"
+  filename?: string;
+
+  // ✅ CUTOUT
+  cutoutEnabled?: boolean;
 };
 
 function downloadArrayBuffer(buffer: ArrayBuffer, filename: string) {
@@ -59,14 +67,18 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
     outputMode,
     baseStyle,
     filename,
+    cutoutEnabled = false,
   } = opts;
 
   if (hm.normF32.length !== hm.w * hm.h) {
     throw new Error("Heightmap mismatch: normF32 length != w*h");
   }
 
+  // 1) decimazione (quella dello slider Qualità)
   const dm = decimateHeightmap(hm, decimateStep);
 
+  // 2) build solido
+  console.time("A_buildSolidFromHeightmap");
   const geom = buildSolidFromHeightmap({
     normF32: dm.normF32,
     w: dm.w,
@@ -77,11 +89,55 @@ export function downloadReliefStlBinary(opts: DownloadOpts) {
     outputMode,
     baseStyle,
   });
+  console.timeEnd("A_buildSolidFromHeightmap");
 
-  const stl = geometryToBinaryStl(geom);
+  let finalGeom = geom;
+
+  // 3) cutout (SOLO base flat)
+  const cutoutRequested = cutoutEnabled && baseStyle === "flat";
+
+  // STRADA A: se troppo grande, lo disattiviamo (e lo diciamo)
+  const maxCutoutPixels = 320 * 320; // 102.400 px circa: cutout parte anche con 256x256
+  const pixels = dm.w * dm.h;
+
+  // base minima “fisica” per CSG stabile
+  const minBaseForCutout = 0.8;
+
+  if (cutoutRequested) {
+    if (pixels > maxCutoutPixels) {
+      alert(
+        `Cutout disattivato automaticamente: risoluzione troppo alta (${dm.w}×${dm.h}).\n` +
+          `Aumenta la decimazione (Qualità più bassa → x3/x4) e riprova.`
+      );
+    } else {
+      try {
+        const baseForCut = Math.max(baseMm, minBaseForCutout);
+
+        console.time("B_applyCutoutToFlatGeometry");
+        finalGeom = applyCutoutToFlatGeometry({
+          geom,
+          hm: dm,
+          widthMm: stlWidthMm,
+          depthMm,
+          baseMm: baseForCut,
+          threshold: 0.18, // fisso (come volevi tu: niente slider soglia)
+        });
+        console.timeEnd("B_applyCutoutToFlatGeometry");
+      } catch (e: any) {
+        console.error("CUTOUT ERROR", e);
+        alert(`Errore Cutout: ${e?.message ?? String(e)}\nProcedo senza cutout.`);
+        finalGeom = geom;
+      }
+    }
+  }
+
+  // 4) export STL
+  console.time("C_geometryToBinaryStl");
+  const stl = geometryToBinaryStl(finalGeom);
+  console.timeEnd("C_geometryToBinaryStl");
 
   // sanity-check STL size
-  const pos = geom.getAttribute("position");
+  const pos = finalGeom.getAttribute("position");
   if (!pos) throw new Error("STL: geometry has no position attribute");
   const triCount = pos.count / 3;
   const expected = 84 + 50 * triCount;

@@ -37,6 +37,9 @@ export type ReliefParams = {
   outputMode: OutputMode;
 
   baseStyle: BaseStyle;
+
+  // ✅ CUTOUT (solo baseStyle="flat")
+  cutoutEnabled: boolean;
 };
 
 type Props = {
@@ -58,6 +61,9 @@ const DEFAULTS: ReliefParams = {
   edge: "round",
   outputMode: "relief", // ✅ fisso
   baseStyle: "flat",
+
+  // ✅ CUTOUT default OFF
+  cutoutEnabled: false,
 };
 
 export default function ReliefControls({ value, onChange, disabled }: Props) {
@@ -68,7 +74,8 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
 
   return (
     <div className="space-y-4">
-            <div className="space-y-2">
+      {/* Tipo progetto */}
+      <div className="space-y-2">
         <Label>Tipo progetto</Label>
         <Select
           disabled={disabled}
@@ -82,20 +89,27 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
             <SelectItem value="logo_text">Logo / Testo (bordi netti)</SelectItem>
             <SelectItem value="human_face">Volto umano (sfumature)</SelectItem>
             <SelectItem value="animal">Animale (texture)</SelectItem>
-            <SelectItem value="nature_landscape">Natura / Paesaggio (profondità)</SelectItem>
-            <SelectItem value="decorative_pattern">Pattern decorativo (ripetizione)</SelectItem>
+            <SelectItem value="nature_landscape">
+              Natura / Paesaggio (profondità)
+            </SelectItem>
+            <SelectItem value="decorative_pattern">
+              Pattern decorativo (ripetizione)
+            </SelectItem>
           </SelectContent>
         </Select>
 
         <p className="text-xs text-slate-600">
           Suggerimento:{" "}
-          <span className="font-medium text-slate-700">Logo/Testo</span> aumenta contrasto e bordi;{" "}
-          <span className="font-medium text-slate-700">Volto</span> mantiene sfumature e volumi.
+          <span className="font-medium text-slate-700">Logo/Testo</span> aumenta
+          contrasto e bordi;{" "}
+          <span className="font-medium text-slate-700">Volto</span> mantiene
+          sfumature e volumi.
         </p>
       </div>
 
       <Separator />
 
+      {/* Base style */}
       <div className="space-y-2">
         <Label>Base</Label>
         <Select
@@ -114,8 +128,51 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
         </Select>
       </div>
 
+      {/* ✅ Cutout (solo base flat) */}
+      {v.baseStyle === "flat" && (
+        <div className="space-y-3 rounded-md border bg-slate-50 p-3">
+          <div className="flex items-center justify-between">
+            <Label>Oggetto scontornato (Cutout)</Label>
+            <Switch
+  disabled={disabled}
+  checked={v.cutoutEnabled}
+  onCheckedChange={(checked) => {
+    // Cutout richiede base minima per evitare geometrie degeneri / CSG instabile
+    if (checked) {
+      const minBase = 0.8;
+      set({
+        cutoutEnabled: true,
+        baseMm: Math.max(v.baseMm ?? 0, minBase),
+        // (opzionale ma consigliato) forziamo flat, perché cutout è definito solo lì
+        baseStyle: "flat",
+      });
+    } else {
+      set({ cutoutEnabled: false });
+    }
+  }}
+/>
+
+          </div>
+
+          <p className="text-xs text-slate-600">
+            Ricava il contorno dalla{" "}
+            <span className="font-medium">heightmap</span> (non dall’immagine) e
+            ritaglia lo STL. Ideale per{" "}
+            <span className="font-medium">logo/testo</span>. Su foto/paesaggi può
+            tagliare male.
+          </p>
+
+          <p className="text-xs text-slate-600">
+            Cutout richiede spessore base ≥{" "}
+            <span className="font-medium">0.8 mm</span>. Se imposti 0, verrà
+            corretto automaticamente.
+          </p>
+        </div>
+      )}
+
       <Separator />
 
+      {/* Profondità */}
       <div className="space-y-2">
         <Label>Profondità rilievo (mm): {v.depthMm.toFixed(1)}</Label>
         <Slider
@@ -128,23 +185,49 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
         />
       </div>
 
+      {/* Base mm */}
             <div className="space-y-2">
         <Label>Spessore base (mm): {v.baseMm.toFixed(1)}</Label>
-        <Slider
-          disabled={disabled}
-          value={[v.baseMm]}
-          min={0}
-          max={20}
-          step={0.1}
-          onValueChange={(arr) => set({ baseMm: clamp(arr[0] ?? 0, 0, 20) })}
-        />
-        <p className="text-xs text-slate-600">
-          Se imposti <span className="font-medium text-slate-700">0</span>, ottieni solo il rilievo (senza basetta).
-        </p>
+
+        {(() => {
+          const cutoutLocksBase = v.baseStyle === "flat" && v.cutoutEnabled;
+          const minBase = cutoutLocksBase ? 0.8 : 0;
+
+          return (
+            <>
+              <Slider
+                disabled={disabled}
+                value={[v.baseMm]}
+                min={minBase}
+                max={20}
+                step={0.1}
+                onValueChange={(arr) => {
+                  const next = clamp(arr[0] ?? 0, minBase, 20);
+                  set({ baseMm: next });
+                }}
+              />
+
+              <p className="text-xs text-slate-600">
+                {cutoutLocksBase ? (
+                  <>
+                    Cutout richiede <span className="font-medium text-slate-700">spessore base ≥ 0.8 mm</span>.
+                    Lo spessore minimo viene applicato automaticamente.
+                  </>
+                ) : (
+                  <>
+                    Se imposti <span className="font-medium text-slate-700">0</span>, ottieni solo il rilievo (senza basetta).
+                  </>
+                )}
+              </p>
+            </>
+          );
+        })()}
       </div>
+
 
       <Separator />
 
+      {/* Dettaglio */}
       <div className="space-y-2">
         <Label>Dettaglio: {v.detail.toFixed(2)}</Label>
         <Slider
@@ -157,6 +240,7 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
         />
       </div>
 
+      {/* Smussatura */}
       <div className="space-y-2">
         <Label>Smussatura: {v.smooth.toFixed(2)}</Label>
         <Slider
@@ -171,13 +255,16 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
 
       <Separator />
 
-            <div className="space-y-1">
+      {/* Bordi arrotondati */}
+      <div className="space-y-1">
         <div className="flex items-center justify-between">
           <Label>Bordi arrotondati</Label>
           <Switch
             disabled={disabled}
             checked={v.edge === "round"}
-            onCheckedChange={(checked) => set({ edge: checked ? "round" : "sharp" })}
+            onCheckedChange={(checked) =>
+              set({ edge: checked ? "round" : "sharp" })
+            }
           />
         </div>
         <p className="text-xs text-slate-600">
