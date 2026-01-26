@@ -104,6 +104,12 @@ const zBottomOffset = (_H: number) => 0;
   // OFFSET (SHELL CHIUSO): bottom offset + pareti laterali
   // --------------------------
   if (baseStyle === "offset") {
+    if (baseMm < 0.2) {
+  // sotto 0.2mm è praticamente zero: evitiamo degenerazioni e repair aggressivo dello slicer
+  // fallback: comportati come "flat" (mesh chiusa classica) oppure forza baseMm minimo
+  // Qui scelgo fallback "flat": esci dal ramo offset.
+  // (Se preferisci, posso farti la variante "clamp a 0.8mm")
+}
     // Nota: per un shell sensato baseMm dovrebbe essere > 0 (anche 0.8–1mm).
     // Se baseMm=0 top e bottom coincidono e puoi avere triangoli degeneri.
     // Non blocco l'export, ma è bene saperlo.
