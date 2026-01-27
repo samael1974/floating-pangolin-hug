@@ -91,11 +91,11 @@ function normalFromHeightmap(
  *
  * Base styles:
  * - flat:     bottom plane z=0, top z=base + depth*H
- * - recessed: bottom plane z=0, top z=max(0, base - depth*H)  (carved down from a slab)
+ * - recessed: bottom plane z=0, top z=max(0, base - depth*H)
  * - offset:   "solidify": bottom is top moved inward along local normal by baseMm (shell)
  *
- * Output is centered in XY around (0,0). Z is not forced to be >=0 here:
- * preview/STL can translate to put minZ=0 if desired.
+ * Note: offset-along-normal è concettualmente un “solidify”; su geometrie molto ripide può auto-intersecarsi
+ * (fenomeno noto per gli offset di superfici). :contentReference[oaicite:1]{index=1}
  */
 export function buildSolidFromHeightmap(
   input: BuildSolidFromHeightmapInput
@@ -122,12 +122,22 @@ export function buildSolidFromHeightmap(
   // Requested: disallow base thickness < 0.4mm
   const base = Math.max(minBaseMm, baseMm);
 
-  // Maintain aspect ratio using segment counts (w-1, h-1), not raw pixels
+  // Maintain aspect ratio using segment counts (w-1, h-1)
   const outHeightMm = outWidthMm * ((h - 1) / (w - 1));
 
   // Grid spacing in mm
   const dxMm = outWidthMm / (w - 1);
   const dyMm = outHeightMm / (h - 1);
+
+  // IMPORTANT FIX:
+  // Precompute processed heights (clamp + invert) so normals/offset match the TOP surface.
+  const H = new Float32Array(w * h);
+  for (let i = 0; i < H.length; i++) {
+    let v = height01[i];
+    if (clampHeights) v = clamp01(v);
+    if (invert) v = 1 - v;
+    H[i] = v;
+  }
 
   // Top grid: w*h, Bottom grid: w*h  => 2*w*h vertices
   const vCount = 2 * w * h;
@@ -140,24 +150,17 @@ export function buildSolidFromHeightmap(
     verts[o + 2] = z;
   };
 
-  // Centered coords for nicer preview (and consistent UX)
+  // Centered coords for nicer preview
   const xStart = -outWidthMm / 2;
   const yStart = -outHeightMm / 2;
 
-  const getH01 = (i: number) => {
-    let v = height01[i];
-    if (clampHeights) v = clamp01(v);
-    if (invert) v = 1 - v;
-    return v;
-  };
-
-  // Fill vertices
   const bottomOffset = w * h;
 
+  // Fill vertices
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = idxOf(x, y, w);
-      const v01 = getH01(i);
+      const v01 = H[i];
 
       const px = xStart + x * dxMm;
       const py = yStart + y * dyMm;
@@ -173,7 +176,7 @@ export function buildSolidFromHeightmap(
         zTop = base - depthMm * v01;
         if (zTop < 0) zTop = 0;
       } else {
-        // offset: top is pure relief (no fake translation)
+        // offset: top is pure relief (NO vertical translation)
         zTop = depthMm * v01;
       }
 
@@ -181,9 +184,8 @@ export function buildSolidFromHeightmap(
 
       // --- bottom vertex ---
       if (baseStyle === "offset") {
-        // CAD-like: move inward along local normal (solidify)
-        const n = normalFromHeightmap(height01, w, h, x, y, depthMm, dxMm, dyMm);
-        // inward = subtract outward normal
+        // "solidify" inward along local normal
+        const n = normalFromHeightmap(H, w, h, x, y, depthMm, dxMm, dyMm);
         const bx = px - n.nx * base;
         const by = py - n.ny * base;
         const bz = zTop - n.nz * base;
@@ -234,7 +236,7 @@ export function buildSolidFromHeightmap(
     }
   }
 
-  // SIDES: connect perimeter (top->bottom), consistent outward winding
+  // SIDES: connect perimeter
 
   // Left edge (x=0) outward ~ -X
   for (let y = 0; y < h - 1; y++) {
