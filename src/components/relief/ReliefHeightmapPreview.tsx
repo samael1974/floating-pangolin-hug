@@ -108,6 +108,9 @@ export default function ReliefHeightmapPreview({
       });
 
       const geom = outSolid.geometry;
+      geom.rotateZ(Math.PI);
+      geom.computeVertexNormals();
+
 
       // centra XY e appoggia Z a 0 (stabile per preview)
       geom.computeBoundingBox();
