@@ -163,7 +163,9 @@ export function buildSolidFromHeightmap(
       const v01 = H[i];
 
       const px = xStart + x * dxMm;
-      const py = yStart + y * dyMm;
+// invert Y so relief matches original image orientation
+const py = -(yStart + y * dyMm);
+
 
       const topIndex = i;
       const botIndex = bottomOffset + i;
