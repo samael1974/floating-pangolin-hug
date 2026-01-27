@@ -69,214 +69,152 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   // OFFSET MODE (guscio + ring XY)
   // ==========================
   if (baseStyle === "offset") {
-    const t = Math.max(baseMm, 0.6);     // spessore guscio (min)
-    const offXY = t;                     // ring in XY
+  const t = Math.max(baseMm, 0.6);     // spessore guscio (min)
+  const offXY = t;                     // cornice in XY
 
-    // In offset vogliamo TOP da 0..depthMm (no base aggiunta)
-    const zTopOffset = (H: number) => {
-      const h01 = clamp01(H);
-      if (outputMode === "mold") return depthMm * (1 - h01);
-      return depthMm * h01;
-    };
+  const zTopOffset = (H: number) => {
+    const h01 = clamp01(H);
+    if (outputMode === "mold") return depthMm * (1 - h01);
+    return depthMm * h01;
+  };
 
-    const zTopGrid = new Float32Array(w * h);
-    const zBotGrid = new Float32Array(w * h);
+  const zTopGrid = new Float32Array(w * h);
+  const zBotGrid = new Float32Array(w * h);
 
-    let minZ = Number.POSITIVE_INFINITY;
-    for (let iy = 0; iy < h; iy++) {
-      for (let ix = 0; ix < w; ix++) {
-        const zt = zTopOffset(normF32[idx(ix, iy)] ?? 0);
-        const zb = zt - t;
-        zTopGrid[idx(ix, iy)] = zt;
-        zBotGrid[idx(ix, iy)] = zb;
-        if (zb < minZ) minZ = zb;
-      }
+  let minZ = Number.POSITIVE_INFINITY;
+  for (let iy = 0; iy < h; iy++) {
+    for (let ix = 0; ix < w; ix++) {
+      const zt = zTopOffset(normF32[idx(ix, iy)] ?? 0);
+      const zb = zt - t;
+      zTopGrid[idx(ix, iy)] = zt;
+      zBotGrid[idx(ix, iy)] = zb;
+      if (zb < minZ) minZ = zb;
     }
-
-    const zShift = -minZ; // porta min(bottom)=0
-
-    const zT = (ix: number, iy: number) => zTopGrid[idx(ix, iy)] + zShift;
-    const zB = (ix: number, iy: number) => zBotGrid[idx(ix, iy)] + zShift;
-
-    // --- TOP surface
-    for (let iy = 0; iy < h - 1; iy++) {
-      for (let ix = 0; ix < w - 1; ix++) {
-        const xA = x0 + ix * dx;
-        const yA = y0 - iy * dy;
-        const xB = x0 + (ix + 1) * dx;
-        const yBv = yA;
-        const xC = xA;
-        const yC = y0 - (iy + 1) * dy;
-        const xD = xB;
-        const yD = yC;
-
-        const zA = zT(ix, iy);
-        const zB1 = zT(ix + 1, iy);
-        const zC1 = zT(ix, iy + 1);
-        const zD1 = zT(ix + 1, iy + 1);
-
-        pushTri(xA, yA, zA, xB, yBv, zB1, xD, yD, zD1);
-        pushTri(xA, yA, zA, xD, yD, zD1, xC, yC, zC1);
-      }
-    }
-
-    // --- BOTTOM surface (winding invertito)
-    for (let iy = 0; iy < h - 1; iy++) {
-      for (let ix = 0; ix < w - 1; ix++) {
-        const xA = x0 + ix * dx;
-        const yA = y0 - iy * dy;
-        const xB = x0 + (ix + 1) * dx;
-        const yBv = yA;
-        const xC = xA;
-        const yC = y0 - (iy + 1) * dy;
-        const xD = xB;
-        const yD = yC;
-
-        const zA = zB(ix, iy);
-        const zB1 = zB(ix + 1, iy);
-        const zC1 = zB(ix, iy + 1);
-        const zD1 = zB(ix + 1, iy + 1);
-
-        pushTri(xA, yA, zA, xD, yD, zD1, xB, yBv, zB1);
-        pushTri(xA, yA, zA, xC, yC, zC1, xD, yD, zD1);
-      }
-    }
-
-    // --- Side walls between top and bottom (perimetro rettangolare della griglia)
-    const wall = (
-      x1: number, y1: number, zt1: number, zb1: number,
-      x2: number, y2: number, zt2: number, zb2: number
-    ) => {
-      pushTri(x1, y1, zb1, x1, y1, zt1, x2, y2, zt2);
-      pushTri(x1, y1, zb1, x2, y2, zt2, x2, y2, zb2);
-    };
-
-    const xL = x0, xR = x0 + widthMm;
-    const yT0 = y0, yB0 = y0 - heightMm;
-
-    // left
-    for (let iy = 0; iy < h - 1; iy++) {
-      const yy1 = y0 - iy * dy;
-      const yy2 = y0 - (iy + 1) * dy;
-      wall(xL, yy1, zT(0, iy), zB(0, iy), xL, yy2, zT(0, iy + 1), zB(0, iy + 1));
-    }
-    // right (invertito)
-    for (let iy = 0; iy < h - 1; iy++) {
-      const yy1 = y0 - iy * dy;
-      const yy2 = y0 - (iy + 1) * dy;
-      wall(xR, yy2, zT(w - 1, iy + 1), zB(w - 1, iy + 1), xR, yy1, zT(w - 1, iy), zB(w - 1, iy));
-    }
-    // top
-    for (let ix = 0; ix < w - 1; ix++) {
-      const xx1 = x0 + ix * dx;
-      const xx2 = x0 + (ix + 1) * dx;
-      wall(xx1, yT0, zT(ix, 0), zB(ix, 0), xx2, yT0, zT(ix + 1, 0), zB(ix + 1, 0));
-    }
-    // bottom (invertito)
-    for (let ix = 0; ix < w - 1; ix++) {
-      const xx1 = x0 + ix * dx;
-      const xx2 = x0 + (ix + 1) * dx;
-      wall(xx2, yB0, zT(ix + 1, h - 1), zB(ix + 1, h - 1), xx1, yB0, zT(ix, h - 1), zB(ix, h - 1));
-    }
-
-    // --- Ring XY a Z=0 (rettangolo esterno e “ponte” verso il perimetro interno)
-    const xL1 = xL - offXY;
-    const xR1 = xR + offXY;
-    const yT1 = yT0 + offXY;
-    const yB1 = yB0 - offXY;
-
-    // ring: 4 bande (8 triangoli)
-    // top band
-    pushTri(xL1, yT1, 0, xR1, yT1, 0, xR, yT0, 0);
-    pushTri(xL1, yT1, 0, xR, yT0, 0, xL, yT0, 0);
-    // bottom band
-    pushTri(xL, yB0, 0, xR, yB0, 0, xR1, yB1, 0);
-    pushTri(xL, yB0, 0, xR1, yB1, 0, xL1, yB1, 0);
-    // left band
-    pushTri(xL1, yB1, 0, xL1, yT1, 0, xL, yT0, 0);
-    pushTri(xL1, yB1, 0, xL, yT0, 0, xL, yB0, 0);
-    // right band
-    pushTri(xR, yT0, 0, xR1, yT1, 0, xR1, yB1, 0);
-    pushTri(xR, yT0, 0, xR1, yB1, 0, xR, yB0, 0);
-
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-    g.computeVertexNormals();
-    return g;
   }
 
-  // ==========================
-  // NON-OFFSET → base piatta classica
-  // ==========================
+  const zShift = -minZ; // porta min(bottom)=0 (tipicamente = t)
+  const zT = (ix: number, iy: number) => zTopGrid[idx(ix, iy)] + zShift;
+  const zB = (ix: number, iy: number) => zBotGrid[idx(ix, iy)] + zShift;
+
+  // ---------------------------
+  // Griglia allargata (w+2, h+2)
+  // - bordo esterno: top = t, bottom = 0
+  // - interno: top = zT, bottom = zB
+  // ---------------------------
+  const w2 = w + 2;
+  const h2 = h + 2;
+
+  const xG = new Float32Array(w2);
+  const yG = new Float32Array(h2);
+
+  // x0..x0+(w-1)*dx è la griglia interna
   const xL = x0;
-  const xR = x0 + widthMm;
-  const yT = y0;
-  const yB = y0 - heightMm;
+  const xR = x0 + (w - 1) * dx;
+  const yT0 = y0;
+  const yB0 = y0 - (h - 1) * dy;
 
-  // TOP surface (flat/recessed/mold)
-  for (let iy = 0; iy < h - 1; iy++) {
-    for (let ix = 0; ix < w - 1; ix++) {
-      const xA = x0 + ix * dx;
-      const yA = y0 - iy * dy;
-      const xB = x0 + (ix + 1) * dx;
-      const yBv = yA;
-      const xC = xA;
-      const yC = y0 - (iy + 1) * dy;
-      const xD = xB;
-      const yD = yC;
+  xG[0] = xL - offXY;
+  for (let ix = 0; ix < w; ix++) xG[ix + 1] = x0 + ix * dx;
+  xG[w2 - 1] = xR + offXY;
 
-      const zA = zTop(normF32[idx(ix, iy)] ?? 0);
-      const zB1 = zTop(normF32[idx(ix + 1, iy)] ?? 0);
-      const zC1 = zTop(normF32[idx(ix, iy + 1)] ?? 0);
-      const zD1 = zTop(normF32[idx(ix + 1, iy + 1)] ?? 0);
+  yG[0] = yT0 + offXY;
+  for (let iy = 0; iy < h; iy++) yG[iy + 1] = y0 - iy * dy;
+  yG[h2 - 1] = yB0 - offXY;
 
-      pushTri(xA, yA, zA, xB, yBv, zB1, xD, yD, zD1);
-      pushTri(xA, yA, zA, xD, yD, zD1, xC, yC, zC1);
+  const idx2 = (ix: number, iy: number) => iy * w2 + ix;
+
+  const zTop2 = new Float32Array(w2 * h2);
+  const zBot2 = new Float32Array(w2 * h2);
+
+  for (let iy = 0; iy < h2; iy++) {
+    for (let ix = 0; ix < w2; ix++) {
+      const innerX = ix - 1;
+      const innerY = iy - 1;
+      const isInner = innerX >= 0 && innerX < w && innerY >= 0 && innerY < h;
+
+      if (isInner) {
+        zTop2[idx2(ix, iy)] = zT(innerX, innerY);
+        zBot2[idx2(ix, iy)] = zB(innerX, innerY);
+      } else {
+        // cornice solida: spessore t (top=t, bottom=0)
+        zTop2[idx2(ix, iy)] = t;
+        zBot2[idx2(ix, iy)] = 0;
+      }
     }
   }
 
-  // BOTTOM (z=0)
-  pushTri(xL, yT, 0, xR, yB, 0, xR, yT, 0);
-  pushTri(xL, yT, 0, xL, yB, 0, xR, yB, 0);
+  // --- TOP surface (winding coerente)
+  for (let iy = 0; iy < h2 - 1; iy++) {
+    for (let ix = 0; ix < w2 - 1; ix++) {
+      const xA = xG[ix],     yA = yG[iy];
+      const xB = xG[ix + 1], yBv = yG[iy];
+      const xC = xG[ix],     yC = yG[iy + 1];
+      const xD = xG[ix + 1], yD = yG[iy + 1];
 
-  // left side
-  for (let iy = 0; iy < h - 1; iy++) {
-    const y1 = y0 - iy * dy;
-    const y2 = y0 - (iy + 1) * dy;
-    const z1 = zTop(normF32[idx(0, iy)] ?? 0);
-    const z2 = zTop(normF32[idx(0, iy + 1)] ?? 0);
-    pushTri(xL, y1, 0, xL, y1, z1, xL, y2, z2);
-    pushTri(xL, y1, 0, xL, y2, z2, xL, y2, 0);
+      const zA = zTop2[idx2(ix, iy)];
+      const zBv2 = zTop2[idx2(ix + 1, iy)];
+      const zC2 = zTop2[idx2(ix, iy + 1)];
+      const zD2 = zTop2[idx2(ix + 1, iy + 1)];
+
+      pushTri(xA, yA, zA, xB, yBv, zBv2, xD, yD, zD2);
+      pushTri(xA, yA, zA, xD, yD, zD2, xC, yC, zC2);
+    }
   }
 
-  // right side
-  for (let iy = 0; iy < h - 1; iy++) {
-    const y1 = y0 - iy * dy;
-    const y2 = y0 - (iy + 1) * dy;
-    const z1 = zTop(normF32[idx(w - 1, iy)] ?? 0);
-    const z2 = zTop(normF32[idx(w - 1, iy + 1)] ?? 0);
-    pushTri(xR, y1, 0, xR, y2, z2, xR, y1, z1);
-    pushTri(xR, y1, 0, xR, y2, 0, xR, y2, z2);
+  // --- BOTTOM surface (winding invertito, verso -Z)
+  for (let iy = 0; iy < h2 - 1; iy++) {
+    for (let ix = 0; ix < w2 - 1; ix++) {
+      const xA = xG[ix],     yA = yG[iy];
+      const xB = xG[ix + 1], yBv = yG[iy];
+      const xC = xG[ix],     yC = yG[iy + 1];
+      const xD = xG[ix + 1], yD = yG[iy + 1];
+
+      const zA = zBot2[idx2(ix, iy)];
+      const zBv2 = zBot2[idx2(ix + 1, iy)];
+      const zC2 = zBot2[idx2(ix, iy + 1)];
+      const zD2 = zBot2[idx2(ix + 1, iy + 1)];
+
+      pushTri(xA, yA, zA, xD, yD, zD2, xB, yBv, zBv2);
+      pushTri(xA, yA, zA, xC, yC, zC2, xD, yD, zD2);
+    }
   }
 
-  // top edge
-  for (let ix = 0; ix < w - 1; ix++) {
-    const x1 = x0 + ix * dx;
-    const x2 = x0 + (ix + 1) * dx;
-    const z1 = zTop(normF32[idx(ix, 0)] ?? 0);
-    const z2 = zTop(normF32[idx(ix + 1, 0)] ?? 0);
-    pushTri(x1, yT, 0, x2, yT, z2, x1, yT, z1);
-    pushTri(x1, yT, 0, x2, yT, 0, x2, yT, z2);
-  }
+  // --- OUTER WALLS: chiusura solo sul perimetro esterno
+  const wallSeg = (
+    x1: number, y1: number, z1t: number, z1b: number,
+    x2: number, y2: number, z2t: number, z2b: number
+  ) => {
+    pushTri(x1, y1, z1b, x1, y1, z1t, x2, y2, z2t);
+    pushTri(x1, y1, z1b, x2, y2, z2t, x2, y2, z2b);
+  };
 
-  // bottom edge
-  for (let ix = 0; ix < w - 1; ix++) {
-    const x1 = x0 + ix * dx;
-    const x2 = x0 + (ix + 1) * dx;
-    const z1 = zTop(normF32[idx(ix, h - 1)] ?? 0);
-    const z2 = zTop(normF32[idx(ix + 1, h - 1)] ?? 0);
-    pushTri(x1, yB, 0, x1, yB, z1, x2, yB, z2);
-    pushTri(x1, yB, 0, x2, yB, z2, x2, yB, 0);
+  // top edge (iy=0)
+  for (let ix = 0; ix < w2 - 1; ix++) {
+    wallSeg(
+      xG[ix + 1], yG[0], zTop2[idx2(ix + 1, 0)], zBot2[idx2(ix + 1, 0)],
+      xG[ix],     yG[0], zTop2[idx2(ix, 0)],     zBot2[idx2(ix, 0)]
+    );
+  }
+  // bottom edge (iy=h2-1)
+  for (let ix = 0; ix < w2 - 1; ix++) {
+    wallSeg(
+      xG[ix],     yG[h2 - 1], zTop2[idx2(ix, h2 - 1)],     zBot2[idx2(ix, h2 - 1)],
+      xG[ix + 1], yG[h2 - 1], zTop2[idx2(ix + 1, h2 - 1)], zBot2[idx2(ix + 1, h2 - 1)]
+    );
+  }
+  // left edge (ix=0)
+  for (let iy = 0; iy < h2 - 1; iy++) {
+    wallSeg(
+      xG[0], yG[iy + 1], zTop2[idx2(0, iy + 1)], zBot2[idx2(0, iy + 1)],
+      xG[0], yG[iy],     zTop2[idx2(0, iy)],     zBot2[idx2(0, iy)]
+    );
+  }
+  // right edge (ix=w2-1)
+  for (let iy = 0; iy < h2 - 1; iy++) {
+    wallSeg(
+      xG[w2 - 1], yG[iy],     zTop2[idx2(w2 - 1, iy)],     zBot2[idx2(w2 - 1, iy)],
+      xG[w2 - 1], yG[iy + 1], zTop2[idx2(w2 - 1, iy + 1)], zBot2[idx2(w2 - 1, iy + 1)]
+    );
   }
 
   const g = new THREE.BufferGeometry();
