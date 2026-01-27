@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+import { useEffect, useMemo } from "react";
+import * as THREE from "three";
 
 // ⚠️ Lascia i tuoi import reali, ad esempio:
 // import type { OutputMode, BaseStyle } from "...";
