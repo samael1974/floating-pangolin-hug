@@ -35,6 +35,12 @@ export default function ReliefPreview3D({ hmState }: Props) {
 
         {/* Cubo di debug: deve essere sempre visibile */}
         <mesh>
+        {reliefGeometry && (
+  <mesh geometry={reliefGeometry} rotation={[-Math.PI / 2, 0, 0]}>
+    <meshStandardMaterial wireframe />
+  </mesh>
+)}
+
           <boxGeometry args={[1, 1, 1]} />
           <meshStandardMaterial />
         </mesh>
