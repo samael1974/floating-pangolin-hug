@@ -97,16 +97,16 @@ export default function ReliefPreview3D({
           }
         }
 
-        const out = buildSolidFromHeightmap({
-  height01: ...,
-  width: ...,
-  height: ...,
-  outWidthMm: ...,
-  depthMm,
-  baseMm,
-  baseStyle: baseStyle as any,
-});
-const geo = out.geometry;
+        const geom = buildSolidFromHeightmap({
+          normF32: out,
+          w: dw,
+          h: dh,
+          widthMm,
+          depthMm,
+          baseMm,
+          outputMode,
+          baseStyle,
+        });
 
         if (mesh) {
           scene.remove(mesh);
