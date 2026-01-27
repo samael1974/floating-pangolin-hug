@@ -153,10 +153,11 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
   smooth: 0.15,
   edge: "sharp",
   outputMode: "relief",
-  baseStyle: "flat",        // oppure "offset" SOLO se BaseStyle include "offset"
+  baseStyle: "flat", // oppure "offset"
+  // ✅ Cutout disattivato e non più in UI
   cutoutEnabled: false,
-  cutoutThreshold: 0.18,
 }));
+
 
   // ✅ Heightmap state/status
   const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
