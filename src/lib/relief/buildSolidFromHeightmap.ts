@@ -125,11 +125,37 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
       pushTri(ax, ay, az, cx, cy, cz, dx_, dy_, dz_);
     };
 
-    // --- 2) TOP BAND (flat) around inner rect at z = t
-    quad(xL1, yT1, t,  xR1, yT1, t,  xR,  yT,  t,  xL,  yT,  t); // top band
-    quad(xL,  yB,  t,  xR,  yB,  t,  xR1, yB1, t,  xL1, yB1, t); // bottom band
-    quad(xL1, yB1, t,  xL1, yT1, t,  xL,  yT,  t,  xL,  yB,  t); // left band
-    quad(xR,  yT,  t,  xR1, yT1, t,  xR1, yB1, t,  xR,  yB,  t); // right band
+      // --- 2) TOP BAND (flat) around inner rect at z = t
+    // Tessellata per combaciare con i segmenti delle inner walls
+
+    // TOP band: tra yT..yT1, segmentata lungo X
+    for (let ix = 0; ix < w - 1; ix++) {
+      const x1 = x0 + ix * dx;
+      const x2 = x0 + (ix + 1) * dx;
+      quad(x1, yT1, t,  x2, yT1, t,  x2, yT, t,  x1, yT, t);
+    }
+
+    // BOTTOM band: tra yB1..yB, segmentata lungo X
+    for (let ix = 0; ix < w - 1; ix++) {
+      const x1 = x0 + ix * dx;
+      const x2 = x0 + (ix + 1) * dx;
+      quad(x1, yB, t,  x2, yB, t,  x2, yB1, t,  x1, yB1, t);
+    }
+
+    // LEFT band: tra xL1..xL, segmentata lungo Y
+    for (let iy = 0; iy < h - 1; iy++) {
+      const y1 = y0 - iy * dy;
+      const y2 = y0 - (iy + 1) * dy;
+      quad(xL1, y2, t,  xL1, y1, t,  xL, y1, t,  xL, y2, t);
+    }
+
+    // RIGHT band: tra xR..xR1, segmentata lungo Y
+    for (let iy = 0; iy < h - 1; iy++) {
+      const y1 = y0 - iy * dy;
+      const y2 = y0 - (iy + 1) * dy;
+      quad(xR, y2, t,  xR, y1, t,  xR1, y1, t,  xR1, y2, t);
+    }
+
 
     // --- 3) INNER WALLS: connect relief edge down to top band (z=t) along inner rect
 
