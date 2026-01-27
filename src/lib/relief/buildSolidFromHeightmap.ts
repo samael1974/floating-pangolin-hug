@@ -72,147 +72,145 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     return baseMm + depthMm * h01;
   };
 
-   // ==========================
-  // OFFSET MODE (CAD-like): cornice piatta + relief al centro (mesh unica)
-  // - Top: griglia allargata (w+2, h+2)
-  //   * bordo esterno: z=t (piatta)
-  //   * area interna: z = t + depth * H (relief o mold)
-  // - Bottom: z=0
-  // - Outer walls: chiusura esterna
-  // ==========================
-  if (baseStyle === "offset") {
-    const t = Math.max(baseMm, 0.6);
-    const offXY = t;
+  // =====================================================
+// OFFSET (CAD-like) = shell a spessore costante
+// - baseMm = spessore shell (min 0.6)
+// - depthMm = ampiezza rilievo (0..depthMm)
+// - risultato: mesh CHIUSA (watertight)
+// =====================================================
+if (baseStyle === "offset") {
+  const t = Math.max(baseMm, 0.6); // spessore shell (min stampabile)
 
-    const zRelief = (H: number) => {
-      const h01 = clamp01(H);
-      if (outputMode === "mold") return t + depthMm * (1 - h01);
-      return t + depthMm * h01;
-    };
+  // Top in offset: NON aggiunge baseMm (quella è lo spessore shell)
+  const zTopOffset = (H: number) => {
+    const h01 = clamp01(H);
+    return outputMode === "mold" ? depthMm * (1 - h01) : depthMm * h01;
+  };
 
-    // coordinate griglia interna (coerenti con dx/dy)
-    // xL,xR,yT,yB sono già calcolati sopra con dx/dy (NON ridefinirli!)
-    // costruiamo una griglia allargata con 1 “anello” esterno piatto
-    const w2 = w + 2;
-    const h2 = h + 2;
+  const zTopGrid = new Float32Array(w * h);
+  const zBotGrid = new Float32Array(w * h);
 
-    const xC = new Float32Array(w2);
-    const yC = new Float32Array(h2);
-
-    // X: [outer-left] + [inner 0..w-1] + [outer-right]
-    xC[0] = xL - offXY;
-    for (let ix = 0; ix < w; ix++) xC[ix + 1] = x0 + ix * dx;
-    xC[w2 - 1] = xR + offXY;
-
-    // Y: [outer-top] + [inner 0..h-1] + [outer-bottom]
-    yC[0] = yT + offXY;
-    for (let iy = 0; iy < h; iy++) yC[iy + 1] = y0 - iy * dy;
-    yC[h2 - 1] = yB - offXY;
-
-    const idx2 = (ix: number, iy: number) => iy * w2 + ix;
-
-    // Top Z grid
-    const zTop = new Float32Array(w2 * h2);
-    for (let iy = 0; iy < h2; iy++) {
-      for (let ix = 0; ix < w2; ix++) {
-        const innerX = ix - 1;
-        const innerY = iy - 1;
-        const isInner = innerX >= 0 && innerX < w && innerY >= 0 && innerY < h;
-        if (isInner) {
-          zTop[idx2(ix, iy)] = zRelief(normF32[idx(innerX, innerY)] ?? 0);
-        } else {
-          zTop[idx2(ix, iy)] = t; // cornice piatta
-        }
-      }
+  // bottom = top - t, poi shift globale per avere minZ = 0
+  let minZ = Number.POSITIVE_INFINITY;
+  for (let iy = 0; iy < h; iy++) {
+    for (let ix = 0; ix < w; ix++) {
+      const zt = zTopOffset(normF32[idx(ix, iy)] ?? 0);
+      const zb = zt - t;
+      zTopGrid[idx(ix, iy)] = zt;
+      zBotGrid[idx(ix, iy)] = zb;
+      if (zb < minZ) minZ = zb;
     }
+  }
+  const zShift = -minZ;
 
-    // --- TOP surface (mesh unica)
-    for (let iy = 0; iy < h2 - 1; iy++) {
-      for (let ix = 0; ix < w2 - 1; ix++) {
-        const xA = xC[ix],     yA = yC[iy];
-        const xB = xC[ix + 1], yBv = yC[iy];
-        const xC_ = xC[ix],    yC_ = yC[iy + 1];
-        const xD = xC[ix + 1], yD = yC[iy + 1];
+  const zT = (ix: number, iy: number) => zTopGrid[idx(ix, iy)] + zShift;
+  const zB = (ix: number, iy: number) => zBotGrid[idx(ix, iy)] + zShift;
 
-        const zA = zTop[idx2(ix, iy)];
-        const zB = zTop[idx2(ix + 1, iy)];
-        const zCz = zTop[idx2(ix, iy + 1)];
-        const zD = zTop[idx2(ix + 1, iy + 1)];
+  const v: number[] = [];
+  const push = (
+    ax: number, ay: number, az: number,
+    bx: number, by: number, bz: number,
+    cx: number, cy: number, cz: number
+  ) => {
+    v.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+  };
 
-        // stesso winding del resto del file
-        pushTri(xA, yA, zA, xB, yBv, zB, xD, yD, zD);
-        pushTri(xA, yA, zA, xD, yD, zD, xC_, yC_, zCz);
-      }
+  // ---------- TOP surface
+  for (let iy = 0; iy < h - 1; iy++) {
+    for (let ix = 0; ix < w - 1; ix++) {
+      const xA = x0 + ix * dx;
+      const yA = y0 - iy * dy;
+      const xB = x0 + (ix + 1) * dx;
+      const yBv = yA;
+      const xC = xA;
+      const yC = y0 - (iy + 1) * dy;
+      const xD = xB;
+      const yD = yC;
+
+      const zA = zT(ix, iy);
+      const zB1 = zT(ix + 1, iy);
+      const zC1 = zT(ix, iy + 1);
+      const zD1 = zT(ix + 1, iy + 1);
+
+      push(xA, yA, zA, xB, yBv, zB1, xD, yD, zD1);
+      push(xA, yA, zA, xD, yD, zD1, xC, yC, zC1);
     }
-
-    // --- BOTTOM surface z=0 (stessa griglia, winding invertito)
-    for (let iy = 0; iy < h2 - 1; iy++) {
-      for (let ix = 0; ix < w2 - 1; ix++) {
-        const xA = xC[ix],     yA = yC[iy];
-        const xB = xC[ix + 1], yBv = yC[iy];
-        const xC_ = xC[ix],    yC_ = yC[iy + 1];
-        const xD = xC[ix + 1], yD = yC[iy + 1];
-
-        // inverti winding per puntare verso -Z
-        pushTri(xA, yA, 0, xD, yD, 0, xB, yBv, 0);
-        pushTri(xA, yA, 0, xC_, yC_, 0, xD, yD, 0);
-      }
-    }
-
-    // --- OUTER WALLS (chiusura esterna): perimetro della griglia allargata
-    const wallSeg = (
-      x1: number, y1: number, z1t: number,
-      x2: number, y2: number, z2t: number
-    ) => {
-      // quad tra top(zTop) e bottom(0)
-      // winding coerente (esterno)
-      pushTri(x1, y1, 0,  x1, y1, z1t,  x2, y2, z2t);
-      pushTri(x1, y1, 0,  x2, y2, z2t,  x2, y2, 0);
-    };
-
-    // top outer edge (iy=0), segmentata lungo X
-    for (let ix = 0; ix < w2 - 1; ix++) {
-      const x1 = xC[ix], x2 = xC[ix + 1];
-      const y = yC[0];
-      const z1t = zTop[idx2(ix, 0)];
-      const z2t = zTop[idx2(ix + 1, 0)];
-      wallSeg(x2, y, z2t, x1, y, z1t); // invertito per outward
-    }
-
-    // bottom outer edge (iy=h2-1)
-    for (let ix = 0; ix < w2 - 1; ix++) {
-      const x1 = xC[ix], x2 = xC[ix + 1];
-      const y = yC[h2 - 1];
-      const z1t = zTop[idx2(ix, h2 - 1)];
-      const z2t = zTop[idx2(ix + 1, h2 - 1)];
-      wallSeg(x1, y, z1t, x2, y, z2t);
-    }
-
-    // left outer edge (ix=0), segmentata lungo Y
-    for (let iy = 0; iy < h2 - 1; iy++) {
-      const y1 = yC[iy], y2 = yC[iy + 1];
-      const x = xC[0];
-      const z1t = zTop[idx2(0, iy)];
-      const z2t = zTop[idx2(0, iy + 1)];
-      wallSeg(x, y2, z2t, x, y1, z1t); // invertito per outward
-    }
-
-    // right outer edge (ix=w2-1)
-    for (let iy = 0; iy < h2 - 1; iy++) {
-      const y1 = yC[iy], y2 = yC[iy + 1];
-      const x = xC[w2 - 1];
-      const z1t = zTop[idx2(w2 - 1, iy)];
-      const z2t = zTop[idx2(w2 - 1, iy + 1)];
-      wallSeg(x, y1, z1t, x, y2, z2t);
-    }
-
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-    g.computeVertexNormals();
-    return g;
   }
 
+  // ---------- BOTTOM surface (winding invertito)
+  for (let iy = 0; iy < h - 1; iy++) {
+    for (let ix = 0; ix < w - 1; ix++) {
+      const xA = x0 + ix * dx;
+      const yA = y0 - iy * dy;
+      const xB = x0 + (ix + 1) * dx;
+      const yBv = yA;
+      const xC = xA;
+      const yC = y0 - (iy + 1) * dy;
+      const xD = xB;
+      const yD = yC;
 
+      const zA = zB(ix, iy);
+      const zB1 = zB(ix + 1, iy);
+      const zC1 = zB(ix, iy + 1);
+      const zD1 = zB(ix + 1, iy + 1);
+
+      push(xA, yA, zA, xD, yD, zD1, xB, yBv, zB1);
+      push(xA, yA, zA, xC, yC, zC1, xD, yD, zD1);
+    }
+  }
+
+  // ---------- Side walls (chiusura perimetro rettangolare)
+  const wall = (
+    x1: number, y1: number, zt1: number, zb1: number,
+    x2: number, y2: number, zt2: number, zb2: number
+  ) => {
+    // due triangoli per quad
+    push(x1, y1, zb1, x1, y1, zt1, x2, y2, zt2);
+    push(x1, y1, zb1, x2, y2, zt2, x2, y2, zb2);
+  };
+
+  const xL = x0;
+  const xR = x0 + widthMm;
+  const yT0 = y0;
+  const yB0 = y0 - heightMm;
+
+  // left
+  for (let iy = 0; iy < h - 1; iy++) {
+    const yy1 = y0 - iy * dy;
+    const yy2 = y0 - (iy + 1) * dy;
+    wall(xL, yy1, zT(0, iy), zB(0, iy), xL, yy2, zT(0, iy + 1), zB(0, iy + 1));
+  }
+  // right (invertito per winding coerente)
+  for (let iy = 0; iy < h - 1; iy++) {
+    const yy1 = y0 - iy * dy;
+    const yy2 = y0 - (iy + 1) * dy;
+    wall(xR, yy2, zT(w - 1, iy + 1), zB(w - 1, iy + 1), xR, yy1, zT(w - 1, iy), zB(w - 1, iy));
+  }
+  // top
+  for (let ix = 0; ix < w - 1; ix++) {
+    const xx1 = x0 + ix * dx;
+    const xx2 = x0 + (ix + 1) * dx;
+    wall(xx1, yT0, zT(ix, 0), zB(ix, 0), xx2, yT0, zT(ix + 1, 0), zB(ix + 1, 0));
+  }
+  // bottom (invertito)
+  for (let ix = 0; ix < w - 1; ix++) {
+    const xx1 = x0 + ix * dx;
+    const xx2 = x0 + (ix + 1) * dx;
+    wall(xx2, yB0, zT(ix + 1, h - 1), zB(ix + 1, h - 1), xx1, yB0, zT(ix, h - 1), zB(ix, h - 1));
+  }
+
+  // ---------- Sanity check: niente NaN/Infinity
+  for (let i = 0; i < v.length; i++) {
+    if (!Number.isFinite(v[i])) {
+      throw new Error(`Solid build (offset): non-finite vertex at buffer index ${i} (${v[i]})`);
+    }
+  }
+
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(v, 3));
+  g.computeVertexNormals();
+  return g;
+}
 
   // ===================================================================
   // NON-OFFSET = base piatta classica (bottom z=0 + 4 lati)
