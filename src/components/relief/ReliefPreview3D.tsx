@@ -4,6 +4,122 @@ import { OrbitControls, Grid } from "@react-three/drei";
 import * as THREE from "three";
 import { OrbitControls, Grid, Edges } from "@react-three/drei";
 
+function makeSolidFromRelief(topGeo: THREE.BufferGeometry, baseMm: number) {
+  const geo = topGeo.clone();
+
+  // assicuro che sia indexed (serve per lavorare bene coi triangoli)
+  if (!geo.index) geo = geo.toNonIndexed();
+
+  const pos = geo.attributes.position.array as Float32Array;
+  const vertCount = pos.length / 3;
+
+  // TOP positions
+  const topPos = new Float32Array(pos);
+
+  // BOTTOM positions (stesse X,Y ma Z = -baseMm)
+  const botPos = new Float32Array(pos.length);
+  for (let i = 0; i < vertCount; i++) {
+    botPos[i * 3 + 0] = topPos[i * 3 + 0];
+    botPos[i * 3 + 1] = topPos[i * 3 + 1];
+    botPos[i * 3 + 2] = -Math.abs(baseMm);
+  }
+
+  // Indici del top: se esiste index lo uso, altrimenti triangoli sequenziali
+  const topIndex = geo.index
+    ? (geo.index.array as Uint16Array | Uint32Array)
+    : null;
+
+  const triCount = topIndex ? topIndex.length / 3 : vertCount / 3;
+
+  // Costruisco index per: top + bottom + side walls
+  // - top: come originale
+  // - bottom: triangoli invertiti (winding opposto)
+  // - sides: chiudo il bordo esterno della griglia (approccio MVP)
+  const indices: number[] = [];
+
+  // TOP
+  if (topIndex) {
+    for (let i = 0; i < topIndex.length; i++) indices.push(topIndex[i]);
+  } else {
+    for (let i = 0; i < vertCount; i++) indices.push(i);
+  }
+
+  // BOTTOM (offset = vertCount, winding invertito)
+  if (topIndex) {
+    for (let i = 0; i < topIndex.length; i += 3) {
+      const a = topIndex[i + 0] + vertCount;
+      const b = topIndex[i + 1] + vertCount;
+      const c = topIndex[i + 2] + vertCount;
+      indices.push(a, c, b);
+    }
+  } else {
+    // non-indexed: inverti per terne
+    for (let i = 0; i < vertCount; i += 3) {
+      indices.push(i + vertCount, i + 2 + vertCount, i + 1 + vertCount);
+    }
+  }
+
+  // SIDE WALLS (MVP): chiudo il contorno del plane
+  // Per farlo in modo affidabile serve sapere gridW/gridH.
+  // Qui usiamo un trucco: leggiamo i segmenti dalla PlaneGeometry parameters se presenti.
+  const params: any = (topGeo as any).parameters;
+  const segW = params?.widthSegments ?? 0;
+  const segH = params?.heightSegments ?? 0;
+
+  const gridW = segW + 1;
+  const gridH = segH + 1;
+
+  if (gridW > 1 && gridH > 1 && gridW * gridH === vertCount) {
+    const vid = (x: number, y: number) => y * gridW + x;
+
+    // bordo alto (y=0)
+    for (let x = 0; x < gridW - 1; x++) {
+      const a = vid(x, 0);
+      const b = vid(x + 1, 0);
+      // due triangoli tra top e bottom
+      indices.push(a, b, b + vertCount);
+      indices.push(a, b + vertCount, a + vertCount);
+    }
+
+    // bordo basso (y=gridH-1)
+    for (let x = 0; x < gridW - 1; x++) {
+      const a = vid(x, gridH - 1);
+      const b = vid(x + 1, gridH - 1);
+      indices.push(b, a, a + vertCount);
+      indices.push(b, a + vertCount, b + vertCount);
+    }
+
+    // bordo sinistro (x=0)
+    for (let y = 0; y < gridH - 1; y++) {
+      const a = vid(0, y);
+      const b = vid(0, y + 1);
+      indices.push(b, a, a + vertCount);
+      indices.push(b, a + vertCount, b + vertCount);
+    }
+
+    // bordo destro (x=gridW-1)
+    for (let y = 0; y < gridH - 1; y++) {
+      const a = vid(gridW - 1, y);
+      const b = vid(gridW - 1, y + 1);
+      indices.push(a, b, b + vertCount);
+      indices.push(a, b + vertCount, a + vertCount);
+    }
+  }
+
+  // Unisco posizioni TOP+BOTTOM
+  const mergedPos = new Float32Array(topPos.length + botPos.length);
+  mergedPos.set(topPos, 0);
+  mergedPos.set(botPos, topPos.length);
+
+  const solid = new THREE.BufferGeometry();
+  solid.setAttribute("position", new THREE.BufferAttribute(mergedPos, 3));
+  solid.setIndex(indices);
+  solid.computeVertexNormals();
+
+  return solid;
+}
+
+
 
 export type HeightmapState = {
   normF32: Float32Array; // valori normalizzati 0..1 (o simile)
