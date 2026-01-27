@@ -126,34 +126,72 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     };
 
       // --- 2) TOP BAND (flat) around inner rect at z = t
-    // Tessellata per combaciare con i segmenti delle inner walls
+    // Inner edge = segmentato (match con inner walls)
+    // Outer edge = SOLO 4 angoli (match con outer walls)
 
-    // TOP band: tra yT..yT1, segmentata lungo X
-    for (let ix = 0; ix < w - 1; ix++) {
-      const x1 = x0 + ix * dx;
-      const x2 = x0 + (ix + 1) * dx;
-      quad(x1, yT1, t,  x2, yT1, t,  x2, yT, t,  x1, yT, t);
+    // TOP band polygon: outerTL -> outerTR -> innerTop from right->left
+    const outerTL: [number, number] = [xL1, yT1];
+    const outerTR: [number, number] = [xR1, yT1];
+
+    // Fan from outerTL
+    {
+      // sequence: outerTR, then inner-top vertices from right to left
+      let prevX = outerTR[0], prevY = outerTR[1];
+      for (let ix = w - 1; ix >= 0; ix--) {
+        const x = x0 + ix * dx;
+        const y = yT;
+        // triangle: outerTL -> prev -> current
+        pushTri(outerTL[0], outerTL[1], t,  prevX, prevY, t,  x, y, t);
+        prevX = x; prevY = y;
+      }
     }
 
-    // BOTTOM band: tra yB1..yB, segmentata lungo X
-    for (let ix = 0; ix < w - 1; ix++) {
-      const x1 = x0 + ix * dx;
-      const x2 = x0 + (ix + 1) * dx;
-      quad(x1, yB, t,  x2, yB, t,  x2, yB1, t,  x1, yB1, t);
+    // BOTTOM band polygon: outerBL -> innerBottom left->right -> outerBR
+    const outerBL: [number, number] = [xL1, yB1];
+    const outerBR: [number, number] = [xR1, yB1];
+
+    // Fan from outerBL
+    {
+      // sequence: inner-bottom vertices from left to right, then outerBR
+      let prevX = x0 + 0 * dx, prevY = yB;
+      for (let ix = 1; ix < w; ix++) {
+        const x = x0 + ix * dx;
+        const y = yB;
+        pushTri(outerBL[0], outerBL[1], t,  prevX, prevY, t,  x, y, t);
+        prevX = x; prevY = y;
+      }
+      // last triangle to outerBR
+      pushTri(outerBL[0], outerBL[1], t,  prevX, prevY, t,  outerBR[0], outerBR[1], t);
     }
 
-    // LEFT band: tra xL1..xL, segmentata lungo Y
-    for (let iy = 0; iy < h - 1; iy++) {
-      const y1 = y0 - iy * dy;
-      const y2 = y0 - (iy + 1) * dy;
-      quad(xL1, y2, t,  xL1, y1, t,  xL, y1, t,  xL, y2, t);
+    // LEFT band polygon: outerBL -> outerTL -> innerLeft top->bottom
+    const outerLT: [number, number] = [xL1, yT1]; // same as outerTL
+    const outerLB: [number, number] = [xL1, yB1]; // same as outerBL
+
+    // Fan from outerLB
+    {
+      let prevX = outerLT[0], prevY = outerLT[1];
+      for (let iy = 0; iy < h; iy++) {
+        const x = xL;
+        const y = y0 - iy * dy;
+        pushTri(outerLB[0], outerLB[1], t,  prevX, prevY, t,  x, y, t);
+        prevX = x; prevY = y;
+      }
     }
 
-    // RIGHT band: tra xR..xR1, segmentata lungo Y
-    for (let iy = 0; iy < h - 1; iy++) {
-      const y1 = y0 - iy * dy;
-      const y2 = y0 - (iy + 1) * dy;
-      quad(xR, y2, t,  xR, y1, t,  xR1, y1, t,  xR1, y2, t);
+    // RIGHT band polygon: outerRT -> outerRB -> innerRight bottom->top
+    const outerRT: [number, number] = [xR1, yT1];
+    const outerRB: [number, number] = [xR1, yB1];
+
+    // Fan from outerRT
+    {
+      let prevX = outerRB[0], prevY = outerRB[1];
+      for (let iy = h - 1; iy >= 0; iy--) {
+        const x = xR;
+        const y = y0 - iy * dy;
+        pushTri(outerRT[0], outerRT[1], t,  prevX, prevY, t,  x, y, t);
+        prevX = x; prevY = y;
+      }
     }
 
 
