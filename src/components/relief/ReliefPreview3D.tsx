@@ -151,6 +151,7 @@ export default function ReliefPreview3D({
   outputMode = "relief",
   baseStyle,
 }: Props) {
+
   const geometry = React.useMemo<THREE.BufferGeometry | null>(() => {
     if (!hmState) return null;
 
@@ -168,11 +169,15 @@ export default function ReliefPreview3D({
       });
 
       const geom = out.geometry;
-      geom.rotateZ(Math.PI);
+
+      // ===== ORIENTAMENTO BASE (baked) =====
+      const ORIENT_FIX_ROTATE_Z = Math.PI;
+      geom.rotateZ(ORIENT_FIX_ROTATE_Z);
+
+      // ===== NORMALI =====
       geom.computeVertexNormals();
 
-
-      // 1) centra XY e appoggia Z a 0
+      // ===== CENTRATURA XY + BASE Z=0 =====
       geom.computeBoundingBox();
       const bb = geom.boundingBox;
       if (bb) {
@@ -181,12 +186,7 @@ export default function ReliefPreview3D({
         geom.translate(-center.x, -center.y, -bb.min.z);
       }
 
-      // 2) ✅ applica fix orientamento (baked)
-      if (ORIENT_FIX_ROTATE_Z !== 0) {
-        geom.rotateZ(ORIENT_FIX_ROTATE_Z);
-      }
-
-      // 3) normali coerenti dopo le trasformazioni
+      // ===== NORMALI FINALI =====
       geom.computeVertexNormals();
 
       return geom;
@@ -201,6 +201,16 @@ export default function ReliefPreview3D({
       geometry?.dispose();
     };
   }, [geometry]);
+
+  // ===== FRAME (TEMP MVP – STEP 3) =====
+  const frameEnabled = true;   // TEMP: sempre ON
+  const frameThickness = 8;    // mm
+  const frameDepth = 12;       // mm
+
+  // TEMP: dimensioni fisse solo per verifica visiva
+  // (nel prossimo step le colleghiamo alle dimensioni reali del relief)
+  const frameOuterW = 160;     // mm
+  const frameOuterH = 120;     // mm
 
   if (!hmState) {
     return (
