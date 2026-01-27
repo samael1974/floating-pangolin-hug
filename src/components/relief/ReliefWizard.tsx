@@ -6,9 +6,8 @@ import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefCon
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
 import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
-import { inspectPng, pngCompatibilityMessage } from "@/lib/relief/inspectPng";
 
-// ✅ 16-bit PNG support
+import { inspectPng, pngCompatibilityMessage } from "@/lib/relief/inspectPng";
 import { decodeDepthmapPng } from "@/lib/relief/decodeDepthmapPng";
 import { renderDepthmapToCanvas } from "@/lib/relief/renderDepthmapToCanvas";
 
