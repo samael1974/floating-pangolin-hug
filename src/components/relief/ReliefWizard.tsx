@@ -312,7 +312,7 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
     return () => {
       cancelled = true;
     };
-  }, [
+    }, [
     file,
     sourceMode,
     invertDepthMap,
@@ -322,7 +322,6 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
     params.detail,
     params.smooth,
     params.edge,
-    params.outputMode,
     params.baseStyle,
   ]);
 
