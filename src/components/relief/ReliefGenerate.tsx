@@ -28,7 +28,7 @@ export default function ReliefGenerate({
 }: Props) {
   return (
     <div className="h-full w-full">
-<ReliefPreview3D
+<ReliefPreview3DAny ... />
   hmState={hmState}
   stlWidthMm={widthMm}
   decimateStep={previewDecimateStep}
