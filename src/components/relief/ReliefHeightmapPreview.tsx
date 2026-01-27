@@ -97,38 +97,42 @@ export default function ReliefPreview3D({
           }
         }
 
-        const geom = buildSolidFromHeightmap({
-          normF32: out,
-          w: dw,
-          h: dh,
-          widthMm,
-          depthMm,
-          baseMm,
-          outputMode,
-          baseStyle,
-        });
+       const outSolid = buildSolidFromHeightmap({
+  height01: out,      // prima: normF32: out
+  width: dw,          // prima: w: dw
+  height: dh,         // prima: h: dh
+  outWidthMm: widthMm, // prima: widthMm
+  depthMm,
+  baseMm,
+  baseStyle: baseStyle as any,
+});
 
-        if (mesh) {
-          scene.remove(mesh);
-          mesh.geometry.dispose();
-        }
-        mesh = new THREE.Mesh(geom, material);
-        // orientamento: Z su, Y “in basso sullo schermo” già ok; ruotiamo per vista più naturale
-        mesh.rotation.x = 0;
-        scene.add(mesh);
-        return;
-      }
+const geom = outSolid.geometry;
 
-      const geom = buildSolidFromHeightmap({
-        normF32: hmState.normF32,
-        w: hmState.w,
-        h: hmState.h,
-        widthMm,
-        depthMm,
-        baseMm,
-        outputMode,
-        baseStyle,
-      });
+if (mesh) {
+  scene.remove(mesh);
+  mesh.geometry.dispose();
+}
+
+mesh = new THREE.Mesh(geom, material);
+// orientamento: Z su, Y “in basso sullo schermo” già ok; ruotiamo per vista più naturale
+mesh.rotation.x = 0;
+scene.add(mesh);
+return;
+}
+
+const outSolid2 = buildSolidFromHeightmap({
+  height01: hmState.normF32, // prima: normF32
+  width: hmState.w,          // prima: w
+  height: hmState.h,         // prima: h
+  outWidthMm: widthMm,       // prima: widthMm
+  depthMm,
+  baseMm,
+  baseStyle: baseStyle as any,
+});
+
+const geom2 = outSolid2.geometry;
+
 
       if (mesh) {
         scene.remove(mesh);
