@@ -76,20 +76,17 @@ throw new Error(`STL: non-finite vertex at index ${i}`);
 }
 
 export function downloadReliefStlBinary(args: DownloadArgs) {
-  const { hm, widthMm, depthMm, baseMm, outputMode, baseStyle } = args;
-  if (!hm) throw new Error("STL: missing heightmap (hm)");
-  if (!(hm.normF32 instanceof Float32Array)) throw new Error("STL: hm.normF32 missing/invalid");
-
   const geom = buildSolidFromHeightmap({
-    normF32: hm.normF32,
-    w: hm.w,
-    h: hm.h,
-    widthMm,
-    depthMm,
-    baseMm,
-    outputMode,
-    baseStyle,
-  });
+  normF32: hm.normF32,
+  w: hm.w,
+  h: hm.h,
+  widthMm,
+  depthMm,
+  baseMm,
+  outputMode,
+  baseStyle,
+});
+
 
   // sanity vertices finite
   const pos = geom.getAttribute("position") as THREE.BufferAttribute | undefined;
