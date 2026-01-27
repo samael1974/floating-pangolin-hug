@@ -10,6 +10,7 @@ import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
 import { inspectPng, pngCompatibilityMessage } from "@/lib/relief/inspectPng";
 import { decodeDepthmapPng } from "@/lib/relief/decodeDepthmapPng";
 import { renderDepthmapToCanvas } from "@/lib/relief/renderDepthmapToCanvas";
+const ReliefPreview3DAny = ReliefPreview3D as unknown as React.ComponentType<any>;
 
 
 type SourceMode = "image" | "depthmap";
