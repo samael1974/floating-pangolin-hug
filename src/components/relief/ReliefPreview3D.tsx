@@ -104,16 +104,11 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
       <directionalLight position={[-520, 260, 260]} intensity={0.28} color="#ffffff" />
       <HeadLight intensity={0.3} />
 
-      <mesh geometry={geometry} rotation={[0, 0, Math.PI]}>
-        <meshPhysicalMaterial
-          color="#E26D5C"
-          metalness={0.02}
-          roughness={0.78}
-          clearcoat={0.08}
-          clearcoatRoughness={0.65}
-          reflectivity={0.12}
-          envMapIntensity={0.4}
-        />
+      <mesh
+  geometry={geometry}
+  rotation={[0, Math.PI, Math.PI]}
+  scale={[1, -1, 1]}
+/>
       </mesh>
 
       <ContactShadows
