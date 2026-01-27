@@ -259,4 +259,3 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   g.computeVertexNormals();
   return g;
 }
-}
