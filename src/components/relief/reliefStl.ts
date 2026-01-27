@@ -192,6 +192,9 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
   baseStyle,
 });
 const geom = out.geometry;
+geom.rotateZ(Math.PI);
+geom.computeVertexNormals();
+
 
 
   // opzionale ma utile: centra e appoggia Z a 0 (come preview)
