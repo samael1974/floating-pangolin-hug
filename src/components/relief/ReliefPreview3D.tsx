@@ -15,3 +15,12 @@ type Props = {
   outputMode?: OutputMode;
   baseStyle: BaseStyle;
 };
+export default function ReliefPreview3D({
+  hmState,
+  stlWidthMm,
+  decimateStep,
+  depthMm,
+  baseMm,
+  outputMode = "relief",
+  baseStyle,
+}: Props) {
