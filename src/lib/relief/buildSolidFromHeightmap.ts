@@ -65,198 +65,157 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     return baseMm + depthMm * h01;
   };
 
+   // ==========================
+  // OFFSET MODE (guscio vero: offset lungo la normale)
   // ==========================
-  // OFFSET MODE (guscio + ring XY)
-  // ==========================
- if (baseStyle === "offset") {
-  const t = Math.max(baseMm, 0.6); // spessore guscio (min)
-  const offXY = t; // cornice in XY
+  if (baseStyle === "offset") {
+    const t = Math.max(baseMm, 0.8); // spessore guscio (min più “stabile”)
 
-  const zTopOffset = (H: number) => {
-    const h01 = clamp01(H);
-    if (outputMode === "mold") return depthMm * (1 - h01);
-    return depthMm * h01;
-  };
+    // In offset vogliamo TOP da 0..depthMm (no base aggiunta)
+    const zTopOffset = (H: number) => {
+      const h01 = clamp01(H);
+      if (outputMode === "mold") return depthMm * (1 - h01);
+      return depthMm * h01;
+    };
 
-  const zTopGrid = new Float32Array(w * h);
-  const zBotGrid = new Float32Array(w * h);
+    // Grid top positions
+    const topX = new Float32Array(w * h);
+    const topY = new Float32Array(w * h);
+    const topZ = new Float32Array(w * h);
 
-  let minZ = Number.POSITIVE_INFINITY;
-  for (let iy = 0; iy < h; iy++) {
-    for (let ix = 0; ix < w; ix++) {
-      const zt = zTopOffset(normF32[idx(ix, iy)] ?? 0);
-      const zb = zt - t;
-      zTopGrid[idx(ix, iy)] = zt;
-      zBotGrid[idx(ix, iy)] = zb;
-      if (zb < minZ) minZ = zb;
-    }
-  }
+    for (let iy = 0; iy < h; iy++) {
+      const yy = y0 - iy * dy;
+      for (let ix = 0; ix < w; ix++) {
+        const xx = x0 + ix * dx;
+        const zt = zTopOffset(normF32[idx(ix, iy)] ?? 0);
 
-  const zShift = -minZ; // porta min(bottom)=0 (tipicamente = t)
-  const zT = (ix: number, iy: number) => zTopGrid[idx(ix, iy)] + zShift;
-  const zB = (ix: number, iy: number) => zBotGrid[idx(ix, iy)] + zShift;
-
-  // Griglia allargata (w+2, h+2)
-  const w2 = w + 2;
-  const h2 = h + 2;
-
-  const xG = new Float32Array(w2);
-  const yG = new Float32Array(h2);
-
-  // bounds coerenti con dx/dy (evita drift numerico)
-  const xL = x0;
-  const xR = x0 + (w - 1) * dx;
-  const yT0 = y0;
-  const yB0 = y0 - (h - 1) * dy;
-
-  xG[0] = xL - offXY;
-  for (let ix = 0; ix < w; ix++) xG[ix + 1] = x0 + ix * dx;
-  xG[w2 - 1] = xR + offXY;
-
-  yG[0] = yT0 + offXY;
-  for (let iy = 0; iy < h; iy++) yG[iy + 1] = y0 - iy * dy;
-  yG[h2 - 1] = yB0 - offXY;
-
-  const idx2 = (ix: number, iy: number) => iy * w2 + ix;
-
-  const zTop2 = new Float32Array(w2 * h2);
-  const zBot2 = new Float32Array(w2 * h2);
-
-  for (let iy = 0; iy < h2; iy++) {
-    for (let ix = 0; ix < w2; ix++) {
-      const innerX = ix - 1;
-      const innerY = iy - 1;
-      const isInner = innerX >= 0 && innerX < w && innerY >= 0 && innerY < h;
-
-      if (isInner) {
-        zTop2[idx2(ix, iy)] = zT(innerX, innerY);
-        zBot2[idx2(ix, iy)] = zB(innerX, innerY);
-      } else {
-        // cornice solida: spessore t (top=t, bottom=0)
-        zTop2[idx2(ix, iy)] = t;
-        zBot2[idx2(ix, iy)] = 0;
+        const i = idx(ix, iy);
+        topX[i] = xx;
+        topY[i] = yy;
+        topZ[i] = zt;
       }
     }
-  }
 
-  // TOP surface (winding coerente col resto)
-  for (let iy = 0; iy < h2 - 1; iy++) {
-    for (let ix = 0; ix < w2 - 1; ix++) {
-      const xA = xG[ix],
-        yA = yG[iy];
-      const xB = xG[ix + 1],
-        yBv = yG[iy];
-      const xC = xG[ix],
-        yC = yG[iy + 1];
-      const xD = xG[ix + 1],
-        yD = yG[iy + 1];
+    // Helpers for finite-diff gradient on Z
+    const clampI = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+    const zAt = (ix: number, iy: number) => {
+      const cx = clampI(ix, 0, w - 1);
+      const cy = clampI(iy, 0, h - 1);
+      return topZ[idx(cx, cy)];
+    };
 
-      const zA = zTop2[idx2(ix, iy)];
-      const zBv2 = zTop2[idx2(ix + 1, iy)];
-      const zC2 = zTop2[idx2(ix, iy + 1)];
-      const zD2 = zTop2[idx2(ix + 1, iy + 1)];
+    // Bottom positions = Top - t * normal
+    const botX = new Float32Array(w * h);
+    const botY = new Float32Array(w * h);
+    const botZ = new Float32Array(w * h);
 
-      pushTri(xA, yA, zA, xB, yBv, zBv2, xD, yD, zD2);
-      pushTri(xA, yA, zA, xD, yD, zD2, xC, yC, zC2);
+    let minBotZ = Number.POSITIVE_INFINITY;
+
+    for (let iy = 0; iy < h; iy++) {
+      for (let ix = 0; ix < w; ix++) {
+        // central differences (fallback to clamped edges)
+        const dzdx = (zAt(ix + 1, iy) - zAt(ix - 1, iy)) / (2 * dx);
+        const dzdy = (zAt(ix, iy + 1) - zAt(ix, iy - 1)) / (2 * dy);
+
+        // Surface normal approx: [-dz/dx, -dz/dy, 1]
+        let nx = -dzdx;
+        let ny = -dzdy;
+        let nz = 1;
+
+        const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+        nx /= len; ny /= len; nz /= len;
+
+        const i = idx(ix, iy);
+
+        const tx = topX[i];
+        const ty = topY[i];
+        const tz = topZ[i];
+
+        const bx = tx - t * nx;
+        const by = ty - t * ny;
+        const bz = tz - t * nz;
+
+        botX[i] = bx;
+        botY[i] = by;
+        botZ[i] = bz;
+
+        if (bz < minBotZ) minBotZ = bz;
+      }
     }
-  }
 
-  // BOTTOM surface (winding invertito, verso -Z)
-  for (let iy = 0; iy < h2 - 1; iy++) {
-    for (let ix = 0; ix < w2 - 1; ix++) {
-      const xA = xG[ix],
-        yA = yG[iy];
-      const xB = xG[ix + 1],
-        yBv = yG[iy];
-      const xC = xG[ix],
-        yC = yG[iy + 1];
-      const xD = xG[ix + 1],
-        yD = yG[iy + 1];
-
-      const zA = zBot2[idx2(ix, iy)];
-      const zBv2 = zBot2[idx2(ix + 1, iy)];
-      const zC2 = zBot2[idx2(ix, iy + 1)];
-      const zD2 = zBot2[idx2(ix + 1, iy + 1)];
-
-      pushTri(xA, yA, zA, xD, yD, zD2, xB, yBv, zBv2);
-      pushTri(xA, yA, zA, xC, yC, zC2, xD, yD, zD2);
+    // Shift so the lowest bottom point is at Z=0
+    const zShift = -minBotZ;
+    for (let i = 0; i < topZ.length; i++) {
+      topZ[i] += zShift;
+      botZ[i] += zShift;
     }
+
+    const Vt = (ix: number, iy: number) => {
+      const i = idx(ix, iy);
+      return [topX[i], topY[i], topZ[i]] as const;
+    };
+    const Vb = (ix: number, iy: number) => {
+      const i = idx(ix, iy);
+      return [botX[i], botY[i], botZ[i]] as const;
+    };
+
+    // --- TOP surface
+    for (let iy = 0; iy < h - 1; iy++) {
+      for (let ix = 0; ix < w - 1; ix++) {
+        const A = Vt(ix, iy);
+        const B = Vt(ix + 1, iy);
+        const C = Vt(ix, iy + 1);
+        const D = Vt(ix + 1, iy + 1);
+
+        pushTri(A[0], A[1], A[2], B[0], B[1], B[2], D[0], D[1], D[2]);
+        pushTri(A[0], A[1], A[2], D[0], D[1], D[2], C[0], C[1], C[2]);
+      }
+    }
+
+    // --- BOTTOM surface (winding invertito)
+    for (let iy = 0; iy < h - 1; iy++) {
+      for (let ix = 0; ix < w - 1; ix++) {
+        const A = Vb(ix, iy);
+        const B = Vb(ix + 1, iy);
+        const C = Vb(ix, iy + 1);
+        const D = Vb(ix + 1, iy + 1);
+
+        pushTri(A[0], A[1], A[2], D[0], D[1], D[2], B[0], B[1], B[2]);
+        pushTri(A[0], A[1], A[2], C[0], C[1], C[2], D[0], D[1], D[2]);
+      }
+    }
+
+    // --- SIDE WALLS (perimetro) usando un loop CCW in XY (vista dall’alto)
+    const wallQuad = (
+      t1: readonly [number, number, number],
+      t2: readonly [number, number, number],
+      b2: readonly [number, number, number],
+      b1: readonly [number, number, number]
+    ) => {
+      // quad: t1 -> t2 -> b2 -> b1
+      pushTri(t1[0], t1[1], t1[2], t2[0], t2[1], t2[2], b2[0], b2[1], b2[2]);
+      pushTri(t1[0], t1[1], t1[2], b2[0], b2[1], b2[2], b1[0], b1[1], b1[2]);
+    };
+
+    // Top edge: (0,0) -> (w-1,0)
+    for (let ix = 0; ix < w - 1; ix++) {
+      wallQuad(Vt(ix, 0), Vt(ix + 1, 0), Vb(ix + 1, 0), Vb(ix, 0));
+    }
+    // Right edge: (w-1,0) -> (w-1,h-1)
+    for (let iy = 0; iy < h - 1; iy++) {
+      wallQuad(Vt(w - 1, iy), Vt(w - 1, iy + 1), Vb(w - 1, iy + 1), Vb(w - 1, iy));
+    }
+    // Bottom edge: (w-1,h-1) -> (0,h-1)
+    for (let ix = w - 1; ix > 0; ix--) {
+      wallQuad(Vt(ix, h - 1), Vt(ix - 1, h - 1), Vb(ix - 1, h - 1), Vb(ix, h - 1));
+    }
+    // Left edge: (0,h-1) -> (0,0)
+    for (let iy = h - 1; iy > 0; iy--) {
+      wallQuad(Vt(0, iy), Vt(0, iy - 1), Vb(0, iy - 1), Vb(0, iy));
+    }
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+    g.computeVertexNormals();
+    return g;
   }
-
-  // OUTER WALLS: chiusura solo sul perimetro esterno
-  const wallSeg = (
-    x1: number,
-    y1: number,
-    z1t: number,
-    z1b: number,
-    x2: number,
-    y2: number,
-    z2t: number,
-    z2b: number
-  ) => {
-    pushTri(x1, y1, z1b, x1, y1, z1t, x2, y2, z2t);
-    pushTri(x1, y1, z1b, x2, y2, z2t, x2, y2, z2b);
-  };
-
-  // top edge (iy=0)
-  for (let ix = 0; ix < w2 - 1; ix++) {
-    wallSeg(
-      xG[ix + 1],
-      yG[0],
-      zTop2[idx2(ix + 1, 0)],
-      zBot2[idx2(ix + 1, 0)],
-      xG[ix],
-      yG[0],
-      zTop2[idx2(ix, 0)],
-      zBot2[idx2(ix, 0)]
-    );
-  }
-
-  // bottom edge (iy=h2-1)
-  for (let ix = 0; ix < w2 - 1; ix++) {
-    wallSeg(
-      xG[ix],
-      yG[h2 - 1],
-      zTop2[idx2(ix, h2 - 1)],
-      zBot2[idx2(ix, h2 - 1)],
-      xG[ix + 1],
-      yG[h2 - 1],
-      zTop2[idx2(ix + 1, h2 - 1)],
-      zBot2[idx2(ix + 1, h2 - 1)]
-    );
-  }
-
-  // left edge (ix=0)
-  for (let iy = 0; iy < h2 - 1; iy++) {
-    wallSeg(
-      xG[0],
-      yG[iy + 1],
-      zTop2[idx2(0, iy + 1)],
-      zBot2[idx2(0, iy + 1)],
-      xG[0],
-      yG[iy],
-      zTop2[idx2(0, iy)],
-      zBot2[idx2(0, iy)]
-    );
-  }
-
-  // right edge (ix=w2-1)
-  for (let iy = 0; iy < h2 - 1; iy++) {
-    wallSeg(
-      xG[w2 - 1],
-      yG[iy],
-      zTop2[idx2(w2 - 1, iy)],
-      zBot2[idx2(w2 - 1, iy)],
-      xG[w2 - 1],
-      yG[iy + 1],
-      zTop2[idx2(w2 - 1, iy + 1)],
-      zBot2[idx2(w2 - 1, iy + 1)]
-    );
-  }
-
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-  g.computeVertexNormals();
-  return g;
-}
-}
