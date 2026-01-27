@@ -2,6 +2,8 @@ import { useEffect, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Grid } from "@react-three/drei";
 import * as THREE from "three";
+import { OrbitControls, Grid, Edges } from "@react-three/drei";
+
 
 export type HeightmapState = {
   normF32: Float32Array; // valori normalizzati 0..1 (o simile)
