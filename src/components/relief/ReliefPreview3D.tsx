@@ -1,5 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+const showHelpers = true;
 
 type Props = {
   // metti i tuoi props veri qui, anche se non li usi nel debug
