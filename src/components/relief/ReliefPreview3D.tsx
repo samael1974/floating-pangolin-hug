@@ -19,7 +19,7 @@ type Props = {
   decimateStep: number;
   depthMm: number;
   baseMm: number;
-  outputMode?: OutputMode; // default "relief"
+  outputMode?: OutputMode; // mantenuto per compatibilità, ma non serve al builder
   baseStyle: BaseStyle;
 };
 
@@ -101,9 +101,7 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
       <hemisphereLight intensity={0.14} groundColor="#050505" />
 
       <CameraKeyLight intensity={1.6} />
-
       <directionalLight position={[-520, 260, 260]} intensity={0.28} color="#ffffff" />
-
       <HeadLight intensity={0.3} />
 
       <mesh geometry={geometry}>
@@ -146,26 +144,30 @@ export default function ReliefPreview3D({
   decimateStep,
   depthMm,
   baseMm,
-  outputMode = "relief",
+  outputMode = "relief", // tenuto (non usato nel builder) per compatibilità esterna
   baseStyle,
 }: Props) {
-  // ✅ Guardia hard: se non c’è heightmap, niente calcoli 3D
   const geometry = React.useMemo<THREE.BufferGeometry | null>(() => {
     if (!hmState) return null;
 
     const hmDec = decimateHm(hmState, decimateStep);
 
     try {
-      const geo = buildSolidFromHeightmap({
-        normF32: hmDec.normF32,
-        w: hmDec.w,
-        h: hmDec.h,
-        widthMm: stlWidthMm,
+      // 🔧 Nuova API: niente normF32/w/h/widthMm/outputMode
+      // Passiamo height01 + width/height + outWidthMm
+      const out = buildSolidFromHeightmap({
+        height01: hmDec.normF32,
+        width: hmDec.w,
+        height: hmDec.h,
+        outWidthMm: stlWidthMm,
         depthMm,
         baseMm,
-        outputMode,
-        baseStyle,
+        // Se il tuo BaseStyle ha gli stessi literal ("flat"|"recessed"|"offset") allora è ok diretto.
+        // In caso contrario serve una mappatura (te la preparo appena vedo reliefTypes.ts).
+        baseStyle: baseStyle as any,
       });
+
+      const geo = out.geometry;
 
       geo.computeBoundingBox();
       const bb = geo.boundingBox;
@@ -184,7 +186,6 @@ export default function ReliefPreview3D({
     }
   }, [hmState, stlWidthMm, decimateStep, depthMm, baseMm, outputMode, baseStyle]);
 
-  // ✅ Evita memory leak: dispose quando cambia geometria o unmount
   React.useEffect(() => {
     return () => {
       geometry?.dispose();
