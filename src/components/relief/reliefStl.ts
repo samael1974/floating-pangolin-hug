@@ -13,10 +13,46 @@ type DownloadArgs = {
   widthMm: number;
   depthMm: number;
   baseMm: number;
-  outputMode: OutputMode; // (attualmente non usato dal builder: tenuto per compatibilità UI)
+  outputMode: OutputMode; // (per ora non usato dal builder: tenuto per compatibilità UI)
   baseStyle: BaseStyle;
   fileName?: string;
 };
+
+// --- Base style mapping (no "any", robust) --------------------
+type SolidBaseStyle = "flat" | "recessed" | "offset";
+
+/**
+ * Converte qualunque BaseStyle UI nei 3 valori accettati dal builder.
+ * Quando ci incolli reliefTypes.ts la rendiamo 100% type-safe via switch.
+ */
+function mapBaseStyleToSolid(baseStyle: BaseStyle): SolidBaseStyle {
+  const v = String(baseStyle ?? "").trim().toLowerCase();
+
+  // incassata / recessed
+  if (
+    v.includes("recess") ||
+    v.includes("incass") ||
+    v.includes("inset") ||
+    v.includes("engrave") ||
+    v.includes("negativ")
+  ) {
+    return "recessed";
+  }
+
+  // offset / CAD-like (per ora offset "verticale" slicer-safe)
+  if (
+    v.includes("offset") ||
+    v.includes("cad") ||
+    v.includes("shell") ||
+    v.includes("spessor") ||
+    v.includes("rialz")
+  ) {
+    return "offset";
+  }
+
+  // default: base piatta
+  return "flat";
+}
 
 /** STL binary writer (little-endian) */
 function geometryToBinaryStl(geom: THREE.BufferGeometry): ArrayBuffer {
@@ -53,7 +89,12 @@ function geometryToBinaryStl(geom: THREE.BufferGeometry): ArrayBuffer {
     ac.subVectors(c, a);
     n.crossVectors(ab, ac);
 
-    if (!Number.isFinite(n.x) || !Number.isFinite(n.y) || !Number.isFinite(n.z) || n.lengthSq() < 1e-30) {
+    if (
+      !Number.isFinite(n.x) ||
+      !Number.isFinite(n.y) ||
+      !Number.isFinite(n.z) ||
+      n.lengthSq() < 1e-30
+    ) {
       n.set(0, 0, 0);
     } else {
       n.normalize();
@@ -164,10 +205,20 @@ function downloadArrayBuffer(buffer: ArrayBuffer, fileName: string) {
 }
 
 export function downloadReliefStlBinary(args: DownloadArgs) {
-  const { hm, widthMm, depthMm, baseMm, outputMode, baseStyle } = args;
+  const {
+    hm,
+    widthMm,
+    depthMm,
+    baseMm,
+    outputMode: _outputMode, // tenuto per compatibilità; non usato ora
+    baseStyle,
+    fileName,
+  } = args;
 
   if (!hm) throw new Error("STL: missing heightmap (hm)");
   if (!(hm.normF32 instanceof Float32Array)) throw new Error("STL: hm.normF32 missing/invalid");
+
+  const solidBaseStyle = mapBaseStyleToSolid(baseStyle);
 
   // ✅ Nuova API: buildSolidFromHeightmap() ritorna { geometry, vertices, indices }
   const out = buildSolidFromHeightmap({
@@ -177,9 +228,7 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
     outWidthMm: widthMm,
     depthMm,
     baseMm,
-    // outputMode: attualmente non usato dal builder (tenuto nel tipo args per UI)
-    // Se BaseStyle non coincide con "flat"|"recessed"|"offset", va mappato (vedi nota sotto).
-    baseStyle: baseStyle as any,
+    baseStyle: solidBaseStyle,
   });
 
   const geom = out.geometry;
@@ -215,5 +264,5 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
   }
 
   const bin = geometryToBinaryStl(geom);
-  downloadArrayBuffer(bin, args.fileName ?? "reliefforge");
+  downloadArrayBuffer(bin, fileName ?? "reliefforge");
 }
