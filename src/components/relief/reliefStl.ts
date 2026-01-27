@@ -14,45 +14,9 @@ type DownloadArgs = {
   depthMm: number;
   baseMm: number;
   outputMode: OutputMode; // (per ora non usato dal builder: tenuto per compatibilità UI)
-  baseStyle: BaseStyle;
+  baseStyle: BaseStyle;   // ✅ coincide con il builder
   fileName?: string;
 };
-
-// --- Base style mapping (no "any", robust) --------------------
-type SolidBaseStyle = "flat" | "recessed" | "offset";
-
-/**
- * Converte qualunque BaseStyle UI nei 3 valori accettati dal builder.
- * Quando ci incolli reliefTypes.ts la rendiamo 100% type-safe via switch.
- */
-function mapBaseStyleToSolid(baseStyle: BaseStyle): SolidBaseStyle {
-  const v = String(baseStyle ?? "").trim().toLowerCase();
-
-  // incassata / recessed
-  if (
-    v.includes("recess") ||
-    v.includes("incass") ||
-    v.includes("inset") ||
-    v.includes("engrave") ||
-    v.includes("negativ")
-  ) {
-    return "recessed";
-  }
-
-  // offset / CAD-like (per ora offset "verticale" slicer-safe)
-  if (
-    v.includes("offset") ||
-    v.includes("cad") ||
-    v.includes("shell") ||
-    v.includes("spessor") ||
-    v.includes("rialz")
-  ) {
-    return "offset";
-  }
-
-  // default: base piatta
-  return "flat";
-}
 
 /** STL binary writer (little-endian) */
 function geometryToBinaryStl(geom: THREE.BufferGeometry): ArrayBuffer {
@@ -218,9 +182,6 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
   if (!hm) throw new Error("STL: missing heightmap (hm)");
   if (!(hm.normF32 instanceof Float32Array)) throw new Error("STL: hm.normF32 missing/invalid");
 
-  const solidBaseStyle = mapBaseStyleToSolid(baseStyle);
-
-  // ✅ Nuova API: buildSolidFromHeightmap() ritorna { geometry, vertices, indices }
   const out = buildSolidFromHeightmap({
     height01: hm.normF32,
     width: hm.w,
@@ -228,7 +189,7 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
     outWidthMm: widthMm,
     depthMm,
     baseMm,
-    baseStyle: solidBaseStyle,
+    baseStyle, // ✅ type-safe: "flat" | "recessed" | "offset"
   });
 
   const geom = out.geometry;
