@@ -116,10 +116,44 @@ function countOpenEdges(geom: THREE.BufferGeometry) {
     addEdge(i2, i0);
   }
 
-  let openEdges = 0;
-  for (const c of edgeCount.values()) if (c === 1) openEdges++;
+ const open: Array<{ a: string; b: string; mid: string; len: number }> = [];
 
-  return { triCount, totalEdges: edgeCount.size, openEdges };
+const parse = (k: string) => {
+  const [x, y, z] = k.split(",").map((s) => Number(s) / 1000);
+  return { x, y, z };
+};
+
+let openEdges = 0;
+for (const [k, c] of edgeCount.entries()) {
+  if (c !== 1) continue;
+  openEdges++;
+
+  // k = "ax,ay,az|bx,by,bz"
+  const [ka, kb] = k.split("|");
+  const A = parse(ka);
+  const B = parse(kb);
+
+  const mx = (A.x + B.x) * 0.5;
+  const my = (A.y + B.y) * 0.5;
+  const mz = (A.z + B.z) * 0.5;
+
+  const dx = A.x - B.x;
+  const dy = A.y - B.y;
+  const dz = A.z - B.z;
+  const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+  if (open.length < 32) {
+    open.push({
+      a: `${A.x.toFixed(3)},${A.y.toFixed(3)},${A.z.toFixed(3)}`,
+      b: `${B.x.toFixed(3)},${B.y.toFixed(3)},${B.z.toFixed(3)}`,
+      mid: `${mx.toFixed(3)},${my.toFixed(3)},${mz.toFixed(3)}`,
+      len: Number(len.toFixed(3)),
+    });
+  }
+}
+
+return { triCount, totalEdges: edgeCount.size, openEdges, openSample: open };
+
 }
 
 function downloadArrayBuffer(buffer: ArrayBuffer, fileName: string) {
