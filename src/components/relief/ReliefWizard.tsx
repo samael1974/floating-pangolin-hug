@@ -145,7 +145,6 @@ export default function ReliefWizard() {
   // ✅ Nome file STL (personalizzabile)
   const [customName, setCustomName] = React.useState<string>("reliefforge");
 
-// ✅ Params (allineati a ReliefParams: include cutoutEnabled REQUIRED)
 const [params, setParams] = React.useState<ReliefParams>(() => ({
   projectType: "logo_text",
   depthMm: 3,
@@ -154,10 +153,11 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
   smooth: 0.15,
   edge: "sharp",
   outputMode: "relief",
-  baseStyle: "flat",
+  baseStyle: "offset", // se vuoi default offset; se preferisci "flat", cambia qui
 
-  // ✅ richiesto dal tuo tipo ReliefParams
+  // REQUIRED da ReliefParams (da errore TypeScript)
   cutoutEnabled: false,
+  cutoutThreshold: 0.18,
 }));
 
 
