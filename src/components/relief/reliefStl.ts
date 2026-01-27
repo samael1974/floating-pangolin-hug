@@ -89,7 +89,8 @@ function downloadArrayBuffer(buffer: ArrayBuffer, fileName: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = fileName.toLowerCase().endsWith(".stl") ? fileName : `${fileName}.stl`;
-  document.body.appendChild(a);
+throw new Error(`STL: non-finite vertex at index ${i}`);
+
   a.click();
   a.remove();
 
