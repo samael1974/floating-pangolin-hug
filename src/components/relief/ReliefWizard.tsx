@@ -11,6 +11,7 @@ import { inspectPng, pngCompatibilityMessage } from "@/lib/relief/inspectPng";
 import { decodeDepthmapPng } from "@/lib/relief/decodeDepthmapPng";
 import { renderDepthmapToCanvas } from "@/lib/relief/renderDepthmapToCanvas";
 
+
 type SourceMode = "image" | "depthmap";
 
 export type HeightmapState = {
