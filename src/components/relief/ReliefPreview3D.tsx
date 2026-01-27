@@ -139,12 +139,7 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
           </mesh>
         )}
 
-        {/* Cubo debug al centro */}
-        <mesh position={[0, cubeSize * 0.5, 0]}>
-          <boxGeometry args={[cubeSize, cubeSize, cubeSize]} />
-          <meshStandardMaterial />
-        </mesh>
-
+        
         <OrbitControls makeDefault target={[0, 0, 0]} />
       </Canvas>
     </div>
