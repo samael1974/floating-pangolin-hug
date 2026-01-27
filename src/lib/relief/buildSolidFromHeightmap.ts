@@ -52,16 +52,6 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     return baseMm + depthMm * h01;
   };
   
-    // ✅ FIX: STL slicer è Z-up, ma la geometria può uscire Y-up (Three.js)
-  // Ruota la mesh così lo "spessore" (rilievo/base) finisce su Z.
-  geom.rotateX(-Math.PI / 2);
-
-  // ✅ Rimetti a terra dopo la rotazione (minZ = 0)
-  geom.computeBoundingBox();
-  if (geom.boundingBox) {
-    geom.translate(0, 0, -geom.boundingBox.min.z);
-  }
-
 
   const verts: number[] = [];
   const pushTri = (
