@@ -15,6 +15,9 @@ export default function ReliefPreview3D({ hmState }: Props) {
       <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
         <ambientLight intensity={1} />
         <directionalLight position={[3, 3, 3]} intensity={1} />
+        <axesHelper args={[50]} />
+        <gridHelper args={[200, 20]} />
+
         {/* Debug object ALWAYS visible */}
         <mesh>
           <boxGeometry args={[1, 1, 1]} />
