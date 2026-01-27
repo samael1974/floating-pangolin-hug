@@ -16,7 +16,7 @@ type Props = {
   baseStyle: BaseStyle;
 };
 
-export default function ReliefPreview3D(props: Props) {
+export default function ReliefPreview3D(props: Props): JSX.Element | null {
   const {
     hmState,
     stlWidthMm,
@@ -27,5 +27,9 @@ export default function ReliefPreview3D(props: Props) {
     baseStyle,
   } = props;
 
-  // ... (qui sotto resta il tuo codice attuale invariato)
+  // ⬇️ IMPORTANTISSIMO:
+  // sotto deve esistere ALMENO un return JSX, oppure return null.
+  // Se hai già il tuo codice (useMemo, geometry, Canvas), lascialo com’è,
+  // ma assicurati che alla fine ci sia un return (...).
+  return null;
 }
