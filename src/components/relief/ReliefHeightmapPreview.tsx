@@ -12,8 +12,7 @@ type Props = {
   baseMm: number;
   previewDecimateStep: number;
   baseStyle: BaseStyle;
-  // output fisso in app, ma teniamo param per compatibilità se serve
-  outputMode?: OutputMode;
+  outputMode?: OutputMode; // (non usato dal builder, ma tenuto per compatibilità)
 };
 
 export default function ReliefHeightmapPreview({
@@ -23,7 +22,7 @@ export default function ReliefHeightmapPreview({
   baseMm,
   previewDecimateStep,
   baseStyle,
-  outputMode = "relief", // (non usato dal builder, ma tenuto per compatibilità)
+  outputMode = "relief",
 }: Props) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
@@ -33,7 +32,7 @@ export default function ReliefHeightmapPreview({
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    renderer.setClearColor(0x000000, 0); // trasparente
+    renderer.setClearColor(0x000000, 0);
 
     const scene = new THREE.Scene();
 
@@ -74,7 +73,7 @@ export default function ReliefHeightmapPreview({
     function buildGeometryFromHm(hm: HeightmapState): THREE.BufferGeometry {
       const step = Math.max(1, Math.floor(previewDecimateStep || 1));
 
-      // decimazione: campionamento su griglia (sicuro: out length coerente)
+      // decimazione: campionamento su griglia
       let height01 = hm.normF32;
       let w = hm.w;
       let h = hm.h;
@@ -97,16 +96,18 @@ export default function ReliefHeightmapPreview({
         h = h2;
       }
 
-      const out = buildSolidFromHeightmap({
-  height01: ...,
-  width: ...,
-  height: ...,
-  outWidthMm: widthMm,
-  depthMm,
-  baseMm,
-  baseStyle,
-});
-const geom = out.geometry;
+      // ✅ Nuova API: ritorna { geometry, vertices, indices }
+      const outSolid = buildSolidFromHeightmap({
+        height01,
+        width: w,
+        height: h,
+        outWidthMm: widthMm,
+        depthMm,
+        baseMm,
+        baseStyle,
+      });
+
+      const geom = outSolid.geometry;
 
       // centra XY e appoggia Z a 0 (stabile per preview)
       geom.computeBoundingBox();
@@ -229,7 +230,7 @@ const geom = out.geometry;
       material.dispose();
       renderer.dispose();
     };
-  }, [hmState, widthMm, depthMm, baseMm, previewDecimateStep, baseStyle, outputMode]);
+  }, [hmState, widthMm, depthMm, baseMm, previewDecimateStep, baseStyle /*, outputMode */]);
 
   return (
     <div className="relative h-full w-full">
