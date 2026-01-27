@@ -796,6 +796,14 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
                     }`}
                   
                   >
+
+                  <button
+  type="button"
+  onClick={() => setInvert(v => !v)}
+  className="btn"
+>
+  {invert ? "Inverti Depth Map: ON" : "Inverti Depth Map: OFF"}
+</button>
                     Dettagli
                   </button>
                 </div>
