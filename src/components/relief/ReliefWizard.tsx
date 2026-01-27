@@ -753,14 +753,14 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
 
               <div className="h-[420px] lg:h-[520px]">
                 <ReliefPreview3D
-                  hmState={hmState}
-                  stlWidthMm={stlWidthMm}
-                  decimateStep={decimateStep}
-                  depthMm={params.depthMm}
-                  baseMm={params.baseMm}
-                  outputMode={params.outputMode}
-                  baseStyle={params.baseStyle}
-                />
+              hmState={hmState}
+             stlWidthMm={stlWidthMm}
+            decimateStep={decimateStep}
+           depthMm={depthMm}
+           baseMm={baseMm}
+           outputMode={outputMode}
+           baseStyle={baseStyle}
+/>
               </div>
             </div>
 
