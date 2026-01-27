@@ -172,6 +172,7 @@ export default function ReliefPreview3D({
       });
 
       const geom = out.geometry;
+      
 
       // 1) centra XY e appoggia Z a 0
       geom.computeBoundingBox();
