@@ -230,20 +230,33 @@ export default function ReliefPreview3D({
     );
   }
 
-  return (
-    <Canvas
-      dpr={[1, 2]}
-      gl={{ antialias: true, alpha: true }}
-      onCreated={({ gl }) => {
-        gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 0.3;
-        gl.outputColorSpace = THREE.SRGBColorSpace;
+return (
+  <Canvas
+    dpr={[1, 2]}
+    gl={{ antialias: true, alpha: true }}
+    onCreated={({ gl }) => {
+      gl.toneMapping = THREE.ACESFilmicToneMapping;
+      gl.toneMappingExposure = 0.3;
+      gl.outputColorSpace = THREE.SRGBColorSpace;
+    }}
+    camera={{ position: [180, -260, 220], fov: 38, near: 0.1, far: 8000 }}
+    style={{ width: "100%", height: "100%" }}
+  >
+    <color attach="background" args={["#f6f7fb"]} />
+
+    {/* CORNICE / PASSEPARTOUT (MVP) */}
+    <FramePreview3D
+      enabled={frameEnabled}
+      params={{
+        outerWidth: frameOuterW,
+        outerHeight: frameOuterH,
+        frameThickness: frameThickness,
+        depth: frameDepth,
       }}
-      camera={{ position: [180, -260, 220], fov: 38, near: 0.1, far: 8000 }}
-      style={{ width: "100%", height: "100%" }}
-    >
-      <color attach="background" args={["#f6f7fb"]} />
-      <Scene geometry={geometry} />
-    </Canvas>
-  );
-}
+    />
+
+    {/* RELIEF */}
+    <Scene geometry={geometry} />
+  </Canvas>
+);
+
