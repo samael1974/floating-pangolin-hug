@@ -158,7 +158,6 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
   cutoutEnabled: false,
 }));
 
-
   // ✅ Heightmap state/status
   const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
   const [hmStatus, setHmStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
