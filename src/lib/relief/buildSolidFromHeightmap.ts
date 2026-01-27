@@ -61,6 +61,8 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     verts.push(ax, ay, az, bx, by, bz, cx, cy, cz);
   };
 
+    
+
   // ==========================
   // TOP SURFACE (sempre)
   // ==========================
