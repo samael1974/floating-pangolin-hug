@@ -1,10 +1,10 @@
 import * as React from "react";
 import type {} from "@react-three/fiber";
 
-// ⚠️ Import modulo intero (evita errori “no exported member”)
+// Importo il modulo intero (evita “no exported member”)
 import * as FrameMod from "@/lib/relief/frame/createFrameGeometry";
 
-// Definisco il type QUI per evitare l’errore “FrameParams non esportato”
+// Type locale: non dipende da export FrameParams
 type FrameParams = {
   outerWidth: number;
   outerHeight: number;
@@ -18,7 +18,7 @@ type Props = {
 };
 
 export default function FramePreview3D({ enabled, params }: Props) {
-  // Prendo la factory in modo “compatibile” sia con export named che default
+  // Supporta sia export named che default (nel dubbio)
   const createFn =
     (FrameMod as any).createFrameGeometry ?? (FrameMod as any).default;
 
