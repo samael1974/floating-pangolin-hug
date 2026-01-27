@@ -156,16 +156,18 @@ export default function ReliefPreview3D({
       // 🔧 Nuova API: niente normF32/w/h/widthMm/outputMode
       // Passiamo height01 + width/height + outWidthMm
       const out = buildSolidFromHeightmap({
-        height01: hmDec.normF32,
-        width: hmDec.w,
-        height: hmDec.h,
-        outWidthMm: stlWidthMm,
-        depthMm,
-        baseMm,
-        // Se il tuo BaseStyle ha gli stessi literal ("flat"|"recessed"|"offset") allora è ok diretto.
-        // In caso contrario serve una mappatura (te la preparo appena vedo reliefTypes.ts).
-        baseStyle: baseStyle as any,
-      });
+  height01: hmDec.normF32,
+  width: hmDec.w,
+  height: hmDec.h,
+  outWidthMm: stlWidthMm,
+  depthMm,
+  baseMm,
+  baseStyle,
+  // outputMode non serve qui se il builder non lo usa
+});
+
+const geo = out.geometry;
+
 
       const geo = out.geometry;
 
