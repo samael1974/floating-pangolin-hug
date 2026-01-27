@@ -72,7 +72,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     return baseMm + depthMm * h01;
   };
 
-  // ==========================
+   // ==========================
   // OFFSET MODE (baseOffset "CAD": bordo XY + top band + bottom unico)
   // ==========================
   if (baseStyle === "offset") {
@@ -81,14 +81,12 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
 
     const zRelief = (H: number) => {
       const h01 = clamp01(H);
-      // relief: base top = t, sopra aggiungi depth
       if (outputMode === "mold") return t + depthMm * (1 - h01);
       return t + depthMm * h01;
     };
 
-    const xL = x0, xR = x0 + widthMm;
-    const yT = y0, yB = y0 - heightMm;
-
+    // IMPORTANTISSIMO: usa SEMPRE i bordi derivati dalla griglia (dx/dy)
+    // (xL, xR, yT, yB) sono già definiti sopra in modo coerente con i vertici.
     const xL1 = xL - offXY;
     const xR1 = xR + offXY;
     const yT1 = yT + offXY;
@@ -116,7 +114,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
       }
     }
 
-    // helper: quad as 2 tris (keep winding like your other surfaces)
+    // helper: quad as 2 tris
     const quad = (
       ax: number, ay: number, az: number,
       bx: number, by: number, bz: number,
@@ -128,17 +126,14 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     };
 
     // --- 2) TOP BAND (flat) around inner rect at z = t
-    // top band (between yT..yT1)
-    quad(xL1, yT1, t,  xR1, yT1, t,  xR, yT, t,  xL, yT, t);
-    // bottom band (between yB1..yB)
-    quad(xL,  yB,  t,  xR,  yB,  t,  xR1, yB1, t,  xL1, yB1, t);
-    // left band (between xL1..xL)
-    quad(xL1, yB1, t,  xL1, yT1, t,  xL,  yT,  t,  xL,  yB,  t);
-    // right band (between xR..xR1)
-    quad(xR,  yT,  t,  xR1, yT1, t,  xR1, yB1, t,  xR,  yB,  t);
+    quad(xL1, yT1, t,  xR1, yT1, t,  xR,  yT,  t,  xL,  yT,  t); // top band
+    quad(xL,  yB,  t,  xR,  yB,  t,  xR1, yB1, t,  xL1, yB1, t); // bottom band
+    quad(xL1, yB1, t,  xL1, yT1, t,  xL,  yT,  t,  xL,  yB,  t); // left band
+    quad(xR,  yT,  t,  xR1, yT1, t,  xR1, yB1, t,  xR,  yB,  t); // right band
 
     // --- 3) INNER WALLS: connect relief edge down to top band (z=t) along inner rect
-    // left inner wall (x = xL) outward normal ~ -X
+
+    // left inner wall (x = xL)
     for (let iy = 0; iy < h - 1; iy++) {
       const y1 = y0 - iy * dy;
       const y2 = y0 - (iy + 1) * dy;
@@ -148,7 +143,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
       pushTri(xL, y1, t,  xL, y2, z2, xL, y2, t);
     }
 
-    // right inner wall (x = xR) outward normal ~ +X
+    // right inner wall (x = xR)
     for (let iy = 0; iy < h - 1; iy++) {
       const y1 = y0 - iy * dy;
       const y2 = y0 - (iy + 1) * dy;
@@ -158,7 +153,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
       pushTri(xR, y1, t,  xR, y2, t,  xR, y2, z2);
     }
 
-    // top inner wall (y = yT) outward normal ~ +Y
+    // top inner wall (y = yT)
     for (let ix = 0; ix < w - 1; ix++) {
       const x1 = x0 + ix * dx;
       const x2 = x0 + (ix + 1) * dx;
@@ -168,7 +163,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
       pushTri(x1, yT, t,  x2, yT, t,  x2, yT, z2);
     }
 
-    // bottom inner wall (y = yB) outward normal ~ -Y
+    // bottom inner wall (y = yB)
     for (let ix = 0; ix < w - 1; ix++) {
       const x1 = x0 + ix * dx;
       const x2 = x0 + (ix + 1) * dx;
@@ -180,26 +175,20 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
 
     // --- 4) OUTER WALLS: outer rect from z=0 to z=t
     // left outer (x = xL1)
-    for (let s = 0; s < 1; s++) {
-      // segment yB1..yT1 as single quad split in 2 tris
-      pushTri(xL1, yB1, 0,  xL1, yB1, t,  xL1, yT1, t);
-      pushTri(xL1, yB1, 0,  xL1, yT1, t,  xL1, yT1, 0);
-    }
+    pushTri(xL1, yB1, 0,  xL1, yB1, t,  xL1, yT1, t);
+    pushTri(xL1, yB1, 0,  xL1, yT1, t,  xL1, yT1, 0);
+
     // right outer (x = xR1)
-    for (let s = 0; s < 1; s++) {
-      pushTri(xR1, yB1, 0,  xR1, yT1, t,  xR1, yB1, t);
-      pushTri(xR1, yB1, 0,  xR1, yT1, 0,  xR1, yT1, t);
-    }
+    pushTri(xR1, yB1, 0,  xR1, yT1, t,  xR1, yB1, t);
+    pushTri(xR1, yB1, 0,  xR1, yT1, 0,  xR1, yT1, t);
+
     // top outer (y = yT1)
-    for (let s = 0; s < 1; s++) {
-      pushTri(xL1, yT1, 0,  xR1, yT1, t,  xL1, yT1, t);
-      pushTri(xL1, yT1, 0,  xR1, yT1, 0,  xR1, yT1, t);
-    }
+    pushTri(xL1, yT1, 0,  xR1, yT1, t,  xL1, yT1, t);
+    pushTri(xL1, yT1, 0,  xR1, yT1, 0,  xR1, yT1, t);
+
     // bottom outer (y = yB1)
-    for (let s = 0; s < 1; s++) {
-      pushTri(xL1, yB1, 0,  xL1, yB1, t,  xR1, yB1, t);
-      pushTri(xL1, yB1, 0,  xR1, yB1, t,  xR1, yB1, 0);
-    }
+    pushTri(xL1, yB1, 0,  xL1, yB1, t,  xR1, yB1, t);
+    pushTri(xL1, yB1, 0,  xR1, yB1, t,  xR1, yB1, 0);
 
     // --- 5) BOTTOM (outer rect) z=0
     pushTri(xL1, yT1, 0,  xR1, yB1, 0,  xR1, yT1, 0);
@@ -210,6 +199,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     g.computeVertexNormals();
     return g;
   }
+
 
   // ===================================================================
   // NON-OFFSET = base piatta classica (bottom z=0 + 4 lati)
