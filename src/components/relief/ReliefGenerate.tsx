@@ -1,6 +1,7 @@
 import * as React from "react";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
-import type { BaseStyle } from "@/lib/reliefTypes";
+import type { BaseStyle } from "@/lib/relief/reliefTypes";
+
 const ReliefPreview3DAny = ReliefPreview3D as unknown as React.ComponentType<any>;
 
 type HeightmapState = {
@@ -28,15 +29,15 @@ export default function ReliefGenerate({
 }: Props) {
   return (
     <div className="h-full w-full">
-<ReliefPreview3DAny
-  hmState={hmState}
-  stlWidthMm={widthMm}
-  decimateStep={previewDecimateStep}
-  depthMm={depthMm}
-  baseMm={baseMm}
-  outputMode="relief"
-  baseStyle={baseStyle}
-/>
+      <ReliefPreview3DAny
+        hmState={hmState}
+        stlWidthMm={widthMm}
+        decimateStep={previewDecimateStep}
+        depthMm={depthMm}
+        baseMm={baseMm}
+        outputMode="relief"
+        baseStyle={baseStyle}
+      />
     </div>
   );
 }
