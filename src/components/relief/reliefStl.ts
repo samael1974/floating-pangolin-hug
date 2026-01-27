@@ -193,6 +193,7 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
 });
 const geom = out.geometry;
 
+
   // opzionale ma utile: centra e appoggia Z a 0 (come preview)
   geom.computeBoundingBox();
   const bb = geom.boundingBox;
