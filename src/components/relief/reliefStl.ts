@@ -1,9 +1,6 @@
-// src/components/relief/reliefStl.ts
 import * as THREE from "three";
-
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
 import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
-import { applyCutoutToFlatGeometry } from "@/lib/relief/cutout";
 
 export type HeightmapState = {
   normF32: Float32Array;
@@ -11,9 +8,8 @@ export type HeightmapState = {
   h: number;
 };
 
-export type DownloadArgs = {
-  hm?: HeightmapState; // ✅ usato dal Wizard
-  hmState?: HeightmapState; // ✅ compatibilità vecchia
+type DownloadArgs = {
+  hm: HeightmapState;          // ✅ UNICA sorgente: hm
   widthMm: number;
   depthMm: number;
   baseMm: number;
@@ -29,7 +25,6 @@ function geometryToBinaryStl(geom: THREE.BufferGeometry): ArrayBuffer {
   if (!pos) throw new Error("STL: geometry has no position attribute");
 
   const triCount = Math.floor(pos.count / 3);
-
   const buffer = new ArrayBuffer(84 + triCount * 50);
   const view = new DataView(buffer);
 
@@ -101,70 +96,25 @@ function downloadArrayBuffer(buffer: ArrayBuffer, fileName: string) {
   URL.revokeObjectURL(url);
 }
 
-/**
- * Named export usato dal Wizard:
- * - downloadReliefStlBinary({ hm, widthMm, depthMm, baseMm, outputMode, baseStyle, fileName })
- * - oppure (hm, { widthMm, depthMm, ... })
- */
-export function downloadReliefStlBinary(arg1: DownloadArgs | HeightmapState, arg2?: Partial<DownloadArgs>) {
-  // Normalizza input
-  let args: DownloadArgs;
-  let hm: HeightmapState | undefined;
+export function downloadReliefStlBinary(args: DownloadArgs) {
+  const { hm, widthMm, depthMm, baseMm, outputMode, baseStyle } = args;
+  if (!hm) throw new Error("STL: missing heightmap (hm)");
+  if (!(hm.normF32 instanceof Float32Array)) throw new Error("STL: hm.normF32 missing/invalid");
 
-  const isHm =
-    (arg1 as any)?.normF32 instanceof Float32Array &&
-    typeof (arg1 as any)?.w === "number" &&
-    typeof (arg1 as any)?.h === "number";
-
-  if (isHm) {
-    hm = arg1 as HeightmapState;
-    if (!arg2) throw new Error("STL: mancano gli argomenti (widthMm/depthMm/baseMm/...)");
-    if (typeof arg2.widthMm !== "number") throw new Error("STL: widthMm mancante");
-    if (typeof arg2.depthMm !== "number") throw new Error("STL: depthMm mancante");
-    if (typeof arg2.baseMm !== "number") throw new Error("STL: baseMm mancante");
-
-    args = {
-      hm,
-      widthMm: arg2.widthMm,
-      depthMm: arg2.depthMm,
-      baseMm: arg2.baseMm,
-      outputMode: (arg2.outputMode ?? "relief") as OutputMode,
-      baseStyle: (arg2.baseStyle ?? "flat") as BaseStyle,
-      fileName: arg2.fileName ?? "reliefforge.stl",
-    };
-  } else {
-    args = arg1 as DownloadArgs;
-    hm = args.hm ?? args.hmState;
-    if (!hm) throw new Error("STL: hm/hmState mancante");
-    if (typeof args.widthMm !== "number") throw new Error("STL: widthMm mancante");
-    if (typeof args.depthMm !== "number") throw new Error("STL: depthMm mancante");
-    if (typeof args.baseMm !== "number") throw new Error("STL: baseMm mancante");
-  }
-
-  // Build geometry (Three = Y-up)
-  let geom = buildSolidFromHeightmap({
+  const geom = buildSolidFromHeightmap({
     normF32: hm.normF32,
     w: hm.w,
     h: hm.h,
-    widthMm: args.widthMm,
-    depthMm: args.depthMm,
-    baseMm: args.baseMm,
-    outputMode: args.outputMode,
-    baseStyle: args.baseStyle,
+    widthMm,
+    depthMm,
+    baseMm,
+    outputMode,
+    baseStyle,
   });
 
-  // ✅ FIX asse per slicer (Z-up)
-  geom.rotateX(-Math.PI / 2);
-  geom.computeBoundingBox();
-  if (geom.boundingBox) geom.translate(0, 0, -geom.boundingBox.min.z);
-
-  // Cutout (se no-op, non fa nulla)
-  geom = applyCutoutToFlatGeometry(geom);
-
-  // Sanity
+  // sanity vertices finite
   const pos = geom.getAttribute("position") as THREE.BufferAttribute | undefined;
   if (!pos) throw new Error("STL: missing position");
-
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
@@ -173,5 +123,5 @@ export function downloadReliefStlBinary(arg1: DownloadArgs | HeightmapState, arg
   }
 
   const bin = geometryToBinaryStl(geom);
-  downloadArrayBuffer(bin, args.fileName ?? "reliefforge.stl");
+  downloadArrayBuffer(bin, args.fileName ?? "reliefforge");
 }
