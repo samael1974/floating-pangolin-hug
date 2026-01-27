@@ -201,7 +201,7 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
 
   // ✅ debug: open edges
   const check = countOpenEdges(geom);
-  console.log("[MESH CHECK]", check);
+  console.log("[MESH CHECK]", check); if (check.openEdges > 0) console.table(check.openSample);
   if (check.openEdges > 0) {
     throw new Error(`Mesh non chiusa: openEdges=${check.openEdges}`);
   }
