@@ -50,22 +50,32 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
       baseStyle,
     });
 
-    const keys = hmState ? Object.keys(hmState) : [];
-    console.log("hmState keys:", keys);
+    const reliefGeometry = useMemo(() => {
+  if (!hmState) return null;
 
-    if (hmState) {
-      const summary = Object.fromEntries(
-        keys.map((k) => {
-          const v = (hmState as any)[k];
-          const type = Array.isArray(v)
-            ? `Array(${v.length})`
-            : typeof v;
-          return [k, type];
-        })
-      );
-      console.log("hmState summary:", summary);
-    }
-  }, [hmState, stlWidthMm, decimateStep, depthMm, baseMm, outputMode, baseStyle]);
+  const { w, h, normF32 } = hmState;
+
+  // dimensioni della piastra in preview (mm ≈ unità scena)
+  const width = stlWidthMm;
+  const height = stlWidthMm * (h / w);
+
+  // PlaneGeometry: (width, height, widthSegments, heightSegments)
+  const geo = new THREE.PlaneGeometry(width, height, w - 1, h - 1);
+
+  // Sposta i vertici in Z usando la heightmap normalizzata
+  const pos = geo.attributes.position.array as Float32Array;
+  const vCount = Math.min(normF32.length, pos.length / 3);
+
+  for (let i = 0; i < vCount; i++) {
+    pos[i * 3 + 2] = normF32[i] * depthMm; // da 0 a depthMm
+  }
+
+  geo.attributes.position.needsUpdate = true;
+  geo.computeVertexNormals();
+
+  return geo;
+}, [hmState, stlWidthMm, depthMm]);
+
 
   return (
     <div style={{ width: "100%", height: 420, background: "#fff" }}>
