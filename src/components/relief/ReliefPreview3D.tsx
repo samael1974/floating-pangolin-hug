@@ -6,6 +6,8 @@ import * as THREE from "three";
 
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
 import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
+import FramePreview3D from "./FramePreview3D";
+
 
 export type HeightmapState = {
   normF32: Float32Array;
