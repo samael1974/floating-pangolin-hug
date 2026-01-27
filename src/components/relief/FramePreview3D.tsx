@@ -1,5 +1,6 @@
 import * as React from "react";
-import { createFrameGeometry, type FrameParams } from "@/lib/relief/frame/createFrameGeometry";
+import * as Frame from "@/lib/relief/frame/createFrameGeometry";
+import type { FrameParams } from "@/lib/relief/frame/createFrameGeometry";
 
 // ✅ Import “types side-effect” per far riconoscere <mesh> e <meshStandardMaterial> a TS
 import type {} from "@react-three/fiber";
