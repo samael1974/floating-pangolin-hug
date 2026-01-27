@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as THREE from "three";
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
-import type { BaseStyle, OutputMode } from "@/lib/reliefTypes";
+import type { BaseStyle, OutputMode } from "@/lib/relief/reliefTypes";
 
 type HeightmapState = { normF32: Float32Array; w: number; h: number };
 
@@ -23,7 +23,7 @@ export default function ReliefPreview3D({
   baseMm,
   previewDecimateStep,
   baseStyle,
-  outputMode = "relief",
+  outputMode = "relief", // (non usato dal builder, ma tenuto per compatibilità)
 }: Props) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
@@ -53,7 +53,7 @@ export default function ReliefPreview3D({
     fill.position.set(-250, 200, 250);
     scene.add(fill);
 
-    // “piano” leggero per ombre visive (senza shadow map per semplicità)
+    // grid leggero
     const grid = new THREE.GridHelper(widthMm * 1.2, 12, 0xcccccc, 0xdddddd);
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.25;
@@ -61,14 +61,66 @@ export default function ReliefPreview3D({
     grid.position.z = -0.02;
     scene.add(grid);
 
-    // Mesh
-    let mesh: THREE.Mesh | null = null;
-
+    // Material
     const material = new THREE.MeshStandardMaterial({
       color: 0xe9e9e9,
       roughness: 0.9,
       metalness: 0.0,
     });
+
+    // Mesh
+    let mesh: THREE.Mesh | null = null;
+
+    function buildGeometryFromHm(hm: HeightmapState): THREE.BufferGeometry {
+      const step = Math.max(1, Math.floor(previewDecimateStep || 1));
+
+      // decimazione: campionamento su griglia (sicuro: out length coerente)
+      let height01 = hm.normF32;
+      let w = hm.w;
+      let h = hm.h;
+
+      if (step > 1) {
+        const w2 = Math.max(2, Math.floor(hm.w / step));
+        const h2 = Math.max(2, Math.floor(hm.h / step));
+        const out = new Float32Array(w2 * h2);
+
+        for (let y = 0; y < h2; y++) {
+          const sy = Math.min(hm.h - 1, y * step);
+          for (let x = 0; x < w2; x++) {
+            const sx = Math.min(hm.w - 1, x * step);
+            out[y * w2 + x] = hm.normF32[sy * hm.w + sx] ?? 0;
+          }
+        }
+
+        height01 = out;
+        w = w2;
+        h = h2;
+      }
+
+      const outSolid = buildSolidFromHeightmap({
+        height01,
+        width: w,
+        height: h,
+        outWidthMm: widthMm,
+        depthMm,
+        baseMm,
+        baseStyle, // ✅ type-safe: "flat" | "recessed" | "offset"
+      });
+
+      const geom = outSolid.geometry;
+
+      // centra XY e appoggia Z a 0 (stabile per preview)
+      geom.computeBoundingBox();
+      const bb = geom.boundingBox;
+      if (bb) {
+        const center = new THREE.Vector3();
+        bb.getCenter(center);
+        geom.translate(-center.x, -center.y, -bb.min.z);
+      }
+
+      geom.computeVertexNormals();
+      return geom;
+    }
 
     function rebuild() {
       if (!hmState) {
@@ -80,65 +132,15 @@ export default function ReliefPreview3D({
         return;
       }
 
-      // decimazione preview (semplice): campionamento su griglia
-      const step = Math.max(1, Math.floor(previewDecimateStep));
-      const w = hmState.w;
-      const h = hmState.h;
-
-      if (step > 1) {
-        const dw = Math.floor((w - 1) / step) + 1;
-        const dh = Math.floor((h - 1) / step) + 1;
-        const out = new Float32Array(dw * dh);
-
-        let p = 0;
-        for (let iy = 0; iy < h; iy += step) {
-          for (let ix = 0; ix < w; ix += step) {
-            out[p++] = hmState.normF32[iy * w + ix];
-          }
-        }
-
-       const outSolid = buildSolidFromHeightmap({
-  height01: out,      // prima: normF32: out
-  width: dw,          // prima: w: dw
-  height: dh,         // prima: h: dh
-  outWidthMm: widthMm, // prima: widthMm
-  depthMm,
-  baseMm,
-  baseStyle: baseStyle as any,
-});
-
-const geom = outSolid.geometry;
-
-if (mesh) {
-  scene.remove(mesh);
-  mesh.geometry.dispose();
-}
-
-mesh = new THREE.Mesh(geom, material);
-// orientamento: Z su, Y “in basso sullo schermo” già ok; ruotiamo per vista più naturale
-mesh.rotation.x = 0;
-scene.add(mesh);
-return;
-}
-
-const outSolid2 = buildSolidFromHeightmap({
-  height01: hmState.normF32, // prima: normF32
-  width: hmState.w,          // prima: w
-  height: hmState.h,         // prima: h
-  outWidthMm: widthMm,       // prima: widthMm
-  depthMm,
-  baseMm,
-  baseStyle: baseStyle as any,
-});
-
-const geom2 = outSolid2.geometry;
-
+      const geom = buildGeometryFromHm(hmState);
 
       if (mesh) {
         scene.remove(mesh);
         mesh.geometry.dispose();
       }
+
       mesh = new THREE.Mesh(geom, material);
+      mesh.rotation.x = 0;
       scene.add(mesh);
     }
 
@@ -202,7 +204,7 @@ const geom2 = outSolid2.geometry;
     rebuild();
 
     const ro = new ResizeObserver(() => resize());
-    canvas.parentElement && ro.observe(canvas.parentElement);
+    if (canvas.parentElement) ro.observe(canvas.parentElement);
 
     let raf = 0;
     const loop = () => {
@@ -224,18 +226,27 @@ const geom2 = outSolid2.geometry;
         scene.remove(mesh);
         mesh.geometry.dispose();
       }
+
       material.dispose();
       renderer.dispose();
     };
     // rebuild when inputs change:
-  }, [hmState, widthMm, depthMm, baseMm, previewDecimateStep, baseStyle]);
+  }, [
+    hmState,
+    widthMm,
+    depthMm,
+    baseMm,
+    previewDecimateStep,
+    baseStyle,
+    outputMode, // (non usato, ma lasciato perché è prop)
+  ]);
 
   return (
     <div className="relative h-full w-full">
       <canvas ref={canvasRef} className="h-full w-full" />
       {!hmState && (
         <div className="absolute inset-0 grid place-items-center text-xs text-gray-500">
-          La preview 3D appare dopo la generazione della heightmap (normF32/w/h).
+          La preview 3D appare dopo la generazione della heightmap.
         </div>
       )}
     </div>
