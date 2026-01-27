@@ -35,9 +35,10 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   const y0 = heightMm / 2;
 
   const xL = x0;
-  const xR = x0 + (w - 1) * dx;
+  const xR = x0 + (w - 1) * dx;   // << usa dx (stesso identico calcolo della griglia)
   const yT = y0;
-  const yB = y0 - (h - 1) * dy;
+  const yB = y0 - (h - 1) * dy;   // << usa dy (stesso identico calcolo della griglia)
+
 
   const verts: number[] = [];
   const pushTri = (
