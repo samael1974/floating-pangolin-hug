@@ -87,6 +87,14 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
   baseStyle,
 });
 
+const check = countOpenEdges(geom);
+console.log("[MESH CHECK]", check);
+
+if (check.openEdges > 0) {
+  throw new Error(`Mesh non chiusa: openEdges=${check.openEdges}`);
+}
+
+
 
   // sanity vertices finite
   const pos = geom.getAttribute("position") as THREE.BufferAttribute | undefined;
@@ -101,3 +109,4 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
   const bin = geometryToBinaryStl(geom);
   downloadArrayBuffer(bin, args.fileName ?? "reliefforge");
 }
+
