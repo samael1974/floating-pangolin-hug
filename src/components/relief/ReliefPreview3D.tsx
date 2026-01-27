@@ -3,6 +3,7 @@ import * as React from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
+import FramePreview3D from "./FramePreview3D";
 
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
 import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
