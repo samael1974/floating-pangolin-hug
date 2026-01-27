@@ -17,8 +17,9 @@ type Props = {
   decimateStep: number;
   depthMm: number;
   baseMm: number;
-  outputMode?: OutputMode;
-  baseStyle: BaseStyle;
+  outputMode?: any;
+  baseStyle: any;
+
 };
 
 export default function ReliefPreview3D(props: Props): JSX.Element {
