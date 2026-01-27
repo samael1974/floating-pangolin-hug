@@ -136,10 +136,14 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
 
         {/* Rilievo: ruoto il piano per appoggiarlo sulla griglia */}
         {reliefGeometry && (
-          <mesh geometry={reliefGeometry} rotation={[-Math.PI / 2, 0, 0]}>
-            <meshStandardMaterial wireframe side={THREE.DoubleSide} />
-          </mesh>
-        )}
+  <mesh
+    geometry={makeSolidFromRelief(reliefGeometry, baseMm)}
+    rotation={[-Math.PI / 2, 0, 0]}
+  >
+    <meshStandardMaterial roughness={0.75} metalness={0.05} />
+    <Edges />
+  </mesh>
+)}
 
         
         <OrbitControls makeDefault target={[0, 0, 0]} />
