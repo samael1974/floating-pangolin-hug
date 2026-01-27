@@ -1,46 +1,62 @@
 import { useEffect, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid } from "@react-three/drei";
-import * as THREE from "three";
 import { OrbitControls, Grid, Edges } from "@react-three/drei";
+import * as THREE from "three";
 
+export type HeightmapState = {
+  normF32: Float32Array; // valori 0..1 (o simile)
+  w: number;
+  h: number;
+};
+
+type Props = {
+  hmState: HeightmapState | null;
+  stlWidthMm: number;
+  decimateStep: number;
+  depthMm: number;
+  baseMm: number;
+  outputMode?: any;
+  baseStyle: any;
+};
+
+/**
+ * Crea un solido "tipo STL" da un top (plane deformato):
+ * - TOP (come la geometry originale)
+ * - BOTTOM (piatto a -baseMm)
+ * - WALLS (chiusura sui 4 bordi della griglia)
+ *
+ * Funziona bene quando topGeo è una PlaneGeometry indicizzata (lo è di default).
+ */
 function makeSolidFromRelief(topGeo: THREE.BufferGeometry, baseMm: number) {
   const geo = topGeo.clone();
 
-  // assicuro che sia indexed (serve per lavorare bene coi triangoli)
-  if (!geo.index) geo = geo.toNonIndexed();
-
-  const pos = geo.attributes.position.array as Float32Array;
+  const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
+  const pos = posAttr.array as Float32Array;
   const vertCount = pos.length / 3;
 
-  // TOP positions
+  // TOP positions (copiati)
   const topPos = new Float32Array(pos);
 
   // BOTTOM positions (stesse X,Y ma Z = -baseMm)
   const botPos = new Float32Array(pos.length);
+  const bottomZ = -Math.abs(baseMm);
+
   for (let i = 0; i < vertCount; i++) {
     botPos[i * 3 + 0] = topPos[i * 3 + 0];
     botPos[i * 3 + 1] = topPos[i * 3 + 1];
-    botPos[i * 3 + 2] = -Math.abs(baseMm);
+    botPos[i * 3 + 2] = bottomZ;
   }
 
-  // Indici del top: se esiste index lo uso, altrimenti triangoli sequenziali
-  const topIndex = geo.index
-    ? (geo.index.array as Uint16Array | Uint32Array)
-    : null;
+  // Indici del TOP
+  const topIndex = geo.index ? (geo.index.array as any) : null;
 
-  const triCount = topIndex ? topIndex.length / 3 : vertCount / 3;
-
-  // Costruisco index per: top + bottom + side walls
-  // - top: come originale
-  // - bottom: triangoli invertiti (winding opposto)
-  // - sides: chiudo il bordo esterno della griglia (approccio MVP)
   const indices: number[] = [];
 
   // TOP
   if (topIndex) {
     for (let i = 0; i < topIndex.length; i++) indices.push(topIndex[i]);
   } else {
+    // non-indexed: triangoli sequenziali
     for (let i = 0; i < vertCount; i++) indices.push(i);
   }
 
@@ -53,15 +69,12 @@ function makeSolidFromRelief(topGeo: THREE.BufferGeometry, baseMm: number) {
       indices.push(a, c, b);
     }
   } else {
-    // non-indexed: inverti per terne
     for (let i = 0; i < vertCount; i += 3) {
       indices.push(i + vertCount, i + 2 + vertCount, i + 1 + vertCount);
     }
   }
 
-  // SIDE WALLS (MVP): chiudo il contorno del plane
-  // Per farlo in modo affidabile serve sapere gridW/gridH.
-  // Qui usiamo un trucco: leggiamo i segmenti dalla PlaneGeometry parameters se presenti.
+  // WALLS (MVP): chiudo i 4 bordi se posso ricostruire la griglia
   const params: any = (topGeo as any).parameters;
   const segW = params?.widthSegments ?? 0;
   const segH = params?.heightSegments ?? 0;
@@ -69,6 +82,7 @@ function makeSolidFromRelief(topGeo: THREE.BufferGeometry, baseMm: number) {
   const gridW = segW + 1;
   const gridH = segH + 1;
 
+  // Questa condizione è vera quando il TOP è una PlaneGeometry indicizzata standard
   if (gridW > 1 && gridH > 1 && gridW * gridH === vertCount) {
     const vid = (x: number, y: number) => y * gridW + x;
 
@@ -76,7 +90,6 @@ function makeSolidFromRelief(topGeo: THREE.BufferGeometry, baseMm: number) {
     for (let x = 0; x < gridW - 1; x++) {
       const a = vid(x, 0);
       const b = vid(x + 1, 0);
-      // due triangoli tra top e bottom
       indices.push(a, b, b + vertCount);
       indices.push(a, b + vertCount, a + vertCount);
     }
@@ -106,7 +119,7 @@ function makeSolidFromRelief(topGeo: THREE.BufferGeometry, baseMm: number) {
     }
   }
 
-  // Unisco posizioni TOP+BOTTOM
+  // Unisco TOP+BOTTOM
   const mergedPos = new Float32Array(topPos.length + botPos.length);
   mergedPos.set(topPos, 0);
   mergedPos.set(botPos, topPos.length);
@@ -119,34 +132,6 @@ function makeSolidFromRelief(topGeo: THREE.BufferGeometry, baseMm: number) {
   return solid;
 }
 
-
-
-export type HeightmapState = {
-  normF32: Float32Array; // valori normalizzati 0..1 (o simile)
-  w: number;
-  h: number;
-};
-
-type Props = {
-  hmState: HeightmapState | null;
-
-  // dimensione desiderata (mm)
-  stlWidthMm: number;
-
-  // “step” di campionamento: 1 piena risoluzione, 2 metà, 4 più leggero…
-  decimateStep: number;
-
-  // profondità rilievo (mm)
-  depthMm: number;
-
-  // non usato qui ma arriva dal Wizard
-  baseMm: number;
-
-  // tienili "any" finché non importi i tipi reali
-  outputMode?: any;
-  baseStyle: any;
-};
-
 export default function ReliefPreview3D(props: Props): JSX.Element {
   const {
     hmState,
@@ -158,11 +143,10 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
     baseStyle,
   } = props;
 
-  // Griglia/assi sempre ON per debug
   const showHelpers = true;
 
-  // Geometria rilievo (piano deformato dalla heightmap)
-  const reliefGeometry = useMemo(() => {
+  // TOP geometry (piano deformato)
+  const reliefTopGeometry = useMemo(() => {
     if (!hmState) return null;
 
     const { w, h, normF32 } = hmState;
@@ -176,10 +160,8 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
     const gridH = Math.floor((h - 1) / step) + 1;
 
     const geo = new THREE.PlaneGeometry(width, height, gridW - 1, gridH - 1);
-
     const pos = geo.attributes.position.array as Float32Array;
 
-    // riempio Z leggendo normF32 in ordine (x,y)
     let v = 0;
     for (let iy = 0; iy < gridH; iy++) {
       const srcY = Math.min(h - 1, iy * step);
@@ -198,6 +180,12 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
     return geo;
   }, [hmState, stlWidthMm, decimateStep, depthMm]);
 
+  // SOLID geometry (tipo STL)
+  const reliefSolidGeometry = useMemo(() => {
+    if (!reliefTopGeometry) return null;
+    return makeSolidFromRelief(reliefTopGeometry, baseMm);
+  }, [reliefTopGeometry, baseMm]);
+
   useEffect(() => {
     console.log("ReliefPreview3D updated", {
       hmState: hmState
@@ -209,7 +197,8 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
       baseMm,
       outputMode,
       baseStyle,
-      hasReliefGeometry: !!reliefGeometry,
+      hasTop: !!reliefTopGeometry,
+      hasSolid: !!reliefSolidGeometry,
     });
   }, [
     hmState,
@@ -219,14 +208,11 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
     baseMm,
     outputMode,
     baseStyle,
-    reliefGeometry,
+    reliefTopGeometry,
+    reliefSolidGeometry,
   ]);
 
-  // Camera: abbastanza lontana per vedere un piano largo 60–200mm
   const camDist = Math.max(120, stlWidthMm * 1.1);
-
-  // Cubo debug: proporzionato alla scena
-  const cubeSize = Math.max(10, stlWidthMm * 0.08);
 
   return (
     <div style={{ width: "100%", height: 420, background: "#fff" }}>
@@ -238,7 +224,6 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
 
         {showHelpers && (
           <>
-            {/* Griglia “infinita” (molto meglio di gridHelper finito) */}
             <Grid
               infiniteGrid
               fadeDistance={600}
@@ -250,18 +235,14 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
           </>
         )}
 
-        {/* Rilievo: ruoto il piano per appoggiarlo sulla griglia */}
-        {reliefGeometry && (
-  <mesh
-    geometry={makeSolidFromRelief(reliefGeometry, baseMm)}
-    rotation={[-Math.PI / 2, 0, 0]}
-  >
-    <meshStandardMaterial roughness={0.75} metalness={0.05} />
-    <Edges />
-  </mesh>
-)}
+        {/* SOLIDO "tipo STL" */}
+        {reliefSolidGeometry && (
+          <mesh geometry={reliefSolidGeometry} rotation={[-Math.PI / 2, 0, 0]}>
+            <meshStandardMaterial roughness={0.75} metalness={0.05} />
+            <Edges />
+          </mesh>
+        )}
 
-        
         <OrbitControls makeDefault target={[0, 0, 0]} />
       </Canvas>
     </div>
