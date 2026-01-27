@@ -2,5 +2,4 @@
 // Tipi condivisi tra UI e core. Niente THREE, niente React.
 
 export type OutputMode = "relief" | "mold";
-export type BaseStyle = "flat" | "recessed";
-import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
+export type BaseStyle = "flat" | "recessed" | "offset";
