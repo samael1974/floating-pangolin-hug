@@ -2,7 +2,8 @@ import * as React from "react";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import type { BaseStyle } from "@/lib/relief/reliefTypes";
 
-const ReliefPreview3DAny = ReliefPreview3D as unknown as React.ComponentType<any>;
+const ReliefPreview3DAny =
+  ReliefPreview3D as unknown as React.ComponentType<Record<string, unknown>>;
 
 type HeightmapState = {
   normF32: Float32Array;
