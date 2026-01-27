@@ -74,7 +74,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   // ==========================
   // OFFSET MODE (baseOffset "CAD": bordo XY + top band + bottom unico)
   // ==========================
-  if (baseStyle === "offset") {
+  if (baseStyle === "offset") {downloadReliefStlBinary
     const t = Math.max(baseMm, 0.6); // spessore base/top band (min)
     const offXY = t;                // margine XY (per ora legato a t)
 
