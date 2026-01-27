@@ -153,12 +153,12 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
   smooth: 0.15,
   edge: "sharp",
   outputMode: "relief",
-  baseStyle: "offset", // se vuoi default offset; se preferisci "flat", cambia qui
+  baseStyle: "flat", // ✅ "offset" NON è nel tuo BaseStyle
 
-  // REQUIRED da ReliefParams (da errore TypeScript)
   cutoutEnabled: false,
   cutoutThreshold: 0.18,
 }));
+
 
 
   // ✅ Heightmap state/status
