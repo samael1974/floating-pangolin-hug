@@ -17,7 +17,7 @@ export type BuildSolidFromHeightmapInput = {
   // optional
   invert?: boolean; // invert height
   clampHeights?: boolean; // clamp height01 to [0..1]
-  minBaseMm?: number; // default 0.4 (requested)
+  minBaseMm?: number; // default 0.4
 };
 
 export type BuildSolidFromHeightmapOutput = {
@@ -92,10 +92,10 @@ function normalFromHeightmap(
  * Base styles:
  * - flat:     bottom plane z=0, top z=base + depth*H
  * - recessed: bottom plane z=0, top z=max(0, base - depth*H)
- * - offset:   "solidify": bottom is top moved inward along local normal by baseMm (shell)
+ * - offset:   slicer-safe "solidify-ish": bottom follows normals but with clamp to reduce self-intersections
  *
- * Note: offset-along-normal è concettualmente un “solidify”; su geometrie molto ripide può auto-intersecarsi
- * (fenomeno noto per gli offset di superfici). :contentReference[oaicite:1]{index=1}
+ * Note: offset along normals can self-intersect on steep features; many tools implement clamping to reduce this.
+ * (e.g. Blender Solidify "Thickness Clamp"). :contentReference[oaicite:2]{index=2}
  */
 export function buildSolidFromHeightmap(
   input: BuildSolidFromHeightmapInput
@@ -129,7 +129,6 @@ export function buildSolidFromHeightmap(
   const dxMm = outWidthMm / (w - 1);
   const dyMm = outHeightMm / (h - 1);
 
-  // IMPORTANT FIX:
   // Precompute processed heights (clamp + invert) so normals/offset match the TOP surface.
   const H = new Float32Array(w * h);
   for (let i = 0; i < H.length; i++) {
@@ -156,6 +155,12 @@ export function buildSolidFromHeightmap(
 
   const bottomOffset = w * h;
 
+  // --- offset safety knobs (internal, no API change) ---
+  // Similar idea to "clamp thickness to shortest adjacent edge" to reduce self-intersections. :contentReference[oaicite:3]{index=3}
+  const shortestEdge = Math.min(dxMm, dyMm);
+  const maxXYShift = 0.49 * shortestEdge; // never cross a cell edge
+  const minZThickness = base; // guarantee thickness in Z for slicer robustness
+
   // Fill vertices
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -163,7 +168,9 @@ export function buildSolidFromHeightmap(
       const v01 = H[i];
 
       const px = xStart + x * dxMm;
-const py = -(yStart + y * dyMm);
+
+      // NON tocchiamo orientamenti: lasciamo esattamente come nel tuo STL attuale.
+      const py = -(yStart + y * dyMm);
 
       const topIndex = i;
       const botIndex = bottomOffset + i;
@@ -184,11 +191,28 @@ const py = -(yStart + y * dyMm);
 
       // --- bottom vertex ---
       if (baseStyle === "offset") {
-        // "solidify" inward along local normal
+        // "solidify-ish" inward along local normal, but with clamp
         const n = normalFromHeightmap(H, w, h, x, y, depthMm, dxMm, dyMm);
-        const bx = px - n.nx * base;
-        const by = py - n.ny * base;
-        const bz = zTop - n.nz * base;
+
+        // Candidate lateral shift from normal
+        let offX = n.nx * base;
+        let offY = n.ny * base;
+
+        // Clamp XY shift to avoid severe self-intersections (Solidify Clamp concept) :contentReference[oaicite:4]{index=4}
+        const xyLen = Math.hypot(offX, offY);
+        if (xyLen > maxXYShift && xyLen > 1e-12) {
+          const s = maxXYShift / xyLen;
+          offX *= s;
+          offY *= s;
+        }
+
+        // Z: guarantee minimum thickness for slicer stability.
+        // This is the key to avoid "missing material" artifacts when the offset shell folds on itself.
+        const bz = zTop - minZThickness;
+
+        const bx = px - offX;
+        const by = py - offY;
+
         setV(botIndex, bx, by, bz);
       } else {
         // slicer-safe flat back
