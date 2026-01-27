@@ -73,11 +73,16 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   };
 
    // ==========================
-  // OFFSET MODE (baseOffset "CAD": bordo XY + top band + bottom unico)
+  // OFFSET MODE (CAD-like): cornice piatta + relief al centro (mesh unica)
+  // - Top: griglia allargata (w+2, h+2)
+  //   * bordo esterno: z=t (piatta)
+  //   * area interna: z = t + depth * H (relief o mold)
+  // - Bottom: z=0
+  // - Outer walls: chiusura esterna
   // ==========================
   if (baseStyle === "offset") {
-    const t = Math.max(baseMm, 0.6); // spessore base/top band (min)
-    const offXY = t;                // margine XY (per ora legato a t)
+    const t = Math.max(baseMm, 0.6);
+    const offXY = t;
 
     const zRelief = (H: number) => {
       const h01 = clamp01(H);
@@ -85,184 +90,128 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
       return t + depthMm * h01;
     };
 
-    // IMPORTANTISSIMO: usa SEMPRE i bordi derivati dalla griglia (dx/dy)
-    // (xL, xR, yT, yB) sono già definiti sopra in modo coerente con i vertici.
-    const xL1 = xL - offXY;
-    const xR1 = xR + offXY;
-    const yT1 = yT + offXY;
-    const yB1 = yB - offXY;
+    // coordinate griglia interna (coerenti con dx/dy)
+    // xL,xR,yT,yB sono già calcolati sopra con dx/dy (NON ridefinirli!)
+    // costruiamo una griglia allargata con 1 “anello” esterno piatto
+    const w2 = w + 2;
+    const h2 = h + 2;
 
-    // --- 1) TOP relief surface (inner rect)
-    for (let iy = 0; iy < h - 1; iy++) {
-      for (let ix = 0; ix < w - 1; ix++) {
-        const xA = x0 + ix * dx;
-        const yA = y0 - iy * dy;
-        const xB = x0 + (ix + 1) * dx;
-        const yBv = yA;
-        const xC = xA;
-        const yC = y0 - (iy + 1) * dy;
-        const xD = xB;
-        const yD = yC;
+    const xC = new Float32Array(w2);
+    const yC = new Float32Array(h2);
 
-        const zA = zRelief(normF32[idx(ix, iy)] ?? 0);
-        const zB2 = zRelief(normF32[idx(ix + 1, iy)] ?? 0);
-        const zC2 = zRelief(normF32[idx(ix, iy + 1)] ?? 0);
-        const zD2 = zRelief(normF32[idx(ix + 1, iy + 1)] ?? 0);
+    // X: [outer-left] + [inner 0..w-1] + [outer-right]
+    xC[0] = xL - offXY;
+    for (let ix = 0; ix < w; ix++) xC[ix + 1] = x0 + ix * dx;
+    xC[w2 - 1] = xR + offXY;
 
-        pushTri(xA, yA, zA, xB, yBv, zB2, xD, yD, zD2);
-        pushTri(xA, yA, zA, xD, yD, zD2, xC, yC, zC2);
+    // Y: [outer-top] + [inner 0..h-1] + [outer-bottom]
+    yC[0] = yT + offXY;
+    for (let iy = 0; iy < h; iy++) yC[iy + 1] = y0 - iy * dy;
+    yC[h2 - 1] = yB - offXY;
+
+    const idx2 = (ix: number, iy: number) => iy * w2 + ix;
+
+    // Top Z grid
+    const zTop = new Float32Array(w2 * h2);
+    for (let iy = 0; iy < h2; iy++) {
+      for (let ix = 0; ix < w2; ix++) {
+        const innerX = ix - 1;
+        const innerY = iy - 1;
+        const isInner = innerX >= 0 && innerX < w && innerY >= 0 && innerY < h;
+        if (isInner) {
+          zTop[idx2(ix, iy)] = zRelief(normF32[idx(innerX, innerY)] ?? 0);
+        } else {
+          zTop[idx2(ix, iy)] = t; // cornice piatta
+        }
       }
     }
 
-    // helper: quad as 2 tris
-    const quad = (
-      ax: number, ay: number, az: number,
-      bx: number, by: number, bz: number,
-      cx: number, cy: number, cz: number,
-      dx_: number, dy_: number, dz_: number
+    // --- TOP surface (mesh unica)
+    for (let iy = 0; iy < h2 - 1; iy++) {
+      for (let ix = 0; ix < w2 - 1; ix++) {
+        const xA = xC[ix],     yA = yC[iy];
+        const xB = xC[ix + 1], yBv = yC[iy];
+        const xC_ = xC[ix],    yC_ = yC[iy + 1];
+        const xD = xC[ix + 1], yD = yC[iy + 1];
+
+        const zA = zTop[idx2(ix, iy)];
+        const zB = zTop[idx2(ix + 1, iy)];
+        const zCz = zTop[idx2(ix, iy + 1)];
+        const zD = zTop[idx2(ix + 1, iy + 1)];
+
+        // stesso winding del resto del file
+        pushTri(xA, yA, zA, xB, yBv, zB, xD, yD, zD);
+        pushTri(xA, yA, zA, xD, yD, zD, xC_, yC_, zCz);
+      }
+    }
+
+    // --- BOTTOM surface z=0 (stessa griglia, winding invertito)
+    for (let iy = 0; iy < h2 - 1; iy++) {
+      for (let ix = 0; ix < w2 - 1; ix++) {
+        const xA = xC[ix],     yA = yC[iy];
+        const xB = xC[ix + 1], yBv = yC[iy];
+        const xC_ = xC[ix],    yC_ = yC[iy + 1];
+        const xD = xC[ix + 1], yD = yC[iy + 1];
+
+        // inverti winding per puntare verso -Z
+        pushTri(xA, yA, 0, xD, yD, 0, xB, yBv, 0);
+        pushTri(xA, yA, 0, xC_, yC_, 0, xD, yD, 0);
+      }
+    }
+
+    // --- OUTER WALLS (chiusura esterna): perimetro della griglia allargata
+    const wallSeg = (
+      x1: number, y1: number, z1t: number,
+      x2: number, y2: number, z2t: number
     ) => {
-      pushTri(ax, ay, az, bx, by, bz, cx, cy, cz);
-      pushTri(ax, ay, az, cx, cy, cz, dx_, dy_, dz_);
+      // quad tra top(zTop) e bottom(0)
+      // winding coerente (esterno)
+      pushTri(x1, y1, 0,  x1, y1, z1t,  x2, y2, z2t);
+      pushTri(x1, y1, 0,  x2, y2, z2t,  x2, y2, 0);
     };
 
-      // --- 2) TOP BAND (flat) around inner rect at z = t
-    // Inner edge = segmentato (match con inner walls)
-    // Outer edge = SOLO 4 angoli (match con outer walls)
-
-    // TOP band polygon: outerTL -> outerTR -> innerTop from right->left
-    const outerTL: [number, number] = [xL1, yT1];
-    const outerTR: [number, number] = [xR1, yT1];
-
-    // Fan from outerTL
-    {
-      // sequence: outerTR, then inner-top vertices from right to left
-      let prevX = outerTR[0], prevY = outerTR[1];
-      for (let ix = w - 1; ix >= 0; ix--) {
-        const x = x0 + ix * dx;
-        const y = yT;
-        // triangle: outerTL -> prev -> current
-        pushTri(outerTL[0], outerTL[1], t,  prevX, prevY, t,  x, y, t);
-        prevX = x; prevY = y;
-      }
+    // top outer edge (iy=0), segmentata lungo X
+    for (let ix = 0; ix < w2 - 1; ix++) {
+      const x1 = xC[ix], x2 = xC[ix + 1];
+      const y = yC[0];
+      const z1t = zTop[idx2(ix, 0)];
+      const z2t = zTop[idx2(ix + 1, 0)];
+      wallSeg(x2, y, z2t, x1, y, z1t); // invertito per outward
     }
 
-    // BOTTOM band polygon: outerBL -> innerBottom left->right -> outerBR
-    const outerBL: [number, number] = [xL1, yB1];
-    const outerBR: [number, number] = [xR1, yB1];
-
-    // Fan from outerBL
-    {
-      // sequence: inner-bottom vertices from left to right, then outerBR
-      let prevX = x0 + 0 * dx, prevY = yB;
-      for (let ix = 1; ix < w; ix++) {
-        const x = x0 + ix * dx;
-        const y = yB;
-        pushTri(outerBL[0], outerBL[1], t,  prevX, prevY, t,  x, y, t);
-        prevX = x; prevY = y;
-      }
-      // last triangle to outerBR
-      pushTri(outerBL[0], outerBL[1], t,  prevX, prevY, t,  outerBR[0], outerBR[1], t);
+    // bottom outer edge (iy=h2-1)
+    for (let ix = 0; ix < w2 - 1; ix++) {
+      const x1 = xC[ix], x2 = xC[ix + 1];
+      const y = yC[h2 - 1];
+      const z1t = zTop[idx2(ix, h2 - 1)];
+      const z2t = zTop[idx2(ix + 1, h2 - 1)];
+      wallSeg(x1, y, z1t, x2, y, z2t);
     }
 
-    // LEFT band polygon: outerBL -> outerTL -> innerLeft top->bottom
-    const outerLT: [number, number] = [xL1, yT1]; // same as outerTL
-    const outerLB: [number, number] = [xL1, yB1]; // same as outerBL
-
-    // Fan from outerLB
-    {
-      let prevX = outerLT[0], prevY = outerLT[1];
-      for (let iy = 0; iy < h; iy++) {
-        const x = xL;
-        const y = y0 - iy * dy;
-        pushTri(outerLB[0], outerLB[1], t,  prevX, prevY, t,  x, y, t);
-        prevX = x; prevY = y;
-      }
+    // left outer edge (ix=0), segmentata lungo Y
+    for (let iy = 0; iy < h2 - 1; iy++) {
+      const y1 = yC[iy], y2 = yC[iy + 1];
+      const x = xC[0];
+      const z1t = zTop[idx2(0, iy)];
+      const z2t = zTop[idx2(0, iy + 1)];
+      wallSeg(x, y2, z2t, x, y1, z1t); // invertito per outward
     }
 
-    // RIGHT band polygon: outerRT -> outerRB -> innerRight bottom->top
-    const outerRT: [number, number] = [xR1, yT1];
-    const outerRB: [number, number] = [xR1, yB1];
-
-    // Fan from outerRT
-    {
-      let prevX = outerRB[0], prevY = outerRB[1];
-      for (let iy = h - 1; iy >= 0; iy--) {
-        const x = xR;
-        const y = y0 - iy * dy;
-        pushTri(outerRT[0], outerRT[1], t,  prevX, prevY, t,  x, y, t);
-        prevX = x; prevY = y;
-      }
+    // right outer edge (ix=w2-1)
+    for (let iy = 0; iy < h2 - 1; iy++) {
+      const y1 = yC[iy], y2 = yC[iy + 1];
+      const x = xC[w2 - 1];
+      const z1t = zTop[idx2(w2 - 1, iy)];
+      const z2t = zTop[idx2(w2 - 1, iy + 1)];
+      wallSeg(x, y1, z1t, x, y2, z2t);
     }
-
-
-    // --- 3) INNER WALLS: connect relief edge down to top band (z=t) along inner rect
-
-    // left inner wall (x = xL)
-    for (let iy = 0; iy < h - 1; iy++) {
-      const y1 = y0 - iy * dy;
-      const y2 = y0 - (iy + 1) * dy;
-      const z1 = zRelief(normF32[idx(0, iy)] ?? 0);
-      const z2 = zRelief(normF32[idx(0, iy + 1)] ?? 0);
-      pushTri(xL, y1, t,  xL, y1, z1, xL, y2, z2);
-      pushTri(xL, y1, t,  xL, y2, z2, xL, y2, t);
-    }
-
-    // right inner wall (x = xR)
-    for (let iy = 0; iy < h - 1; iy++) {
-      const y1 = y0 - iy * dy;
-      const y2 = y0 - (iy + 1) * dy;
-      const z1 = zRelief(normF32[idx(w - 1, iy)] ?? 0);
-      const z2 = zRelief(normF32[idx(w - 1, iy + 1)] ?? 0);
-      pushTri(xR, y1, t,  xR, y2, z2, xR, y1, z1);
-      pushTri(xR, y1, t,  xR, y2, t,  xR, y2, z2);
-    }
-
-    // top inner wall (y = yT)
-    for (let ix = 0; ix < w - 1; ix++) {
-      const x1 = x0 + ix * dx;
-      const x2 = x0 + (ix + 1) * dx;
-      const z1 = zRelief(normF32[idx(ix, 0)] ?? 0);
-      const z2 = zRelief(normF32[idx(ix + 1, 0)] ?? 0);
-      pushTri(x1, yT, t,  x2, yT, z2, x1, yT, z1);
-      pushTri(x1, yT, t,  x2, yT, t,  x2, yT, z2);
-    }
-
-    // bottom inner wall (y = yB)
-    for (let ix = 0; ix < w - 1; ix++) {
-      const x1 = x0 + ix * dx;
-      const x2 = x0 + (ix + 1) * dx;
-      const z1 = zRelief(normF32[idx(ix, h - 1)] ?? 0);
-      const z2 = zRelief(normF32[idx(ix + 1, h - 1)] ?? 0);
-      pushTri(x1, yB, t,  x1, yB, z1, x2, yB, z2);
-      pushTri(x1, yB, t,  x2, yB, z2, x2, yB, t);
-    }
-
-    // --- 4) OUTER WALLS: outer rect from z=0 to z=t
-    // left outer (x = xL1)
-    pushTri(xL1, yB1, 0,  xL1, yB1, t,  xL1, yT1, t);
-    pushTri(xL1, yB1, 0,  xL1, yT1, t,  xL1, yT1, 0);
-
-    // right outer (x = xR1)
-    pushTri(xR1, yB1, 0,  xR1, yT1, t,  xR1, yB1, t);
-    pushTri(xR1, yB1, 0,  xR1, yT1, 0,  xR1, yT1, t);
-
-    // top outer (y = yT1)
-    pushTri(xL1, yT1, 0,  xR1, yT1, t,  xL1, yT1, t);
-    pushTri(xL1, yT1, 0,  xR1, yT1, 0,  xR1, yT1, t);
-
-    // bottom outer (y = yB1)
-    pushTri(xL1, yB1, 0,  xL1, yB1, t,  xR1, yB1, t);
-    pushTri(xL1, yB1, 0,  xR1, yB1, t,  xR1, yB1, 0);
-
-    // --- 5) BOTTOM (outer rect) z=0
-    pushTri(xL1, yT1, 0,  xR1, yB1, 0,  xR1, yT1, 0);
-    pushTri(xL1, yT1, 0,  xL1, yB1, 0,  xR1, yB1, 0);
 
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
     g.computeVertexNormals();
     return g;
   }
+
 
 
   // ===================================================================
