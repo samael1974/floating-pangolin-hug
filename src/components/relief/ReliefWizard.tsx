@@ -794,6 +794,7 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
                     className={`rounded px-2 py-1 text-xs font-medium ${
                       previewTab === "stl" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                     }`}
+                  
                   >
                     Dettagli
                   </button>
