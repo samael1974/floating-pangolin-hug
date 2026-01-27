@@ -51,6 +51,8 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
 
     return baseMm + depthMm * h01;
   };
+  
+  
 
   const verts: number[] = [];
   const pushTri = (
