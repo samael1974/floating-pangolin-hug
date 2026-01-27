@@ -68,9 +68,9 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   // ==========================
   // OFFSET MODE (guscio + ring XY)
   // ==========================
-  if (baseStyle === "offset") {
-  const t = Math.max(baseMm, 0.6);     // spessore guscio (min)
-  const offXY = t;                     // cornice in XY
+ if (baseStyle === "offset") {
+  const t = Math.max(baseMm, 0.6); // spessore guscio (min)
+  const offXY = t; // cornice in XY
 
   const zTopOffset = (H: number) => {
     const h01 = clamp01(H);
@@ -96,18 +96,14 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   const zT = (ix: number, iy: number) => zTopGrid[idx(ix, iy)] + zShift;
   const zB = (ix: number, iy: number) => zBotGrid[idx(ix, iy)] + zShift;
 
-  // ---------------------------
   // Griglia allargata (w+2, h+2)
-  // - bordo esterno: top = t, bottom = 0
-  // - interno: top = zT, bottom = zB
-  // ---------------------------
   const w2 = w + 2;
   const h2 = h + 2;
 
   const xG = new Float32Array(w2);
   const yG = new Float32Array(h2);
 
-  // x0..x0+(w-1)*dx è la griglia interna
+  // bounds coerenti con dx/dy (evita drift numerico)
   const xL = x0;
   const xR = x0 + (w - 1) * dx;
   const yT0 = y0;
@@ -143,13 +139,17 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     }
   }
 
-  // --- TOP surface (winding coerente)
+  // TOP surface (winding coerente col resto)
   for (let iy = 0; iy < h2 - 1; iy++) {
     for (let ix = 0; ix < w2 - 1; ix++) {
-      const xA = xG[ix],     yA = yG[iy];
-      const xB = xG[ix + 1], yBv = yG[iy];
-      const xC = xG[ix],     yC = yG[iy + 1];
-      const xD = xG[ix + 1], yD = yG[iy + 1];
+      const xA = xG[ix],
+        yA = yG[iy];
+      const xB = xG[ix + 1],
+        yBv = yG[iy];
+      const xC = xG[ix],
+        yC = yG[iy + 1];
+      const xD = xG[ix + 1],
+        yD = yG[iy + 1];
 
       const zA = zTop2[idx2(ix, iy)];
       const zBv2 = zTop2[idx2(ix + 1, iy)];
@@ -161,13 +161,17 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     }
   }
 
-  // --- BOTTOM surface (winding invertito, verso -Z)
+  // BOTTOM surface (winding invertito, verso -Z)
   for (let iy = 0; iy < h2 - 1; iy++) {
     for (let ix = 0; ix < w2 - 1; ix++) {
-      const xA = xG[ix],     yA = yG[iy];
-      const xB = xG[ix + 1], yBv = yG[iy];
-      const xC = xG[ix],     yC = yG[iy + 1];
-      const xD = xG[ix + 1], yD = yG[iy + 1];
+      const xA = xG[ix],
+        yA = yG[iy];
+      const xB = xG[ix + 1],
+        yBv = yG[iy];
+      const xC = xG[ix],
+        yC = yG[iy + 1];
+      const xD = xG[ix + 1],
+        yD = yG[iy + 1];
 
       const zA = zBot2[idx2(ix, iy)];
       const zBv2 = zBot2[idx2(ix + 1, iy)];
@@ -179,10 +183,16 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     }
   }
 
-  // --- OUTER WALLS: chiusura solo sul perimetro esterno
+  // OUTER WALLS: chiusura solo sul perimetro esterno
   const wallSeg = (
-    x1: number, y1: number, z1t: number, z1b: number,
-    x2: number, y2: number, z2t: number, z2b: number
+    x1: number,
+    y1: number,
+    z1t: number,
+    z1b: number,
+    x2: number,
+    y2: number,
+    z2t: number,
+    z2b: number
   ) => {
     pushTri(x1, y1, z1b, x1, y1, z1t, x2, y2, z2t);
     pushTri(x1, y1, z1b, x2, y2, z2t, x2, y2, z2b);
@@ -191,29 +201,56 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   // top edge (iy=0)
   for (let ix = 0; ix < w2 - 1; ix++) {
     wallSeg(
-      xG[ix + 1], yG[0], zTop2[idx2(ix + 1, 0)], zBot2[idx2(ix + 1, 0)],
-      xG[ix],     yG[0], zTop2[idx2(ix, 0)],     zBot2[idx2(ix, 0)]
+      xG[ix + 1],
+      yG[0],
+      zTop2[idx2(ix + 1, 0)],
+      zBot2[idx2(ix + 1, 0)],
+      xG[ix],
+      yG[0],
+      zTop2[idx2(ix, 0)],
+      zBot2[idx2(ix, 0)]
     );
   }
+
   // bottom edge (iy=h2-1)
   for (let ix = 0; ix < w2 - 1; ix++) {
     wallSeg(
-      xG[ix],     yG[h2 - 1], zTop2[idx2(ix, h2 - 1)],     zBot2[idx2(ix, h2 - 1)],
-      xG[ix + 1], yG[h2 - 1], zTop2[idx2(ix + 1, h2 - 1)], zBot2[idx2(ix + 1, h2 - 1)]
+      xG[ix],
+      yG[h2 - 1],
+      zTop2[idx2(ix, h2 - 1)],
+      zBot2[idx2(ix, h2 - 1)],
+      xG[ix + 1],
+      yG[h2 - 1],
+      zTop2[idx2(ix + 1, h2 - 1)],
+      zBot2[idx2(ix + 1, h2 - 1)]
     );
   }
+
   // left edge (ix=0)
   for (let iy = 0; iy < h2 - 1; iy++) {
     wallSeg(
-      xG[0], yG[iy + 1], zTop2[idx2(0, iy + 1)], zBot2[idx2(0, iy + 1)],
-      xG[0], yG[iy],     zTop2[idx2(0, iy)],     zBot2[idx2(0, iy)]
+      xG[0],
+      yG[iy + 1],
+      zTop2[idx2(0, iy + 1)],
+      zBot2[idx2(0, iy + 1)],
+      xG[0],
+      yG[iy],
+      zTop2[idx2(0, iy)],
+      zBot2[idx2(0, iy)]
     );
   }
+
   // right edge (ix=w2-1)
   for (let iy = 0; iy < h2 - 1; iy++) {
     wallSeg(
-      xG[w2 - 1], yG[iy],     zTop2[idx2(w2 - 1, iy)],     zBot2[idx2(w2 - 1, iy)],
-      xG[w2 - 1], yG[iy + 1], zTop2[idx2(w2 - 1, iy + 1)], zBot2[idx2(w2 - 1, iy + 1)]
+      xG[w2 - 1],
+      yG[iy],
+      zTop2[idx2(w2 - 1, iy)],
+      zBot2[idx2(w2 - 1, iy)],
+      xG[w2 - 1],
+      yG[iy + 1],
+      zTop2[idx2(w2 - 1, iy + 1)],
+      zBot2[idx2(w2 - 1, iy + 1)]
     );
   }
 
