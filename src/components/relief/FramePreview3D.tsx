@@ -1,10 +1,10 @@
 import * as React from "react";
 import type {} from "@react-three/fiber";
 
-// Importo il modulo intero (evita “no exported member”)
+// Importo il modulo intero (evita TS2305 “no exported member”)
 import * as FrameMod from "@/lib/relief/frame/createFrameGeometry";
 
-// Type locale: non dipende da export FrameParams
+// Type locale: non dipende dagli export FrameParams
 type FrameParams = {
   outerWidth: number;
   outerHeight: number;
@@ -18,7 +18,7 @@ type Props = {
 };
 
 export default function FramePreview3D({ enabled, params }: Props) {
-  // Supporta sia export named che default (nel dubbio)
+  // supporta sia export named che default (nel dubbio)
   const createFn =
     (FrameMod as any).createFrameGeometry ?? (FrameMod as any).default;
 
@@ -33,12 +33,17 @@ export default function FramePreview3D({ enabled, params }: Props) {
     }
 
     return createFn(params);
-  }, [enabled, params.outerWidth, params.outerHeight, params.frameThickness, params.depth, createFn]);
+  }, [
+    enabled,
+    params.outerWidth,
+    params.outerHeight,
+    params.frameThickness,
+    params.depth,
+    createFn,
+  ]);
 
   React.useEffect(() => {
-    return () => {
-      geometry?.dispose?.();
-    };
+    return () => geometry?.dispose?.();
   }, [geometry]);
 
   if (!enabled || !geometry) return null;
