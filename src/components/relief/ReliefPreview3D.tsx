@@ -82,6 +82,12 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
       <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
         <ambientLight intensity={1} />
         <directionalLight position={[3, 3, 3]} intensity={1} />
+        {reliefGeometry && (
+  <mesh geometry={reliefGeometry} rotation={[-Math.PI / 2, 0, 0]}>
+    <meshStandardMaterial wireframe />
+  </mesh>
+)}
+
 
         {showHelpers && (
           <>
