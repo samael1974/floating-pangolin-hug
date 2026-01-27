@@ -97,17 +97,16 @@ export default function ReliefHeightmapPreview({
         h = h2;
       }
 
-      const outSolid = buildSolidFromHeightmap({
-        height01,
-        width: w,
-        height: h,
-        outWidthMm: widthMm,
-        depthMm,
-        baseMm,
-        baseStyle, // ✅ type-safe: "flat" | "recessed" | "offset"
-      });
-
-      const geom = outSolid.geometry;
+      const out = buildSolidFromHeightmap({
+  height01: ...,
+  width: ...,
+  height: ...,
+  outWidthMm: widthMm,
+  depthMm,
+  baseMm,
+  baseStyle,
+});
+const geom = out.geometry;
 
       // centra XY e appoggia Z a 0 (stabile per preview)
       geom.computeBoundingBox();
