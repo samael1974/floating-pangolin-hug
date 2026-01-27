@@ -183,16 +183,15 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
   if (!(hm.normF32 instanceof Float32Array)) throw new Error("STL: hm.normF32 missing/invalid");
 
   const out = buildSolidFromHeightmap({
-    height01: hm.normF32,
-    width: hm.w,
-    height: hm.h,
-    outWidthMm: widthMm,
-    depthMm,
-    baseMm,
-    baseStyle, // ✅ type-safe: "flat" | "recessed" | "offset"
-  });
-
-  const geom = out.geometry;
+  height01: hm.normF32,
+  width: hm.w,
+  height: hm.h,
+  outWidthMm: widthMm,
+  depthMm,
+  baseMm,
+  baseStyle,
+});
+const geom = out.geometry;
 
   // opzionale ma utile: centra e appoggia Z a 0 (come preview)
   geom.computeBoundingBox();
