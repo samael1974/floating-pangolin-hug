@@ -16,7 +16,7 @@ type Props = {
   outputMode?: OutputMode;
 };
 
-export default function ReliefPreview3D({
+export default function ReliefHeightmapPreview({
   hmState,
   widthMm,
   depthMm,
@@ -230,16 +230,7 @@ export default function ReliefPreview3D({
       material.dispose();
       renderer.dispose();
     };
-    // rebuild when inputs change:
-  }, [
-    hmState,
-    widthMm,
-    depthMm,
-    baseMm,
-    previewDecimateStep,
-    baseStyle,
-    outputMode, // (non usato, ma lasciato perché è prop)
-  ]);
+  }, [hmState, widthMm, depthMm, baseMm, previewDecimateStep, baseStyle, outputMode]);
 
   return (
     <div className="relative h-full w-full">
