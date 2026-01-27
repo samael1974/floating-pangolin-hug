@@ -11,6 +11,12 @@ export default function ReliefPreview3D({ hmState }: Props) {
 
   // Helpers (assi + griglia) nella preview: tienili ON per ora
   const showHelpers = true;
+  const reliefGeometry =
+  (hmState as any)?.reliefGeometry ??
+  (hmState as any)?.geometry ??
+  (hmState as any)?.meshGeometry ??
+  null;
+
 
   return (
     <div style={{ width: "100%", height: 420, background: "#fff" }}>
