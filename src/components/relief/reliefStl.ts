@@ -13,7 +13,7 @@ type DownloadArgs = {
   widthMm: number;
   depthMm: number;
   baseMm: number;
-  outputMode: OutputMode;
+  outputMode: OutputMode; // (attualmente non usato dal builder: tenuto per compatibilità UI)
   baseStyle: BaseStyle;
   fileName?: string;
 };
@@ -53,12 +53,7 @@ function geometryToBinaryStl(geom: THREE.BufferGeometry): ArrayBuffer {
     ac.subVectors(c, a);
     n.crossVectors(ab, ac);
 
-    if (
-      !Number.isFinite(n.x) ||
-      !Number.isFinite(n.y) ||
-      !Number.isFinite(n.z) ||
-      n.lengthSq() < 1e-30
-    ) {
+    if (!Number.isFinite(n.x) || !Number.isFinite(n.y) || !Number.isFinite(n.z) || n.lengthSq() < 1e-30) {
       n.set(0, 0, 0);
     } else {
       n.normalize();
@@ -116,44 +111,42 @@ function countOpenEdges(geom: THREE.BufferGeometry) {
     addEdge(i2, i0);
   }
 
- const open: Array<{ a: string; b: string; mid: string; len: number }> = [];
+  const open: Array<{ a: string; b: string; mid: string; len: number }> = [];
 
-const parse = (k: string) => {
-  const [x, y, z] = k.split(",").map((s) => Number(s) / 1000);
-  return { x, y, z };
-};
+  const parse = (k: string) => {
+    const [x, y, z] = k.split(",").map((s) => Number(s) / 1000);
+    return { x, y, z };
+  };
 
-let openEdges = 0;
-for (const [k, c] of edgeCount.entries()) {
-  if (c !== 1) continue;
-  openEdges++;
+  let openEdges = 0;
+  for (const [k, c] of edgeCount.entries()) {
+    if (c !== 1) continue;
+    openEdges++;
 
-  // k = "ax,ay,az|bx,by,bz"
-  const [ka, kb] = k.split("|");
-  const A = parse(ka);
-  const B = parse(kb);
+    const [ka, kb] = k.split("|");
+    const A = parse(ka);
+    const B = parse(kb);
 
-  const mx = (A.x + B.x) * 0.5;
-  const my = (A.y + B.y) * 0.5;
-  const mz = (A.z + B.z) * 0.5;
+    const mx = (A.x + B.x) * 0.5;
+    const my = (A.y + B.y) * 0.5;
+    const mz = (A.z + B.z) * 0.5;
 
-  const dx = A.x - B.x;
-  const dy = A.y - B.y;
-  const dz = A.z - B.z;
-  const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const dx = A.x - B.x;
+    const dy = A.y - B.y;
+    const dz = A.z - B.z;
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-  if (open.length < 32) {
-    open.push({
-      a: `${A.x.toFixed(3)},${A.y.toFixed(3)},${A.z.toFixed(3)}`,
-      b: `${B.x.toFixed(3)},${B.y.toFixed(3)},${B.z.toFixed(3)}`,
-      mid: `${mx.toFixed(3)},${my.toFixed(3)},${mz.toFixed(3)}`,
-      len: Number(len.toFixed(3)),
-    });
+    if (open.length < 32) {
+      open.push({
+        a: `${A.x.toFixed(3)},${A.y.toFixed(3)},${A.z.toFixed(3)}`,
+        b: `${B.x.toFixed(3)},${B.y.toFixed(3)},${B.z.toFixed(3)}`,
+        mid: `${mx.toFixed(3)},${my.toFixed(3)},${mz.toFixed(3)}`,
+        len: Number(len.toFixed(3)),
+      });
+    }
   }
-}
 
-return { triCount, totalEdges: edgeCount.size, openEdges, openSample: open };
-
+  return { triCount, totalEdges: edgeCount.size, openEdges, openSample: open };
 }
 
 function downloadArrayBuffer(buffer: ArrayBuffer, fileName: string) {
@@ -176,16 +169,30 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
   if (!hm) throw new Error("STL: missing heightmap (hm)");
   if (!(hm.normF32 instanceof Float32Array)) throw new Error("STL: hm.normF32 missing/invalid");
 
-  const geom = buildSolidFromHeightmap({
-    normF32: hm.normF32,
-    w: hm.w,
-    h: hm.h,
-    widthMm,
+  // ✅ Nuova API: buildSolidFromHeightmap() ritorna { geometry, vertices, indices }
+  const out = buildSolidFromHeightmap({
+    height01: hm.normF32,
+    width: hm.w,
+    height: hm.h,
+    outWidthMm: widthMm,
     depthMm,
     baseMm,
-    outputMode,
-    baseStyle,
+    // outputMode: attualmente non usato dal builder (tenuto nel tipo args per UI)
+    // Se BaseStyle non coincide con "flat"|"recessed"|"offset", va mappato (vedi nota sotto).
+    baseStyle: baseStyle as any,
   });
+
+  const geom = out.geometry;
+
+  // opzionale ma utile: centra e appoggia Z a 0 (come preview)
+  geom.computeBoundingBox();
+  const bb = geom.boundingBox;
+  if (bb) {
+    const center = new THREE.Vector3();
+    bb.getCenter(center);
+    geom.translate(-center.x, -center.y, -bb.min.z);
+  }
+  geom.computeVertexNormals();
 
   // sanity vertices finite
   const pos = geom.getAttribute("position") as THREE.BufferAttribute | undefined;
@@ -201,7 +208,8 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
 
   // ✅ debug: open edges
   const check = countOpenEdges(geom);
-  console.log("[MESH CHECK]", check); if (check.openEdges > 0) console.table(check.openSample);
+  console.log("[MESH CHECK]", check);
+  if (check.openEdges > 0) console.table(check.openSample);
   if (check.openEdges > 0) {
     throw new Error(`Mesh non chiusa: openEdges=${check.openEdges}`);
   }
