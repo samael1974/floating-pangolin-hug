@@ -156,10 +156,6 @@ export default function ReliefPreview3D({
 
     const hmDec = decimateHm(hmState, decimateStep);
 
-    // ✅ ORIENTAMENTO: qui decidi la “cura” una volta sola.
-    // Math.PI = 180° attorno a Z (equivalente al tuo rotation sul mesh, ma BAKED nel geometry)
-    const ORIENT_FIX_ROTATE_Z = Math.PI;
-
     try {
       const out = buildSolidFromHeightmap({
         height01: hmDec.normF32,
