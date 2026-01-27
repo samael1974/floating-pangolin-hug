@@ -2,7 +2,8 @@ import * as React from "react";
 import type {} from "@react-three/fiber";
 
 // Importo il modulo intero (evita TS2305 “no exported member”)
-import * as FrameMod from "@/lib/relief/frame/createFrameGeometry";
+import { createFrameGeometry, type FrameParams } from "@/lib/relief/frame/createFrameGeometry";
+
 
 // Type locale: non dipende dagli export FrameParams
 type FrameParams = {
