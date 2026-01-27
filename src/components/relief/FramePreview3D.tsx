@@ -1,3 +1,4 @@
+// src/components/relief/FramePreview3D.tsx
 import * as React from "react";
 import type {} from "@react-three/fiber";
 
@@ -8,39 +9,22 @@ type Props = {
   params: FrameParams;
 };
 
-
-type Props = {
-  enabled: boolean;
-  params: FrameParams;
-};
-
 export default function FramePreview3D({ enabled, params }: Props) {
-  // supporta sia export named che default (nel dubbio)
-  const createFn =
-    (FrameMod as any).createFrameGeometry ?? (FrameMod as any).default;
-
   const geometry = React.useMemo(() => {
     if (!enabled) return null;
-
-    if (typeof createFn !== "function") {
-      console.error(
-        "createFrameGeometry non trovato: controlla src/lib/relief/frame/createFrameGeometry.ts"
-      );
-      return null;
-    }
-
-    return createFn(params);
+    return createFrameGeometry(params);
   }, [
     enabled,
     params.outerWidth,
     params.outerHeight,
     params.frameThickness,
     params.depth,
-    createFn,
   ]);
 
   React.useEffect(() => {
-    return () => geometry?.dispose?.();
+    return () => {
+      geometry?.dispose();
+    };
   }, [geometry]);
 
   if (!enabled || !geometry) return null;
