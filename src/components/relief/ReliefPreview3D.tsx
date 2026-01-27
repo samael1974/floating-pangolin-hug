@@ -1,35 +1,28 @@
-import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
-
-export type HeightmapState = {
-  normF32: Float32Array;
-  w: number;
-  h: number;
-};
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
 
 type Props = {
-  hmState: HeightmapState | null;
-  stlWidthMm: number;
-  decimateStep: number;
-  depthMm: number;
-  baseMm: number;
-  outputMode?: OutputMode;
-  baseStyle: BaseStyle;
+  // metti i tuoi props veri qui, anche se non li usi nel debug
+  hmState: any;
 };
 
-export default function ReliefPreview3D(props: Props): JSX.Element | null {
-  const {
-    hmState,
-    stlWidthMm,
-    decimateStep,
-    depthMm,
-    baseMm,
-    outputMode = "relief",
-    baseStyle,
-  } = props;
+export default function ReliefPreview3D({ hmState }: Props) {
+  // LOG: se questo non stampa, il componente non viene montato
+  console.log("ReliefPreview3D mounted", { hmState });
 
-  // ⬇️ IMPORTANTISSIMO:
-  // sotto deve esistere ALMENO un return JSX, oppure return null.
-  // Se hai già il tuo codice (useMemo, geometry, Canvas), lascialo com’è,
-  // ma assicurati che alla fine ci sia un return (...).
-  return null;
+  return (
+    <div style={{ width: "100%", height: 420, background: "#fff" }}>
+      <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
+        <ambientLight intensity={1} />
+        <directionalLight position={[3, 3, 3]} intensity={1} />
+        {/* Debug object ALWAYS visible */}
+        <mesh>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial />
+        </mesh>
+
+        <OrbitControls makeDefault />
+      </Canvas>
+    </div>
+  );
 }
