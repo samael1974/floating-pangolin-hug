@@ -1,20 +1,30 @@
 import { useEffect, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Grid } from "@react-three/drei";
 import * as THREE from "three";
 
 export type HeightmapState = {
-  normF32: Float32Array;
+  normF32: Float32Array; // valori normalizzati 0..1 (o simile)
   w: number;
   h: number;
 };
 
 type Props = {
   hmState: HeightmapState | null;
+
+  // dimensione desiderata (mm)
   stlWidthMm: number;
+
+  // “step” di campionamento: 1 piena risoluzione, 2 metà, 4 più leggero…
   decimateStep: number;
+
+  // profondità rilievo (mm)
   depthMm: number;
+
+  // non usato qui ma arriva dal Wizard
   baseMm: number;
+
+  // tienili "any" finché non importi i tipi reali
   outputMode?: any;
   baseStyle: any;
 };
@@ -30,31 +40,28 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
     baseStyle,
   } = props;
 
+  // Griglia/assi sempre ON per debug
   const showHelpers = true;
 
-  // 1) Costruisco una geometria "terreno" dalla heightmap (wireframe)
+  // Geometria rilievo (piano deformato dalla heightmap)
   const reliefGeometry = useMemo(() => {
     if (!hmState) return null;
 
     const { w, h, normF32 } = hmState;
 
-    // passo di campionamento (1 = piena risoluzione, 2 = metà, 4 = più leggero, ecc.)
     const step = Math.max(1, Math.floor(decimateStep || 1));
 
-    // dimensioni in "mm" (qui unità scena = mm)
-    const width = stlWidthMm;
-    const height = stlWidthMm * (h / w);
+    const width = Math.max(1, stlWidthMm);
+    const height = width * (h / w);
 
-    // griglia campionata
     const gridW = Math.floor((w - 1) / step) + 1;
     const gridH = Math.floor((h - 1) / step) + 1;
 
-    // PlaneGeometry( width, height, widthSegments, heightSegments )
     const geo = new THREE.PlaneGeometry(width, height, gridW - 1, gridH - 1);
 
     const pos = geo.attributes.position.array as Float32Array;
 
-    // riempio la Z (altezza) leggendo normF32 con lo stesso ordine (x,y)
+    // riempio Z leggendo normF32 in ordine (x,y)
     let v = 0;
     for (let iy = 0; iy < gridH; iy++) {
       const srcY = Math.min(h - 1, iy * step);
@@ -62,8 +69,7 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
         const srcX = Math.min(w - 1, ix * step);
         const srcIndex = srcY * w + srcX;
 
-        // posizione: x,y,z (z è l'altezza)
-        pos[v * 3 + 2] = normF32[srcIndex] * depthMm;
+        pos[v * 3 + 2] = (normF32[srcIndex] ?? 0) * depthMm;
         v++;
       }
     }
@@ -74,10 +80,11 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
     return geo;
   }, [hmState, stlWidthMm, decimateStep, depthMm]);
 
-  // 2) Log “pulito” (non serve a ogni render)
   useEffect(() => {
     console.log("ReliefPreview3D updated", {
-      hmState: hmState ? { w: hmState.w, h: hmState.h, len: hmState.normF32.length } : null,
+      hmState: hmState
+        ? { w: hmState.w, h: hmState.h, len: hmState.normF32.length }
+        : null,
       stlWidthMm,
       decimateStep,
       depthMm,
@@ -86,39 +93,59 @@ export default function ReliefPreview3D(props: Props): JSX.Element {
       baseStyle,
       hasReliefGeometry: !!reliefGeometry,
     });
-  }, [hmState, stlWidthMm, decimateStep, depthMm, baseMm, outputMode, baseStyle, reliefGeometry]);
+  }, [
+    hmState,
+    stlWidthMm,
+    decimateStep,
+    depthMm,
+    baseMm,
+    outputMode,
+    baseStyle,
+    reliefGeometry,
+  ]);
 
-  // Camera dall'alto: così vedi il "piano" e non un taglio
-  const camY = Math.max(60, stlWidthMm * 0.8);
-  const camZ = Math.max(80, stlWidthMm * 1.1);
+  // Camera: abbastanza lontana per vedere un piano largo 60–200mm
+  const camDist = Math.max(120, stlWidthMm * 1.1);
+
+  // Cubo debug: proporzionato alla scena
+  const cubeSize = Math.max(10, stlWidthMm * 0.08);
 
   return (
     <div style={{ width: "100%", height: 420, background: "#fff" }}>
-      <Canvas camera={{ position: [0, camY, camZ], fov: 45 }}>
-        <ambientLight intensity={1} />
-        <directionalLight position={[200, 300, 200]} intensity={1} />
+      <Canvas
+        camera={{ position: [0, camDist, camDist], fov: 45, near: 0.1, far: 5000 }}
+      >
+        <ambientLight intensity={0.9} />
+        <directionalLight position={[200, 300, 200]} intensity={1.1} />
 
         {showHelpers && (
           <>
-            <axesHelper args={[50]} />
-            <gridHelper args={[200, 20]} />
+            {/* Griglia “infinita” (molto meglio di gridHelper finito) */}
+            <Grid
+              infiniteGrid
+              fadeDistance={600}
+              fadeStrength={3}
+              cellSize={10}
+              sectionSize={50}
+            />
+            <axesHelper args={[stlWidthMm]} />
           </>
         )}
 
         {/* Rilievo: ruoto il piano per appoggiarlo sulla griglia */}
         {reliefGeometry && (
           <mesh geometry={reliefGeometry} rotation={[-Math.PI / 2, 0, 0]}>
-            <meshStandardMaterial wireframe />
+            <meshStandardMaterial wireframe side={THREE.DoubleSide} />
           </mesh>
         )}
 
         {/* Cubo debug al centro */}
-        <mesh position={[0, 5, 0]}>
-          <boxGeometry args={[10, 10, 10]} />
+        <mesh position={[0, cubeSize * 0.5, 0]}>
+          <boxGeometry args={[cubeSize, cubeSize, cubeSize]} />
           <meshStandardMaterial />
         </mesh>
 
-        <OrbitControls makeDefault />
+        <OrbitControls makeDefault target={[0, 0, 0]} />
       </Canvas>
     </div>
   );
