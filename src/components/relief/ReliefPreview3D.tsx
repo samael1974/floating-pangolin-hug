@@ -3,7 +3,6 @@ import * as React from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
-import FramePreview3D from "./FramePreview3D";
 
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
 import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
@@ -20,7 +19,7 @@ type Props = {
   decimateStep: number;
   depthMm: number;
   baseMm: number;
-  outputMode?: OutputMode; // mantenuto per compatibilità, ma non serve al builder
+  outputMode?: OutputMode; // mantenuto per compatibilità esterna
   baseStyle: BaseStyle;
 };
 
@@ -102,10 +101,14 @@ function Scene({ geometry }: { geometry: THREE.BufferGeometry }) {
       <hemisphereLight intensity={0.14} groundColor="#050505" />
 
       <CameraKeyLight intensity={1.6} />
-      <directionalLight position={[-520, 260, 260]} intensity={0.28} color="#ffffff" />
+      <directionalLight
+        position={[-520, 260, 260]}
+        intensity={0.28}
+        color="#ffffff"
+      />
       <HeadLight intensity={0.3} />
 
-      <mesh geometry={geometry} rotation={[0, 0, Math.PI]}>
+      <mesh geometry={geometry}>
         <meshPhysicalMaterial
           color="#E26D5C"
           metalness={0.02}
@@ -145,13 +148,17 @@ export default function ReliefPreview3D({
   decimateStep,
   depthMm,
   baseMm,
-  outputMode = "relief", // tenuto (non usato nel builder) per compatibilità esterna
+  outputMode = "relief",
   baseStyle,
 }: Props) {
   const geometry = React.useMemo<THREE.BufferGeometry | null>(() => {
     if (!hmState) return null;
 
     const hmDec = decimateHm(hmState, decimateStep);
+
+    // ✅ ORIENTAMENTO: qui decidi la “cura” una volta sola.
+    // Math.PI = 180° attorno a Z (equivalente al tuo rotation sul mesh, ma BAKED nel geometry)
+    const ORIENT_FIX_ROTATE_Z = Math.PI;
 
     try {
       const out = buildSolidFromHeightmap({
@@ -166,16 +173,23 @@ export default function ReliefPreview3D({
 
       const geom = out.geometry;
 
+      // 1) centra XY e appoggia Z a 0
       geom.computeBoundingBox();
       const bb = geom.boundingBox;
       if (bb) {
         const center = new THREE.Vector3();
         bb.getCenter(center);
-        // centra XY e appoggia Z a 0
         geom.translate(-center.x, -center.y, -bb.min.z);
       }
 
+      // 2) ✅ applica fix orientamento (baked)
+      if (ORIENT_FIX_ROTATE_Z !== 0) {
+        geom.rotateZ(ORIENT_FIX_ROTATE_Z);
+      }
+
+      // 3) normali coerenti dopo le trasformazioni
       geom.computeVertexNormals();
+
       return geom;
     } catch (e) {
       console.error("ReliefPreview3D build error:", e);
