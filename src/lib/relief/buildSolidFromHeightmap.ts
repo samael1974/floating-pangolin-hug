@@ -1,7 +1,6 @@
 // src/lib/relief/buildSolidFromHeightmap.ts
 import * as THREE from "three";
-
-export type BaseStyle = "flat" | "recessed" | "offset";
+import type { BaseStyle } from "./reliefTypes";
 
 export type BuildSolidFromHeightmapInput = {
   // height normalized [0..1], length = width*height
@@ -10,41 +9,97 @@ export type BuildSolidFromHeightmapInput = {
   height: number;
 
   // physical params
-  outWidthMm: number;     // final STL X size in mm
-  depthMm: number;        // relief amplitude (mm)
-  baseMm: number;         // base thickness (mm)
-  baseStyle: BaseStyle;   // flat | recessed | offset
+  outWidthMm: number; // final STL X size in mm
+  depthMm: number; // relief amplitude (mm)
+  baseMm: number; // base thickness (mm) OR shell thickness when baseStyle="offset"
+  baseStyle: BaseStyle; // "flat" | "recessed" | "offset"
 
   // optional
-  invert?: boolean;       // invert height
+  invert?: boolean; // invert height
   clampHeights?: boolean; // clamp height01 to [0..1]
+  minBaseMm?: number; // default 0.4 (requested)
 };
 
 export type BuildSolidFromHeightmapOutput = {
   geometry: THREE.BufferGeometry;
   vertices: Float32Array; // xyz packed
-  indices: Uint32Array;   // triangle indices
+  indices: Uint32Array; // triangle indices
 };
 
+// ---------- helpers ----------
+function clamp(v: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, v));
+}
 function clamp01(x: number) {
   return x < 0 ? 0 : x > 1 ? 1 : x;
 }
-
 function idxOf(x: number, y: number, w: number) {
   return y * w + x;
+}
+function computeHeightMm(height01: Float32Array, i: number, depthMm: number) {
+  return height01[i] * depthMm;
+}
+
+/**
+ * Normal (unit) of heightfield at (ix,iy) using finite differences on Z.
+ * sxMm, syMm are the real mm-per-pixel in X/Y so slopes are scaled correctly.
+ */
+function normalFromHeightmap(
+  height01: Float32Array,
+  w: number,
+  h: number,
+  ix: number,
+  iy: number,
+  depthMm: number,
+  sxMm: number,
+  syMm: number
+) {
+  const x0 = clamp(ix - 1, 0, w - 1);
+  const x1 = clamp(ix + 1, 0, w - 1);
+  const y0 = clamp(iy - 1, 0, h - 1);
+  const y1 = clamp(iy + 1, 0, h - 1);
+
+  const iL = iy * w + x0;
+  const iR = iy * w + x1;
+  const iD = y0 * w + ix;
+  const iU = y1 * w + ix;
+
+  const zL = computeHeightMm(height01, iL, depthMm);
+  const zR = computeHeightMm(height01, iR, depthMm);
+  const zD = computeHeightMm(height01, iD, depthMm);
+  const zU = computeHeightMm(height01, iU, depthMm);
+
+  const dzdx = (zR - zL) / Math.max(1e-9, (x1 - x0) * sxMm);
+  const dzdy = (zU - zD) / Math.max(1e-9, (y1 - y0) * syMm);
+
+  // normal ~ (-dzdx, -dzdy, 1)
+  let nx = -dzdx;
+  let ny = -dzdy;
+  let nz = 1;
+
+  const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+  if (len < 1e-12 || !Number.isFinite(len)) return { nx: 0, ny: 0, nz: 1 };
+
+  nx /= len;
+  ny /= len;
+  nz /= len;
+  return { nx, ny, nz };
 }
 
 /**
  * Build a CLOSED (manifold) mesh from a heightmap grid.
  *
- * Base styles (pragmatic + slicer-safe):
- * - flat:     bottom plane z=0, top z=depth*H
- * - recessed: top plane at z=baseMm, relief goes DOWN (carved) by depth*H (clamped at >=0)
- * - offset:   top z=depth*H + baseMm, bottom plane z=0 (stable, "vertical offset")
+ * Base styles:
+ * - flat:     bottom plane z=0, top z=base + depth*H
+ * - recessed: bottom plane z=0, top z=max(0, base - depth*H)  (carved down from a slab)
+ * - offset:   "solidify": bottom is top moved inward along local normal by baseMm (shell)
  *
- * NOTE: "CAD offset along normals" can be added later (v1.4). This version restores build and avoids holes.
+ * Output is centered in XY around (0,0). Z is not forced to be >=0 here:
+ * preview/STL can translate to put minZ=0 if desired.
  */
-export function buildSolidFromHeightmap(input: BuildSolidFromHeightmapInput): BuildSolidFromHeightmapOutput {
+export function buildSolidFromHeightmap(
+  input: BuildSolidFromHeightmapInput
+): BuildSolidFromHeightmapOutput {
   const {
     height01,
     width: w,
@@ -55,30 +110,29 @@ export function buildSolidFromHeightmap(input: BuildSolidFromHeightmapInput): Bu
     baseStyle,
     invert = false,
     clampHeights = true,
+    minBaseMm = 0.4,
   } = input;
 
-  if (w <= 1 || h <= 1) throw new Error("Heightmap too small.");
+  if (w <= 1 || h <= 1) throw new Error("Heightmap too small (need >= 2x2).");
   if (height01.length !== w * h) throw new Error("height01 length mismatch.");
   if (!(outWidthMm > 0)) throw new Error("outWidthMm must be > 0.");
   if (!(depthMm >= 0)) throw new Error("depthMm must be >= 0.");
   if (!(baseMm >= 0)) throw new Error("baseMm must be >= 0.");
 
-  // maintain aspect ratio
-  const outHeightMm = outWidthMm * (h / w);
+  // Requested: disallow base thickness < 0.4mm
+  const base = Math.max(minBaseMm, baseMm);
 
-  // grid spacing in mm
-  const dx = outWidthMm / (w - 1);
-  const dy = outHeightMm / (h - 1);
+  // Maintain aspect ratio using segment counts (w-1, h-1), not raw pixels
+  const outHeightMm = outWidthMm * ((h - 1) / (w - 1));
 
-  // --- vertex counts:
-  // We build:
-  // - top surface grid: w*h vertices
-  // - bottom surface grid: w*h vertices
-  // Total vertices = 2*w*h
+  // Grid spacing in mm
+  const dxMm = outWidthMm / (w - 1);
+  const dyMm = outHeightMm / (h - 1);
+
+  // Top grid: w*h, Bottom grid: w*h  => 2*w*h vertices
   const vCount = 2 * w * h;
   const verts = new Float32Array(vCount * 3);
 
-  // helper to set vertex
   const setV = (vi: number, x: number, y: number, z: number) => {
     const o = vi * 3;
     verts[o] = x;
@@ -86,70 +140,69 @@ export function buildSolidFromHeightmap(input: BuildSolidFromHeightmapInput): Bu
     verts[o + 2] = z;
   };
 
-  // map grid to centered coordinates (nice for preview)
-  const x0 = -outWidthMm / 2;
-  const y0 = -outHeightMm / 2;
+  // Centered coords for nicer preview (and consistent UX)
+  const xStart = -outWidthMm / 2;
+  const yStart = -outHeightMm / 2;
 
-  // compute Z for a pixel
-  const getH = (i: number) => {
+  const getH01 = (i: number) => {
     let v = height01[i];
     if (clampHeights) v = clamp01(v);
     if (invert) v = 1 - v;
     return v;
   };
 
-  const topZ = (v01: number) => {
-    if (baseStyle === "flat") {
-      return depthMm * v01;
-    }
-    if (baseStyle === "recessed") {
-      // base slab on top; carve down
-      const z = baseMm - depthMm * v01;
-      return z < 0 ? 0 : z;
-    }
-    // offset: raise everything by baseMm (so you always have thickness)
-    return baseMm + depthMm * v01;
-  };
-
-  const bottomZ = (_v01: number) => {
-    // slicer-safe: always a flat bottom
-    return 0;
-  };
-
   // Fill vertices
+  const bottomOffset = w * h;
+
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = idxOf(x, y, w);
-      const v01 = getH(i);
+      const v01 = getH01(i);
 
-      const px = x0 + x * dx;
-      const py = y0 + y * dy;
+      const px = xStart + x * dxMm;
+      const py = yStart + y * dyMm;
 
-      const topIndex = i;           // 0..w*h-1
-      const bottomIndex = i + w*h;  // w*h..2*w*h-1
+      const topIndex = i;
+      const botIndex = bottomOffset + i;
 
-      setV(topIndex, px, py, topZ(v01));
-      setV(bottomIndex, px, py, bottomZ(v01));
+      // --- top z ---
+      let zTop = 0;
+      if (baseStyle === "flat") {
+        zTop = base + depthMm * v01;
+      } else if (baseStyle === "recessed") {
+        zTop = base - depthMm * v01;
+        if (zTop < 0) zTop = 0;
+      } else {
+        // offset: top is pure relief (no fake translation)
+        zTop = depthMm * v01;
+      }
+
+      setV(topIndex, px, py, zTop);
+
+      // --- bottom vertex ---
+      if (baseStyle === "offset") {
+        // CAD-like: move inward along local normal (solidify)
+        const n = normalFromHeightmap(height01, w, h, x, y, depthMm, dxMm, dyMm);
+        // inward = subtract outward normal
+        const bx = px - n.nx * base;
+        const by = py - n.ny * base;
+        const bz = zTop - n.nz * base;
+        setV(botIndex, bx, by, bz);
+      } else {
+        // slicer-safe flat back
+        setV(botIndex, px, py, 0);
+      }
     }
   }
 
-  // --- triangles
-  // Estimate triangle count:
-  // top:    2*(w-1)*(h-1)
-  // bottom: 2*(w-1)*(h-1)
-  // sides:  perimeter quads -> 2 tris each
-  //  left/right: 2*(h-1) quads
-  //  top/bot:    2*(w-1) quads
-  // total side quads = 2*(h-1)+2*(w-1)
-  // total side tris = 2 * sideQuads
+  // Triangle counts
   const topTris = 2 * (w - 1) * (h - 1);
   const bottomTris = topTris;
   const sideQuads = 2 * (h - 1) + 2 * (w - 1);
   const sideTris = 2 * sideQuads;
-
   const triCount = topTris + bottomTris + sideTris;
-  const indices = new Uint32Array(triCount * 3);
 
+  const indices = new Uint32Array(triCount * 3);
   let ti = 0;
   const pushTri = (a: number, b: number, c: number) => {
     indices[ti++] = a;
@@ -157,81 +210,68 @@ export function buildSolidFromHeightmap(input: BuildSolidFromHeightmapInput): Bu
     indices[ti++] = c;
   };
 
-  // TOP surface (winding: CCW looking from outside => +Z)
+  // TOP surface (CCW when viewed from outside)
   for (let y = 0; y < h - 1; y++) {
     for (let x = 0; x < w - 1; x++) {
       const a = idxOf(x, y, w);
       const b = idxOf(x + 1, y, w);
       const c = idxOf(x, y + 1, w);
       const d = idxOf(x + 1, y + 1, w);
-
-      // a-b-d and a-d-c
       pushTri(a, b, d);
       pushTri(a, d, c);
     }
   }
 
-  // BOTTOM surface (winding reversed to face outward => -Z)
-  const bottomOffset = w * h;
+  // BOTTOM surface (reverse winding)
   for (let y = 0; y < h - 1; y++) {
     for (let x = 0; x < w - 1; x++) {
       const a = bottomOffset + idxOf(x, y, w);
       const b = bottomOffset + idxOf(x + 1, y, w);
       const c = bottomOffset + idxOf(x, y + 1, w);
       const d = bottomOffset + idxOf(x + 1, y + 1, w);
-
-      // reverse
       pushTri(a, d, b);
       pushTri(a, c, d);
     }
   }
 
-  // SIDES: connect perimeter (top to bottom), consistent winding outward
+  // SIDES: connect perimeter (top->bottom), consistent outward winding
 
-  // Left edge (x=0): for each segment y->y+1
+  // Left edge (x=0) outward ~ -X
   for (let y = 0; y < h - 1; y++) {
     const topA = idxOf(0, y, w);
     const topB = idxOf(0, y + 1, w);
     const botA = bottomOffset + idxOf(0, y, w);
     const botB = bottomOffset + idxOf(0, y + 1, w);
-
-    // outward is -X
     pushTri(topA, topB, botB);
     pushTri(topA, botB, botA);
   }
 
-  // Right edge (x=w-1)
+  // Right edge (x=w-1) outward ~ +X
   for (let y = 0; y < h - 1; y++) {
     const topA = idxOf(w - 1, y, w);
     const topB = idxOf(w - 1, y + 1, w);
     const botA = bottomOffset + idxOf(w - 1, y, w);
     const botB = bottomOffset + idxOf(w - 1, y + 1, w);
-
-    // outward is +X
     pushTri(topB, topA, botA);
     pushTri(topB, botA, botB);
   }
 
-  // Bottom edge (y=0)
+  // Bottom edge (y=0) outward ~ -Y
   for (let x = 0; x < w - 1; x++) {
     const topA = idxOf(x, 0, w);
     const topB = idxOf(x + 1, 0, w);
     const botA = bottomOffset + idxOf(x, 0, w);
     const botB = bottomOffset + idxOf(x + 1, 0, w);
-
-    // outward is -Y
     pushTri(topB, topA, botA);
     pushTri(topB, botA, botB);
   }
 
-  // Top edge (y=h-1)
+  // Top edge (y=h-1) outward ~ +Y
   for (let x = 0; x < w - 1; x++) {
     const topA = idxOf(x, h - 1, w);
     const topB = idxOf(x + 1, h - 1, w);
     const botA = bottomOffset + idxOf(x, h - 1, w);
     const botB = bottomOffset + idxOf(x + 1, h - 1, w);
-
-    // outward is +Y
     pushTri(topA, topB, botB);
     pushTri(topA, botB, botA);
   }
