@@ -1,24 +1,17 @@
-"use client";
+import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
 
-import React from 'react';
-import FramePreview3D from './FramePreview3D';
-
-const ReliefPreview3D: React.FC = () => {
-  const frameEnabled = true; // Example value, replace with actual logic
-  return (
-    <div>
-      {/* Other code */}
-      <FramePreview3D
-        enabled={frameEnabled}
-        params={{
-          outerWidth: 100,
-          outerHeight: 200,
-          frameThickness: 5,
-          depth: 10,
-        }}
-      />
-    </div>
-  );
+export type HeightmapState = {
+  normF32: Float32Array;
+  w: number;
+  h: number;
 };
 
-export default ReliefPreview3D;
+type Props = {
+  hmState: HeightmapState | null;
+  stlWidthMm: number;
+  decimateStep: number;
+  depthMm: number;
+  baseMm: number;
+  outputMode?: OutputMode;
+  baseStyle: BaseStyle;
+};
