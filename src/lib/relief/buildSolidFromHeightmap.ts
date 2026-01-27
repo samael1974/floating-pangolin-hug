@@ -13,6 +13,7 @@ type BuildSolidArgs = {
 };
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+const finite = (n: number) => Number.isFinite(n) && !Number.isNaN(n);
 
 export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeometry {
   const { normF32, w, h, widthMm, depthMm, baseMm, outputMode, baseStyle } = args;
@@ -23,7 +24,7 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
 
   const idx = (x: number, y: number) => y * w + x;
 
-  // XY plane, Z thickness (slicer-friendly)
+  // Grid in XY, thickness in Z (Z-up, slicer-friendly)
   const aspect = h / w;
   const heightMm = widthMm * aspect;
 
@@ -34,9 +35,9 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   const y0 = heightMm / 2;
 
   const xL = x0;
-  const xR = x0 + widthMm;      // più robusto di (w-1)*dx
+  const xR = x0 + (w - 1) * dx;
   const yT = y0;
-  const yB = y0 - heightMm;     // più robusto di (h-1)*dy
+  const yB = y0 - (h - 1) * dy;
 
   const verts: number[] = [];
   const pushTri = (
@@ -44,30 +45,22 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     bx: number, by: number, bz: number,
     cx: number, cy: number, cz: number
   ) => {
-    // guard-rail anti NaN/Infinity
     if (
-      !Number.isFinite(ax) || !Number.isFinite(ay) || !Number.isFinite(az) ||
-      !Number.isFinite(bx) || !Number.isFinite(by) || !Number.isFinite(bz) ||
-      !Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(cz)
+      !finite(ax) || !finite(ay) || !finite(az) ||
+      !finite(bx) || !finite(by) || !finite(bz) ||
+      !finite(cx) || !finite(cy) || !finite(cz)
     ) {
       throw new Error("buildSolidFromHeightmap: non-finite vertex");
     }
     verts.push(ax, ay, az, bx, by, bz, cx, cy, cz);
   };
 
-  // --- “height” del rilievo (0..depth) ---
-  const reliefH = (H: number) => {
-    const h01 = clamp01(H);
-    if (outputMode === "mold") return depthMm * (1 - h01);
-    return depthMm * h01;
-  };
-
-  // ---------- TOP Z (flat / recessed / mold) ----------
+  // ---------- Z per modalità NON-OFFSET (base piatta classica) ----------
   const zTopClassic = (H: number) => {
     const h01 = clamp01(H);
 
     if (baseStyle === "recessed") {
-      // incavo verso il basso dentro la base (0..base)
+      // incavo dentro la base (verso -Z, ma clamp a 0)
       return Math.max(0, baseMm - depthMm * h01);
     }
 
@@ -78,22 +71,41 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     return baseMm + depthMm * h01;
   };
 
-  // ==========================
-  // OFFSET MODE (cornice XY + base solida + rilievo sopra)
-  // ==========================
+  // ===================================================================
+  // OFFSET MODE = SHELL: bottom segue la forma (top - thickness), NON piatto
+  // ===================================================================
   if (baseStyle === "offset") {
-    const baseTop = Math.max(baseMm, 0.8);   // top della base (minimo “fisico”)
-    const offXY = baseTop;                  // offset XY = spessore base (semplice e stabile)
+    // spessore minimo per evitare pareti zero
+    const t = Math.max(baseMm, 0.6);
 
-    const xL1 = xL - offXY;
-    const xR1 = xR + offXY;
-    const yT1 = yT + offXY;
-    const yB1 = yB - offXY;
+    // in offset, il "rilievo" vive in 0..depth (senza aggiungere baseMm)
+    const zTopOffset = (H: number) => {
+      const h01 = clamp01(H);
+      return outputMode === "mold" ? depthMm * (1 - h01) : depthMm * h01;
+    };
 
-    // ---- TOP rilievo: parte da baseTop ----
-    const zTop = (ix: number, iy: number) => baseTop + reliefH(normF32[idx(ix, iy)] ?? 0);
+    // Precalcolo top/bottom per griglia e shift a terra (min bottom => 0)
+    const zTGrid = new Float32Array(w * h);
+    const zBGrid = new Float32Array(w * h);
 
-    // 1) TOP SURFACE (rilievo)
+    let minBottom = Number.POSITIVE_INFINITY;
+
+    for (let iy = 0; iy < h; iy++) {
+      for (let ix = 0; ix < w; ix++) {
+        const zt = zTopOffset(normF32[idx(ix, iy)] ?? 0);
+        const zb = zt - t;
+        zTGrid[idx(ix, iy)] = zt;
+        zBGrid[idx(ix, iy)] = zb;
+        if (zb < minBottom) minBottom = zb;
+      }
+    }
+
+    const zShift = -minBottom; // porta il bottom minimo a 0
+
+    const zT = (ix: number, iy: number) => zTGrid[idx(ix, iy)] + zShift;
+    const zBf = (ix: number, iy: number) => zBGrid[idx(ix, iy)] + zShift;
+
+    // ---------- TOP surface ----------
     for (let iy = 0; iy < h - 1; iy++) {
       for (let ix = 0; ix < w - 1; ix++) {
         const xA = x0 + ix * dx;
@@ -105,99 +117,77 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
         const xD = xB;
         const yD = yC;
 
-        const zA = zTop(ix, iy);
-        const zB2 = zTop(ix + 1, iy);
-        const zC2 = zTop(ix, iy + 1);
-        const zD2 = zTop(ix + 1, iy + 1);
+        const zA = zT(ix, iy);
+        const zB1 = zT(ix + 1, iy);
+        const zC1 = zT(ix, iy + 1);
+        const zD1 = zT(ix + 1, iy + 1);
 
-        pushTri(xA, yA, zA, xB, yBv, zB2, xD, yD, zD2);
-        pushTri(xA, yA, zA, xD, yD, zD2, xC, yC, zC2);
+        pushTri(xA, yA, zA, xB, yBv, zB1, xD, yD, zD1);
+        pushTri(xA, yA, zA, xD, yD, zD1, xC, yC, zC1);
       }
     }
 
-    // 2) OUTER BOTTOM (rettangolo esterno) a Z=0
-    // winding verso -Z
-    pushTri(xL1, yT1, 0, xR1, yB1, 0, xR1, yT1, 0);
-    pushTri(xL1, yT1, 0, xL1, yB1, 0, xR1, yB1, 0);
+    // ---------- BOTTOM surface (winding verso -Z) ----------
+    for (let iy = 0; iy < h - 1; iy++) {
+      for (let ix = 0; ix < w - 1; ix++) {
+        const xA = x0 + ix * dx;
+        const yA = y0 - iy * dy;
+        const xB = x0 + (ix + 1) * dx;
+        const yBv = yA;
+        const xC = xA;
+        const yC = y0 - (iy + 1) * dy;
+        const xD = xB;
+        const yD = yC;
 
-    // 3) OUTER WALLS: da Z=0 a Z=baseTop sul perimetro esterno
-    const outerWall = (
-      ax: number, ay: number,
-      bx: number, by: number
-    ) => {
-      // (a0 -> aT -> bT) + (a0 -> bT -> b0)
-      pushTri(ax, ay, 0, ax, ay, baseTop, bx, by, baseTop);
-      pushTri(ax, ay, 0, bx, by, baseTop, bx, by, 0);
-    };
+        const zA = zBf(ix, iy);
+        const zB1 = zBf(ix + 1, iy);
+        const zC1 = zBf(ix, iy + 1);
+        const zD1 = zBf(ix + 1, iy + 1);
 
-    // top outer edge (yT1): xL1 -> xR1
-    outerWall(xL1, yT1, xR1, yT1);
-    // right outer edge (xR1): yT1 -> yB1
-    outerWall(xR1, yT1, xR1, yB1);
-    // bottom outer edge (yB1): xR1 -> xL1
-    outerWall(xR1, yB1, xL1, yB1);
-    // left outer edge (xL1): yB1 -> yT1
-    outerWall(xL1, yB1, xL1, yT1);
+        // invertito rispetto al top
+        pushTri(xA, yA, zA, xD, yD, zD1, xB, yBv, zB1);
+        pushTri(xA, yA, zA, xC, yC, zC1, xD, yD, zD1);
+      }
+    }
 
-    // 4) RING TOP (solo cornice) a Z=baseTop: collega esterno ↔ interno
-    // ring: 4 bande (8 triangoli) a z=baseTop
-    // top band
-    pushTri(xL1, yT1, baseTop, xR1, yT1, baseTop, xR, yT, baseTop);
-    pushTri(xL1, yT1, baseTop, xR, yT, baseTop, xL, yT, baseTop);
-    // bottom band
-    pushTri(xL, yB, baseTop, xR, yB, baseTop, xR1, yB1, baseTop);
-    pushTri(xL, yB, baseTop, xR1, yB1, baseTop, xL1, yB1, baseTop);
-    // left band
-    pushTri(xL1, yB1, baseTop, xL1, yT1, baseTop, xL, yT, baseTop);
-    pushTri(xL1, yB1, baseTop, xL, yT, baseTop, xL, yB, baseTop);
-    // right band
-    pushTri(xR, yT, baseTop, xR1, yT1, baseTop, xR1, yB1, baseTop);
-    pushTri(xR, yT, baseTop, xR1, yB1, baseTop, xR, yB, baseTop);
-
-    // 5) RELIEF SIDE WALLS: dal ring top (Z=baseTop) al top rilievo (Z=zTop)
-    const makeReliefWall = (
-      x1: number, y1: number, zT1: number,
-      x2: number, y2: number, zT2: number,
+    // ---------- SIDE WALLS: perimetro rettangolare della griglia ----------
+    const wall = (
+      x1: number, y1: number, zt1: number, zb1: number,
+      x2: number, y2: number, zt2: number, zb2: number,
       flip: boolean
     ) => {
-      const b1 = baseTop;
-      const b2 = baseTop;
-
       if (!flip) {
-        pushTri(x1, y1, b1, x1, y1, zT1, x2, y2, zT2);
-        pushTri(x1, y1, b1, x2, y2, zT2, x2, y2, b2);
+        pushTri(x1, y1, zb1, x1, y1, zt1, x2, y2, zt2);
+        pushTri(x1, y1, zb1, x2, y2, zt2, x2, y2, zb2);
       } else {
-        pushTri(x1, y1, b1, x2, y2, zT2, x1, y1, zT1);
-        pushTri(x1, y1, b1, x2, y2, b2, x2, y2, zT2);
+        // winding opposto
+        pushTri(x1, y1, zb1, x2, y2, zt2, x1, y1, zt1);
+        pushTri(x1, y1, zb1, x2, y2, zb2, x2, y2, zt2);
       }
     };
 
-    // LEFT / RIGHT
+    // left / right
     for (let iy = 0; iy < h - 1; iy++) {
-      const y1 = y0 - iy * dy;
-      const y2 = y0 - (iy + 1) * dy;
+      const yy1 = y0 - iy * dy;
+      const yy2 = y0 - (iy + 1) * dy;
 
-      const zL_a = zTop(0, iy);
-      const zL_b = zTop(0, iy + 1);
-      makeReliefWall(xL, y1, zL_a, xL, y2, zL_b, false);
+      // LEFT (flip=false)
+      wall(xL, yy1, zT(0, iy), zBf(0, iy), xL, yy2, zT(0, iy + 1), zBf(0, iy + 1), false);
 
-      const zR_a = zTop(w - 1, iy);
-      const zR_b = zTop(w - 1, iy + 1);
-      makeReliefWall(xR, y1, zR_a, xR, y2, zR_b, true);
+      // RIGHT (flip=true)
+      wall(xR, yy1, zT(w - 1, iy), zBf(w - 1, iy), xR, yy2, zT(w - 1, iy + 1), zBf(w - 1, iy + 1), true);
     }
 
-    // TOP / BOTTOM edges
+    // top / bottom edges
     for (let ix = 0; ix < w - 1; ix++) {
-      const x1 = x0 + ix * dx;
-      const x2 = x0 + (ix + 1) * dx;
+      const xx1 = x0 + ix * dx;
+      const xx2 = x0 + (ix + 1) * dx;
 
-      const zT_a = zTop(ix, 0);
-      const zT_b = zTop(ix + 1, 0);
-      makeReliefWall(x1, yT, zT_a, x2, yT, zT_b, false);
+      // TOP edge (flip=false)
+      wall(xx1, yT, zT(ix, 0), zBf(ix, 0), xx2, yT, zT(ix + 1, 0), zBf(ix + 1, 0), false);
 
-      const zB_a = zTop(ix, h - 1);
-      const zB_b = zTop(ix + 1, h - 1);
-      makeReliefWall(x1, yB, zB_a, x2, yB, zB_b, true);
+      // BOTTOM edge (flip=true)
+      wall(xx1, yB, zT(ix, h - 1), zBf(ix, h - 1), xx2, yB, zT(ix + 1, h - 1), zBf(ix + 1, h - 1), true);
     }
 
     const g = new THREE.BufferGeometry();
@@ -206,29 +196,32 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
     return g;
   }
 
-  // ==========================
-  // NON-OFFSET (flat/recessed/mold classico)
-  // ==========================
+  // ===================================================================
+  // NON-OFFSET = base piatta classica (bottom z=0 + 4 lati)
+  // ===================================================================
 
   // TOP surface
   for (let iy = 0; iy < h - 1; iy++) {
     for (let ix = 0; ix < w - 1; ix++) {
       const xA = x0 + ix * dx;
       const yA = y0 - iy * dy;
+
       const xB = x0 + (ix + 1) * dx;
       const yBv = yA;
+
       const xC = xA;
       const yC = y0 - (iy + 1) * dy;
+
       const xD = xB;
       const yD = yC;
 
       const zA = zTopClassic(normF32[idx(ix, iy)] ?? 0);
-      const zB2 = zTopClassic(normF32[idx(ix + 1, iy)] ?? 0);
-      const zC2 = zTopClassic(normF32[idx(ix, iy + 1)] ?? 0);
-      const zD2 = zTopClassic(normF32[idx(ix + 1, iy + 1)] ?? 0);
+      const zB1 = zTopClassic(normF32[idx(ix + 1, iy)] ?? 0);
+      const zC1 = zTopClassic(normF32[idx(ix, iy + 1)] ?? 0);
+      const zD1 = zTopClassic(normF32[idx(ix + 1, iy + 1)] ?? 0);
 
-      pushTri(xA, yA, zA, xB, yBv, zB2, xD, yD, zD2);
-      pushTri(xA, yA, zA, xD, yD, zD2, xC, yC, zC2);
+      pushTri(xA, yA, zA, xB, yBv, zB1, xD, yD, zD1);
+      pushTri(xA, yA, zA, xD, yD, zD1, xC, yC, zC1);
     }
   }
 
@@ -236,50 +229,48 @@ export function buildSolidFromHeightmap(args: BuildSolidArgs): THREE.BufferGeome
   pushTri(xL, yT, 0, xR, yB, 0, xR, yT, 0);
   pushTri(xL, yT, 0, xL, yB, 0, xR, yB, 0);
 
-  // side walls from z=0 to zTopClassic along perimeter
-  const makeWallClassic = (
-    x1: number, y1: number, zT1: number,
-    x2: number, y2: number, zT2: number,
-    flip: boolean
-  ) => {
-    const b1 = 0;
-    const b2 = 0;
-
-    if (!flip) {
-      pushTri(x1, y1, b1, x1, y1, zT1, x2, y2, zT2);
-      pushTri(x1, y1, b1, x2, y2, zT2, x2, y2, b2);
-    } else {
-      pushTri(x1, y1, b1, x2, y2, zT2, x1, y1, zT1);
-      pushTri(x1, y1, b1, x2, y2, b2, x2, y2, zT2);
-    }
-  };
-
-  // LEFT / RIGHT
+  // Left side
   for (let iy = 0; iy < h - 1; iy++) {
     const y1 = y0 - iy * dy;
     const y2 = y0 - (iy + 1) * dy;
+    const z1 = zTopClassic(normF32[idx(0, iy)] ?? 0);
+    const z2 = zTopClassic(normF32[idx(0, iy + 1)] ?? 0);
 
-    const zL1 = zTopClassic(normF32[idx(0, iy)] ?? 0);
-    const zL2 = zTopClassic(normF32[idx(0, iy + 1)] ?? 0);
-    makeWallClassic(xL, y1, zL1, xL, y2, zL2, false);
-
-    const zR1 = zTopClassic(normF32[idx(w - 1, iy)] ?? 0);
-    const zR2 = zTopClassic(normF32[idx(w - 1, iy + 1)] ?? 0);
-    makeWallClassic(xR, y1, zR1, xR, y2, zR2, true);
+    pushTri(xL, y1, 0, xL, y1, z1, xL, y2, z2);
+    pushTri(xL, y1, 0, xL, y2, z2, xL, y2, 0);
   }
 
-  // TOP / BOTTOM edges
+  // Right side
+  for (let iy = 0; iy < h - 1; iy++) {
+    const y1 = y0 - iy * dy;
+    const y2 = y0 - (iy + 1) * dy;
+    const z1 = zTopClassic(normF32[idx(w - 1, iy)] ?? 0);
+    const z2 = zTopClassic(normF32[idx(w - 1, iy + 1)] ?? 0);
+
+    pushTri(xR, y1, 0, xR, y2, z2, xR, y1, z1);
+    pushTri(xR, y1, 0, xR, y2, 0, xR, y2, z2);
+  }
+
+  // Top edge
   for (let ix = 0; ix < w - 1; ix++) {
-    const x1 = x0 + ix * dx;
-    const x2 = x0 + (ix + 1) * dx;
+    const xx1 = x0 + ix * dx;
+    const xx2 = x0 + (ix + 1) * dx;
+    const z1 = zTopClassic(normF32[idx(ix, 0)] ?? 0);
+    const z2 = zTopClassic(normF32[idx(ix + 1, 0)] ?? 0);
 
-    const zT1 = zTopClassic(normF32[idx(ix, 0)] ?? 0);
-    const zT2 = zTopClassic(normF32[idx(ix + 1, 0)] ?? 0);
-    makeWallClassic(x1, yT, zT1, x2, yT, zT2, false);
+    pushTri(xx1, yT, 0, xx2, yT, z2, xx1, yT, z1);
+    pushTri(xx1, yT, 0, xx2, yT, 0, xx2, yT, z2);
+  }
 
-    const zB1 = zTopClassic(normF32[idx(ix, h - 1)] ?? 0);
-    const zB2 = zTopClassic(normF32[idx(ix + 1, h - 1)] ?? 0);
-    makeWallClassic(x1, yB, zB1, x2, yB, zB2, true);
+  // Bottom edge
+  for (let ix = 0; ix < w - 1; ix++) {
+    const xx1 = x0 + ix * dx;
+    const xx2 = x0 + (ix + 1) * dx;
+    const z1 = zTopClassic(normF32[idx(ix, h - 1)] ?? 0);
+    const z2 = zTopClassic(normF32[idx(ix + 1, h - 1)] ?? 0);
+
+    pushTri(xx1, yB, 0, xx1, yB, z1, xx2, yB, z2);
+    pushTri(xx1, yB, 0, xx2, yB, z2, xx2, yB, 0);
   }
 
   const g = new THREE.BufferGeometry();
