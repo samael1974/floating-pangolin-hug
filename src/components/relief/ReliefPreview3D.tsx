@@ -153,35 +153,29 @@ export default function ReliefPreview3D({
     const hmDec = decimateHm(hmState, decimateStep);
 
     try {
-      // 🔧 Nuova API: niente normF32/w/h/widthMm/outputMode
-      // Passiamo height01 + width/height + outWidthMm
       const out = buildSolidFromHeightmap({
-  height01: hmDec.normF32,
-  width: hmDec.w,
-  height: hmDec.h,
-  outWidthMm: stlWidthMm,
-  depthMm,
-  baseMm,
-  baseStyle,
-  // outputMode non serve qui se il builder non lo usa
-});
+        height01: hmDec.normF32,
+        width: hmDec.w,
+        height: hmDec.h,
+        outWidthMm: stlWidthMm,
+        depthMm,
+        baseMm,
+        baseStyle,
+      });
 
-const geo = out.geometry;
+      const geom = out.geometry;
 
-
-      const geo = out.geometry;
-
-      geo.computeBoundingBox();
-      const bb = geo.boundingBox;
+      geom.computeBoundingBox();
+      const bb = geom.boundingBox;
       if (bb) {
         const center = new THREE.Vector3();
         bb.getCenter(center);
         // centra XY e appoggia Z a 0
-        geo.translate(-center.x, -center.y, -bb.min.z);
+        geom.translate(-center.x, -center.y, -bb.min.z);
       }
 
-      geo.computeVertexNormals();
-      return geo;
+      geom.computeVertexNormals();
+      return geom;
     } catch (e) {
       console.error("ReliefPreview3D build error:", e);
       return null;
