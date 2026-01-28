@@ -1,7 +1,6 @@
-// src/components/relief/ReliefPreview3D.tsx
 import { useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, Edges, ContactShadows } from "@react-three/drei";
+import { OrbitControls, Grid, ContactShadows, Environment, Edges } from "@react-three/drei";
 import * as THREE from "three";
 
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
