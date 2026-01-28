@@ -564,14 +564,18 @@ export default function ReliefWizard() {
           </div>
 
           {/* Params */}
-          <div className="space-y-3 rounded-lg bg-white p-4 shadow">
-            <div>
-              <div className="text-sm font-semibold">2) Parametri bassorilievo</div>
-              <div className="text-xs text-gray-500">
-                I parametri restano attivi anche in modalità Depth map. <span className="font-medium">Tip:</span> se vuoi
-                solo il rilievo senza basetta, imposta <span className="font-medium">Spessore base = 0</span>.
-              </div>
-            </div>
+<div className="space-y-3 rounded-lg bg-white p-4 shadow">
+  <div>
+    <div className="text-sm font-semibold">2) Parametri bassorilievo</div>
+    <div className="text-xs text-gray-500">
+      I parametri restano attivi anche in modalità Depth map.{" "}
+      <span className="font-medium">Nota:</span> lo STL esportato è sempre{" "}
+      <span className="font-medium">chiuso (manifold)</span>, quindi serve uno{" "}
+      <span className="font-medium">spessore minimo</span>: non è possibile esportare
+      “solo superficie” con base = 0. Se vuoi un risultato molto sottile, imposta una base
+      piccola (es. <span className="font-medium">0.4–1.0 mm</span>).
+    </div>
+  </div>
 
             {/* Preset rapidi */}
             <div className="flex flex-wrap gap-2 pt-2">
