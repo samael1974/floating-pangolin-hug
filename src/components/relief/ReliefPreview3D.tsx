@@ -1,7 +1,7 @@
 // src/components/relief/ReliefPreview3D.tsx
 import { useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, Edges, ContactShadows } from "@react-three/drei";
+import { OrbitControls, Grid, ContactShadows, Environment } from "@react-three/drei";
 import * as THREE from "three";
 
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
@@ -20,7 +20,7 @@ type Props = {
   depthMm: number;
   baseMm: number;
   baseStyle: BaseStyle; // "flat" | "recessed" | "offset"
-  outputMode?: any; // se non ti serve qui, lascialo pure
+  outputMode?: any;
 };
 
 function decimateHeights(hm: HeightmapState, stepIn: number) {
@@ -66,14 +66,12 @@ export default function ReliefPreview3D({
       depthMm: Math.max(0, depthMm),
       baseMm: Math.max(0, baseMm),
       baseStyle,
-      // IMPORTANT: l’invert lo fai già a monte nel Wizard
       invert: false,
       clampHeights: true,
       minBaseMm: 0.4,
     });
 
-    // 2) Appoggia la base al “piano”: porta minZ a 0
-    // (poi ruotiamo il pezzo per avere Z-up -> Y-up in scena)
+    // Appoggia base a Z=0 (poi ruotiamo Z->Y)
     geometry.computeBoundingBox();
     const bb = geometry.boundingBox;
     if (bb) {
@@ -83,7 +81,7 @@ export default function ReliefPreview3D({
       }
     }
 
-    // Normali ok per shading
+    // Normali buone = shading migliore
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
 
@@ -100,15 +98,13 @@ export default function ReliefPreview3D({
     const size = new THREE.Vector3();
     bb.getSize(size);
 
-    // dopo translate(minZ->0) l’altezza sta in size.z (Z-up)
-    // ma noi ruotiamo il mesh: Z diventa Y (up)
+    // altezza in Z (STL), diventerà Y in scena dopo rotazione
     const midHeight = size.z * 0.5;
-
     return { size, midHeight };
   }, [solidGeometry]);
 
   const width = Math.max(1, stlWidthMm);
-  const camDist = Math.max(180, width * 1.6);
+  const camDist = Math.max(180, width * 1.55);
   const targetY = bounds?.midHeight ?? 10;
 
   return (
@@ -116,29 +112,43 @@ export default function ReliefPreview3D({
       <Canvas
         shadows
         dpr={[1, 2]}
-        camera={{ position: [0, camDist, camDist], fov: 40, near: 0.1, far: 10000 }}
-        gl={{ antialias: true }}
+        camera={{ position: [0, camDist * 0.75, camDist], fov: 42, near: 0.1, far: 10000 }}
+        gl={{ antialias: true, preserveDrawingBuffer: false }}
+        onCreated={({ gl }) => {
+          // Rendering “più leggibile” (color space + tone mapping)
+          // Renderer.outputColorSpace default SRGBColorSpace, toneMapping e exposure sono proprietà del renderer. :contentReference[oaicite:0]{index=0}
+          gl.outputColorSpace = THREE.SRGBColorSpace;
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.15;
+          gl.shadowMap.enabled = true;
+          gl.shadowMap.type = THREE.PCFSoftShadowMap;
+        }}
       >
-        {/* luci migliori */}
-        <ambientLight intensity={0.45} />
+        {/* Environment = micro-contrasto sulle superfici */}
+        <Environment preset="studio" />
+
+        {/* Luci: una key + una fill + ambient leggero */}
+        <ambientLight intensity={0.18} />
         <directionalLight
-          position={[300, 500, 200]}
-          intensity={1.25}
+          position={[350, 520, 260]}
+          intensity={1.35}
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
           shadow-camera-near={1}
-          shadow-camera-far={2000}
+          shadow-camera-far={2500}
+          shadow-bias={-0.0002}
         />
-        <hemisphereLight intensity={0.35} />
+        <directionalLight position={[-280, 220, -220]} intensity={0.55} />
 
-        {/* helpers */}
+        {/* helpers (griglia spostata leggermente in basso per evitare z-fighting) */}
         {showHelpers && (
           <>
             <Grid
+              position={[0, -0.15, 0]}
               infiniteGrid
               fadeDistance={900}
-              fadeStrength={2.5}
+              fadeStrength={2.8}
               cellSize={10}
               sectionSize={50}
             />
@@ -146,30 +156,44 @@ export default function ReliefPreview3D({
           </>
         )}
 
-        {/* oggetto */}
+        {/* Oggetto */}
         {solidGeometry && (
           <mesh
             geometry={solidGeometry}
-            // Z-up (STL) -> Y-up (three) così la base sta sulla griglia
             rotation={[-Math.PI / 2, 0, 0]}
             castShadow
             receiveShadow
           >
-            <meshStandardMaterial roughness={0.65} metalness={0.08} />
-            <Edges threshold={12} />
+            {/* Material “leggibile”: più contrasto + risposta a Environment */}
+            <meshPhysicalMaterial
+              roughness={0.35}
+              metalness={0.05}
+              clearcoat={0.25}
+              clearcoatRoughness={0.65}
+              envMapIntensity={1.25}
+            />
           </mesh>
         )}
 
-        {/* ombra “a contatto” per far leggere il volume */}
+        {/* Ombra contatto: spostata un filo sotto per NON combattere con la base */}
         <ContactShadows
-          position={[0, 0, 0]}
-          scale={Math.max(200, stlWidthMm * 2)}
-          opacity={0.35}
-          blur={2.6}
-          far={Math.max(200, stlWidthMm * 2)}
+          position={[0, -0.12, 0]}
+          scale={Math.max(220, stlWidthMm * 2)}
+          opacity={0.33}
+          blur={2.8}
+          far={Math.max(240, stlWidthMm * 2)}
         />
 
-        <OrbitControls makeDefault target={[0, targetY, 0]} enableDamping dampingFactor={0.08} />
+        <OrbitControls
+          makeDefault
+          target={[0, targetY, 0]}
+          enableDamping
+          dampingFactor={0.08}
+          enablePan={false}
+          // evita inquadrature “da sotto” che ti fanno perdere il pezzo
+          minPolarAngle={0.15}
+          maxPolarAngle={Math.PI / 2.02}
+        />
       </Canvas>
     </div>
   );
