@@ -48,7 +48,7 @@ async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
   return img;
 }
 
-function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState {
+function imageDataToNormF32(imgData: ImageData): { normF32: Float32Array; w: number; h: number } {
   const { data, width: w, height: h } = imgData;
   const out = new Float32Array(w * h);
 
@@ -56,8 +56,7 @@ function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState
     const r = data[i] ?? 0;
     const g = data[i + 1] ?? 0;
     const b = data[i + 2] ?? 0;
-    let v = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    if (invert) v = 1 - v;
+    const v = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
     out[p] = clamp01(v);
   }
 
@@ -68,7 +67,7 @@ function imageDataToNormF32(imgData: ImageData, invert: boolean): HeightmapState
  * Fallback via Canvas (8-bit) per JPG/WEBP/PNG (se il browser lo “schiaccia”).
  * Il “vero 16-bit” passa da decodeDepthmapPng() (solo PNG).
  */
-async function decodeDepthMapToHmStateCanvas(file: File, invert: boolean, maxSize = 512): Promise<HeightmapState> {
+async function decodeDepthMapToHmStateCanvas(file: File, maxSize = 512): Promise<HeightmapState> {
   const img = await loadImageFromFile(file);
   const iw = img.naturalWidth || img.width;
   const ih = img.naturalHeight || img.height;
@@ -86,7 +85,9 @@ async function decodeDepthMapToHmStateCanvas(file: File, invert: boolean, maxSiz
 
   ctx.drawImage(img, 0, 0, w, h);
   const imgData = ctx.getImageData(0, 0, w, h);
-  return imageDataToNormF32(imgData, invert);
+
+  const { normF32 } = imageDataToNormF32(imgData);
+  return { normF32, w, h };
 }
 
 function invertHmInPlace(hm: HeightmapState) {
@@ -104,7 +105,7 @@ function safeFileName(name: string) {
   return s.length ? s : "reliefforge";
 }
 
-/** Decimazione heightmap (stesso concetto della preview) */
+/** Decimazione heightmap (coerente con preview/export) */
 function decimateHm(hm: HeightmapState, step: number): HeightmapState {
   const s = Math.max(1, Math.floor(step || 1));
   if (s === 1) return hm;
@@ -128,11 +129,13 @@ export default function ReliefWizard() {
   // ✅ Preview tab (colonna destra)
   const [previewTab, setPreviewTab] = React.useState<"image" | "depth" | "stl">("stl");
 
-  // ✅ Pannello istruzioni (inline)
+  // ✅ Pannello istruzioni
   const [showInstructions, setShowInstructions] = React.useState<boolean>(false);
 
   // ✅ Sorgente
   const [sourceMode, setSourceMode] = React.useState<SourceMode>("image");
+
+  // ✅ Toggle invert (vale per entrambe le modalità)
   const [invertDepthMap, setInvertDepthMap] = React.useState(false);
 
   // ✅ Upload
@@ -145,18 +148,17 @@ export default function ReliefWizard() {
   // ✅ Nome file STL (personalizzabile)
   const [customName, setCustomName] = React.useState<string>("reliefforge");
 
-const [params, setParams] = React.useState<ReliefParams>(() => ({
-  projectType: "logo_text",
-  depthMm: 3,
-  baseMm: 2,
-  detail: 0.55,
-  smooth: 0.15,
-  edge: "sharp",
-  outputMode: "relief",
-  baseStyle: "flat", // oppure "offset"
-  // ✅ Cutout disattivato e non più in UI
-  cutoutEnabled: false,
-}));
+  const [params, setParams] = React.useState<ReliefParams>(() => ({
+    projectType: "logo_text",
+    depthMm: 3,
+    baseMm: 2,
+    detail: 0.55,
+    smooth: 0.15,
+    edge: "sharp",
+    outputMode: "relief",
+    baseStyle: "flat", // "flat" | "recessed" | "offset"
+    cutoutEnabled: false, // disattivato
+  }));
 
   // ✅ Heightmap state/status
   const [hmState, setHmState] = React.useState<HeightmapState | null>(null);
@@ -198,12 +200,13 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
       if (!file) {
         setHmState(null);
         setHmStatus("idle");
+        setFileWarning(null);
         return;
       }
 
       setFileWarning(null);
 
-      // Depthmap PNG compatibility check
+      // Depthmap PNG compatibility check (solo quando sourceMode=depthmap)
       if (sourceMode === "depthmap") {
         const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
         if (isPng) {
@@ -229,10 +232,13 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
       }
 
       setHmStatus("loading");
-      const maxSize = 512;
 
       try {
+        const maxSize = 512;
+
+        // ------------------------
         // DEPTHMAP MODE
+        // ------------------------
         if (sourceMode === "depthmap") {
           const isPng = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
           let hm: HeightmapState;
@@ -241,10 +247,12 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
             const buf = new Uint8Array(await file.arrayBuffer());
             const dec = decodeDepthmapPng(buf);
             hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
-            if (invertDepthMap) invertHmInPlace(hm);
           } else {
-            hm = await decodeDepthMapToHmStateCanvas(file, invertDepthMap, maxSize);
+            hm = await decodeDepthMapToHmStateCanvas(file, maxSize);
           }
+
+          // ✅ Invert applicato qui
+          if (invertDepthMap) invertHmInPlace(hm);
 
           if (!cancelled) {
             setHmState(hm);
@@ -253,7 +261,9 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
           return;
         }
 
+        // ------------------------
         // IMAGE MODE
+        // ------------------------
         const img = await loadImageFromFile(file);
         const iw = img.naturalWidth || img.width;
         const ih = img.naturalHeight || img.height;
@@ -295,8 +305,13 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
           throw new Error(`Heightmap mismatch: normF32(${normF32.length}) != ${outW}*${outH}`);
         }
 
+        const hm: HeightmapState = { normF32, w: outW, h: outH };
+
+        // ✅ Invert applicato ANCHE qui (modalità immagine)
+        if (invertDepthMap) invertHmInPlace(hm);
+
         if (!cancelled) {
-          setHmState({ normF32, w: outW, h: outH });
+          setHmState(hm);
           setHmStatus("ready");
         }
       } catch (e) {
@@ -312,7 +327,7 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
     return () => {
       cancelled = true;
     };
-    }, [
+  }, [
     file,
     sourceMode,
     invertDepthMap,
@@ -323,6 +338,7 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
     params.smooth,
     params.edge,
     params.baseStyle,
+    params.outputMode,
   ]);
 
   // ✅ draw canvas: quando apro il tab "Depth map"
@@ -374,7 +390,6 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
       // ✅ decimazione coerente con slider (export e preview allineati)
       const hmForExport = decimateStep > 1 ? decimateHm(hmState, decimateStep) : hmState;
 
-      // ✅ FIRMA CORRETTA: oggetto con { hm: ... }
       downloadReliefStlBinary({
         hm: hmForExport,
         widthMm: stlWidthMm,
@@ -382,7 +397,7 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
         baseMm: params.baseMm,
         outputMode: params.outputMode,
         baseStyle: params.baseStyle,
-        fileName: name, // senza .stl: ci pensa reliefStl.ts
+        fileName: name,
       });
     } catch (e: any) {
       console.error("STL: ERROR", e);
@@ -425,7 +440,9 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
                 type="button"
                 onClick={() => setSourceMode("image")}
                 className={`px-3 py-1.5 text-sm ${
-                  sourceMode === "image" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                  sourceMode === "image"
+                    ? "bg-[#1F4E5F] text-white"
+                    : "bg-white text-[#1F4E5F] hover:bg-gray-50"
                 }`}
               >
                 Immagine
@@ -435,24 +452,25 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
                 type="button"
                 onClick={() => setSourceMode("depthmap")}
                 className={`px-3 py-1.5 text-sm ${
-                  sourceMode === "depthmap" ? "bg-[#1F4E5F] text-white" : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                  sourceMode === "depthmap"
+                    ? "bg-[#1F4E5F] text-white"
+                    : "bg-white text-[#1F4E5F] hover:bg-gray-50"
                 }`}
               >
                 Depth map (8/16-bit)
               </button>
             </div>
 
-            {sourceMode === "depthmap" && (
-              <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={invertDepthMap}
-                  onChange={(e) => setInvertDepthMap(e.target.checked)}
-                />
-                <span>Inverti depth map</span>
-                <span className="text-xs text-gray-500">(se viene “al contrario”)</span>
-              </label>
-            )}
+            {/* ✅ Invert sempre visibile */}
+            <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={invertDepthMap}
+                onChange={(e) => setInvertDepthMap(e.target.checked)}
+              />
+              <span>Inverti profondità</span>
+              <span className="text-xs text-gray-500">(se viene “al contrario”)</span>
+            </label>
           </div>
 
           {/* Upload */}
@@ -767,12 +785,15 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
             {/* Tabs + Istruzioni */}
             <div className="overflow-hidden rounded-md border">
               <div className="flex items-center justify-between gap-2 border-b bg-gray-50 px-3 py-2">
+                {/* ✅ Tabs puliti */}
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setPreviewTab("image")}
                     className={`rounded px-2 py-1 text-xs font-medium ${
-                      previewTab === "image" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                      previewTab === "image"
+                        ? "bg-[#1F4E5F] text-white"
+                        : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                     }`}
                   >
                     Immagine
@@ -782,7 +803,9 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
                     type="button"
                     onClick={() => setPreviewTab("depth")}
                     className={`rounded px-2 py-1 text-xs font-medium ${
-                      previewTab === "depth" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                      previewTab === "depth"
+                        ? "bg-[#1F4E5F] text-white"
+                        : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                     }`}
                   >
                     Depth map
@@ -792,18 +815,11 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
                     type="button"
                     onClick={() => setPreviewTab("stl")}
                     className={`rounded px-2 py-1 text-xs font-medium ${
-                      previewTab === "stl" ? "bg-[#1F4E5F] text-white" : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
+                      previewTab === "stl"
+                        ? "bg-[#1F4E5F] text-white"
+                        : "border bg-white text-[#1F4E5F] hover:bg-gray-50"
                     }`}
-                  
                   >
-
-                  <button
-  type="button"
-  onClick={() => setInvert(v => !v)}
-  className="btn"
->
-  {invert ? "Inverti Depth Map: ON" : "Inverti Depth Map: OFF"}
-</button>
                     Dettagli
                   </button>
                 </div>
@@ -865,7 +881,7 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
                       <div className="mt-3 rounded-md border border-gray-200 bg-white p-2">
                         <div className="font-semibold">Tip rapido</div>
                         <div className="mt-1">
-                          Se il rilievo viene “al contrario”, attiva <span className="font-semibold">Inverti depth map</span>.
+                          Se il rilievo viene “al contrario”, attiva <span className="font-semibold">Inverti profondità</span>.
                         </div>
                       </div>
                     </div>
@@ -905,7 +921,11 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
                   <div className="space-y-2">
                     <div className="text-xs font-medium text-gray-700">Anteprima immagine</div>
                     {previewUrl ? (
-                      <img src={previewUrl} alt="Anteprima" className="max-h-[240px] w-full rounded-md border object-contain" />
+                      <img
+                        src={previewUrl}
+                        alt="Anteprima"
+                        className="max-h-[240px] w-full rounded-md border object-contain"
+                      />
                     ) : (
                       <div className="text-xs text-gray-500">Carica un file per vedere l’anteprima.</div>
                     )}
@@ -918,7 +938,9 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
                     {sourceMode === "depthmap" ? (
                       <canvas ref={dmCanvasRef} className="max-h-[240px] w-full rounded-md border" />
                     ) : (
-                      <div className="text-xs text-gray-500">In modalità Immagine, la depthmap è interna alla pipeline (vedi 3D).</div>
+                      <div className="text-xs text-gray-500">
+                        In modalità Immagine, la depthmap è interna alla pipeline (vedi 3D).
+                      </div>
                     )}
                   </div>
                 )}
@@ -928,9 +950,9 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
                     {(() => {
                       const s = estimateStlStats();
 
-                      const baseMm = Number(params.baseMm ?? 0);
+                      const baseMmNum = Number(params.baseMm ?? 0);
                       const reliefMm = Number(params.depthMm ?? 0);
-                      const totalMm = baseMm + reliefMm;
+                      const totalMm = baseMmNum + reliefMm;
 
                       const hmW = hmState?.w ?? 0;
                       const hmH = hmState?.h ?? 0;
@@ -986,7 +1008,8 @@ const [params, setParams] = React.useState<ReliefParams>(() => ({
                                   <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
                                     <div className="font-semibold">⚠️ Mesh pesante</div>
                                     <div className="mt-1">
-                                      Consiglio: aumenta “Decimazione” almeno a <span className="font-semibold">x{s.suggestedDecimate}</span>.
+                                      Consiglio: aumenta “Decimazione” almeno a{" "}
+                                      <span className="font-semibold">x{s.suggestedDecimate}</span>.
                                     </div>
                                   </div>
                                 ) : (
