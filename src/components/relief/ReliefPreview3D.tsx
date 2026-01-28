@@ -15,12 +15,14 @@ export type HeightmapState = {
 type Props = {
   hmState: HeightmapState | null;
   stlWidthMm: number;
-  decimateStep: number; // ✅ AGGIUNTO
+  decimateStep: number;
   depthMm: number;
   baseMm: number;
   outputMode?: any;
   baseStyle: any;
+  invert?: boolean; // ✅ AGGIUNTO
 };
+
 
 export default function ReliefPreview3D({
   hmState,
