@@ -1,7 +1,7 @@
 // src/components/relief/ReliefPreview3D.tsx
 import { useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, Edges, ContactShadows } from "@react-three/drei";
+import { OrbitControls, Grid, Environment, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
@@ -19,26 +19,25 @@ type Props = {
   decimateStep: number;
   depthMm: number;
   baseMm: number;
-  baseStyle: BaseStyle; // "flat" | "recessed" | "offset"
-  outputMode?: any; // se non ti serve qui, lascialo pure
+  baseStyle: BaseStyle;
+  invert?: boolean; // 👈 per “Inverti depth map”, se vuoi passarlo dal Wizard
 };
 
-function decimateHeights(hm: HeightmapState, stepIn: number) {
-  const step = Math.max(1, Math.floor(stepIn || 1));
-  if (step === 1) return hm;
+function decimateHm(hm: HeightmapState, step: number): HeightmapState {
+  const s = Math.max(1, Math.floor(step || 1));
+  if (s === 1) return hm;
 
-  const w2 = Math.max(2, Math.floor(hm.w / step));
-  const h2 = Math.max(2, Math.floor(hm.h / step));
+  const w2 = Math.max(2, Math.floor(hm.w / s));
+  const h2 = Math.max(2, Math.floor(hm.h / s));
   const out = new Float32Array(w2 * h2);
 
   for (let y = 0; y < h2; y++) {
-    const sy = Math.min(hm.h - 1, y * step);
+    const sy = Math.min(hm.h - 1, y * s);
     for (let x = 0; x < w2; x++) {
-      const sx = Math.min(hm.w - 1, x * step);
+      const sx = Math.min(hm.w - 1, x * s);
       out[y * w2 + x] = hm.normF32[sy * hm.w + sx] ?? 0;
     }
   }
-
   return { normF32: out, w: w2, h: h2 };
 }
 
@@ -49,16 +48,17 @@ export default function ReliefPreview3D({
   depthMm,
   baseMm,
   baseStyle,
+  invert = false,
 }: Props): JSX.Element {
   const showHelpers = true;
 
-  // 1) Geometria SOLIDA identica alla pipeline STL
-  const solidGeometry = useMemo(() => {
-    if (!hmState) return null;
+  // 1) Geometria solida (coerente con STL) + bbox
+  const { solidGeo, bbox, liftY, targetY } = useMemo(() => {
+    if (!hmState) return { solidGeo: null as THREE.BufferGeometry | null, bbox: null as THREE.Box3 | null, liftY: 0, targetY: 0 };
 
-    const hm = decimateHeights(hmState, decimateStep);
+    const hm = decimateHm(hmState, decimateStep);
 
-    const { geometry } = buildSolidFromHeightmap({
+    const out = buildSolidFromHeightmap({
       height01: hm.normF32,
       width: hm.w,
       height: hm.h,
@@ -66,110 +66,87 @@ export default function ReliefPreview3D({
       depthMm: Math.max(0, depthMm),
       baseMm: Math.max(0, baseMm),
       baseStyle,
-      // IMPORTANT: l’invert lo fai già a monte nel Wizard
-      invert: false,
+      invert,
       clampHeights: true,
       minBaseMm: 0.4,
     });
 
-    // 2) Appoggia la base al “piano”: porta minZ a 0
-    // (poi ruotiamo il pezzo per avere Z-up -> Y-up in scena)
-    geometry.computeBoundingBox();
-    const bb = geometry.boundingBox;
-    if (bb) {
-      const minZ = bb.min.z;
-      if (Number.isFinite(minZ) && Math.abs(minZ) > 1e-6) {
-        geometry.translate(0, 0, -minZ);
-      }
-    }
+    const g = out.geometry;
+    g.computeBoundingBox();
+    const bb = g.boundingBox ? g.boundingBox.clone() : new THREE.Box3().setFromBufferAttribute(g.getAttribute("position") as any);
 
-    // Normali ok per shading
-    geometry.computeVertexNormals();
-    geometry.computeBoundingSphere();
+    // ✅ La griglia è a Y=0 (dopo rotazione il “verticale” = Z originale)
+    // Quindi alzo di -minZ per appoggiare la base sul piano.
+    const minZ = bb.min.z;
+    const lift = -minZ;
 
-    return geometry;
-  }, [hmState, stlWidthMm, decimateStep, depthMm, baseMm, baseStyle]);
+    // Target OrbitControls al centro del modello (in altezza)
+    const centerZ = (bb.min.z + bb.max.z) * 0.5;
+    const target = centerZ + lift;
 
-  // Bounds per camera/target migliori
-  const bounds = useMemo(() => {
-    if (!solidGeometry) return null;
-    solidGeometry.computeBoundingBox();
-    const bb = solidGeometry.boundingBox;
-    if (!bb) return null;
+    return { solidGeo: g, bbox: bb, liftY: lift, targetY: target };
+  }, [hmState, stlWidthMm, decimateStep, depthMm, baseMm, baseStyle, invert]);
 
-    const size = new THREE.Vector3();
-    bb.getSize(size);
-
-    // dopo translate(minZ->0) l’altezza sta in size.z (Z-up)
-    // ma noi ruotiamo il mesh: Z diventa Y (up)
-    const midHeight = size.z * 0.5;
-
-    return { size, midHeight };
-  }, [solidGeometry]);
-
-  const width = Math.max(1, stlWidthMm);
-  const camDist = Math.max(180, width * 1.6);
-  const targetY = bounds?.midHeight ?? 10;
+  // 2) Camera “ragionevole” (poi l’utente può orbitare)
+  const camDist = Math.max(140, stlWidthMm * 1.35);
 
   return (
-    <div style={{ width: "100%", height: "100%", background: "#f6f7f9" }}>
+    <div style={{ width: "100%", height: 420, background: "#fff" }}>
       <Canvas
         shadows
         dpr={[1, 2]}
-        camera={{ position: [0, camDist, camDist], fov: 40, near: 0.1, far: 10000 }}
+        camera={{ position: [0, camDist * 0.85, camDist], fov: 45, near: 0.1, far: 10000 }}
         gl={{ antialias: true }}
       >
-        {/* luci migliori */}
-        <ambientLight intensity={0.45} />
+        {/* sfondo leggermente “grigio” per staccare il modello */}
+        <color attach="background" args={["#f8fafc"]} />
+
+        {/* Luci migliori + ambiente */}
+        <ambientLight intensity={0.55} />
         <directionalLight
-          position={[300, 500, 200]}
-          intensity={1.25}
+          position={[300, 450, 250]}
+          intensity={1.15}
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
-          shadow-camera-near={1}
-          shadow-camera-far={2000}
         />
-        <hemisphereLight intensity={0.35} />
+        <directionalLight position={[-250, 200, -200]} intensity={0.45} />
 
-        {/* helpers */}
+        {/* HDRI per far “leggere” le superfici */}
+        <Environment preset="studio" />
+
         {showHelpers && (
           <>
             <Grid
               infiniteGrid
-              fadeDistance={900}
-              fadeStrength={2.5}
+              fadeDistance={700}
+              fadeStrength={3}
               cellSize={10}
               sectionSize={50}
             />
-            <axesHelper args={[Math.max(60, stlWidthMm * 0.7)]} />
+            <axesHelper args={[Math.max(80, stlWidthMm)]} />
           </>
         )}
 
-        {/* oggetto */}
-        {solidGeometry && (
-          <mesh
-            geometry={solidGeometry}
-            // Z-up (STL) -> Y-up (three) così la base sta sulla griglia
-            rotation={[-Math.PI / 2, 0, 0]}
-            castShadow
-            receiveShadow
-          >
-            <meshStandardMaterial roughness={0.65} metalness={0.08} />
-            <Edges threshold={12} />
-          </mesh>
-        )}
-
-        {/* ombra “a contatto” per far leggere il volume */}
+        {/* Ombra di contatto sul piano per far capire l’appoggio */}
         <ContactShadows
           position={[0, 0, 0]}
-          scale={Math.max(200, stlWidthMm * 2)}
           opacity={0.35}
-          blur={2.6}
-          far={Math.max(200, stlWidthMm * 2)}
+          blur={2.2}
+          far={Math.max(200, stlWidthMm * 4)}
+          scale={Math.max(6, stlWidthMm / 10)}
         />
 
-        <OrbitControls makeDefault target={[0, targetY, 0]} enableDamping dampingFactor={0.08} />
+        {/* 3) Modello: ruoto sul piano e lo ALZO (liftY) */}
+        {solidGeo && (
+          <group rotation={[-Math.PI / 2, 0, 0]} position={[0, liftY, 0]}>
+            <mesh geometry={solidGeo} castShadow receiveShadow>
+              <meshStandardMaterial roughness={0.55} metalness={0.08} />
+            </mesh>
+          </group>
+        )}
+
+        <OrbitControls makeDefault target={[0, targetY, 0]} />
       </Canvas>
     </div>
   );
