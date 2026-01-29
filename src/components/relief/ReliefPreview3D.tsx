@@ -164,7 +164,7 @@ export default function ReliefPreview3D({
     if (!hmState) return null;
     if (!mat?.enabled) return null;
 
-    const { vertices, indices } = buildPassepartoutRectPhi({
+    const out = buildPassepartoutRectPhi({
       innerWmm: reliefPlan.w,
       innerHmm: reliefPlan.h,
       steps: mat.steps,
@@ -173,6 +173,19 @@ export default function ReliefPreview3D({
       stepDropMm: mat.stepDropMm,
       minBandMm: mat.minBandMm,
     });
+
+    // Supporta output come:
+    // 1) { vertices, indices }
+    // 2) [vertices, indices]
+    const vertices =
+      (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
+    const indices =
+      (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
+
+    if (!vertices || !indices) {
+      console.error("buildPassepartoutRectPhi: output non valido", out);
+      return null;
+    }
 
     return toThreeGeometry(vertices, indices);
   }, [hmState, mat, reliefPlan.w, reliefPlan.h]);
@@ -184,13 +197,12 @@ export default function ReliefPreview3D({
 
     // If mat is enabled, the frame "inner opening" should surround the mat outer boundary,
     // so we increase inner size by 2*matBands. Otherwise it frames the relief directly.
-    const matBands =
-      mat?.enabled ? Math.max(mat.totalBandsMm, mat.minBandMm * mat.steps) : 0;
+    const matBands = mat?.enabled ? Math.max(mat.totalBandsMm, mat.minBandMm * mat.steps) : 0;
 
     const innerW = reliefPlan.w + 2 * matBands;
     const innerH = reliefPlan.h + 2 * matBands;
 
-    const { vertices, indices } = buildFrameRectPhi({
+    const out = buildFrameRectPhi({
       innerWmm: innerW,
       innerHmm: innerH,
       solidMm: frame.solidMm,
@@ -201,6 +213,16 @@ export default function ReliefPreview3D({
       lipMm: frame.lipMm,
       pocketRadialMm: frame.pocketRadialMm,
     });
+
+    const vertices =
+      (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
+    const indices =
+      (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
+
+    if (!vertices || !indices) {
+      console.error("buildFrameRectPhi: output non valido", out);
+      return null;
+    }
 
     return toThreeGeometry(vertices, indices);
   }, [hmState, frame, mat, reliefPlan.w, reliefPlan.h]);
@@ -229,6 +251,7 @@ export default function ReliefPreview3D({
       </div>
     );
   }
+
 
   // camera “da oggetto fisico”
   const width = Math.max(1, stlWidthMm);
