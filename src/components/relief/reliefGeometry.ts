@@ -1,5 +1,7 @@
 // src/components/relief/reliefGeometry.ts
 import * as THREE from "three";
+import React, { useMemo, useEffect, useRef } from "react";
+
 
 type BuildGeometryOptions = {
   widthMm: number;
