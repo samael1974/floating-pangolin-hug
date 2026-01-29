@@ -39,7 +39,7 @@ const STAND_UP = true;
 const EXTRA_Z_ROT = Math.PI;
 
 // 4) Look & luci
-const BG = "#f6f7f9";
+const BG = "#ECECEC";
 const SHOW_HELPERS = true;
 // =====================================================
 
