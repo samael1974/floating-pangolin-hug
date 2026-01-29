@@ -267,11 +267,12 @@ export default function ReliefPreview3D({
   
   <mesh
   geometry={solidGeometry}
-  position={[0, reliefBaseY, 0]}
+  position={[0, 0, 0]}   // ✅ incrocio assi griglia
   rotation={PREVIEW_MIRROR_Y_180 ? [0, Math.PI, 0] : [0, 0, 0]}
   castShadow
   receiveShadow
 >
+
 
             <meshPhysicalMaterial
               color={"#1F4E5F"}
