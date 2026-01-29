@@ -200,17 +200,16 @@ export default function ReliefPreview3D({
     return toBufferGeometry(vertices, indices);
   }, [hmState, mat, reliefPlan.w, reliefPlan.h]);
 
-    // Frame geometry (cornice intorno a relief + passepartout)
+     // Frame geometry (cornice intorno a relief + passepartout)
   const frameGeometry = useMemo(() => {
     if (!hmState) return null;
     if (!frame?.enabled) return null;
 
-    // calcolo total passepartout (esterno al relief)
+    // calcola quanti mm di mat attorno al relief (anche se minimo)
     const matBands = mat?.enabled
       ? Math.max(mat.totalBandsMm, mat.minBandMm * mat.steps)
       : 0;
 
-    // inner size della cornice ingloba relief + 2 * matBands
     const innerW = reliefPlan.w + 2 * matBands;
     const innerH = reliefPlan.h + 2 * matBands;
 
@@ -223,20 +222,6 @@ export default function ReliefPreview3D({
       glassClearanceMm: frame.glassClearanceMm,
       glueLipMm: frame.lipMm,
     });
-
-    const vertices =
-      (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
-    const indices =
-      (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
-
-    if (!vertices || !indices) {
-      console.error("buildFrameRectPhi: output non valido", out);
-      return null;
-    }
-
-    return toBufferGeometry(vertices, indices);
-  }, [hmState, frame, mat, reliefPlan.w, reliefPlan.h]);
-
 
     const vertices =
       (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
@@ -281,15 +266,12 @@ export default function ReliefPreview3D({
   const camDist = Math.max(220, width * 1.6);
 
   // --- Layering (effetto quadro reale) ---
-  // Passepartout top plane sits BELOW relief top by matDropMm.
-  // Relief base is lifted to sit slightly ABOVE passepartout plane (gap).
   const matDrop = mat?.enabled ? mat.matDropMm : 0;
   const reliefGap = mat?.enabled ? mat.reliefGapMm : 0;
 
   const matTopY = reliefTopY - matDrop;
   const reliefBaseY = matTopY + reliefGap;
 
-  // Ground plane (for contact shadows) ~0: frame base is y=0
   const groundY = -0.01;
 
   return (
@@ -303,17 +285,14 @@ export default function ReliefPreview3D({
           gl.outputColorSpace = THREE.SRGBColorSpace;
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.05;
-
           gl.shadowMap.enabled = true;
           gl.shadowMap.type = THREE.PCFSoftShadowMap;
         }}
       >
         <color attach="background" args={[BG_COLOR]} />
 
-        {/* Environment: fa “leggere” i volumi (micro-contrasto) */}
         <Environment preset="studio" />
 
-        {/* Luci: key + fill + ambient */}
         <ambientLight intensity={0.22} />
 
         <directionalLight
@@ -329,7 +308,6 @@ export default function ReliefPreview3D({
 
         <directionalLight position={[-380, 260, -260]} intensity={0.65} />
 
-        {/* Helpers */}
         {SHOW_HELPERS && (
           <>
             <Grid
@@ -345,7 +323,6 @@ export default function ReliefPreview3D({
         )}
 
         <group>
-          {/* Passepartout: builder top at y=0 -> position so that top sits at matTopY */}
           {matGeometry && (
             <mesh geometry={matGeometry} position={[0, matTopY, 0]} castShadow receiveShadow>
               <meshPhysicalMaterial
@@ -358,7 +335,6 @@ export default function ReliefPreview3D({
             </mesh>
           )}
 
-          {/* Relief: geometry base at y=0 -> lift base to reliefBaseY */}
           <mesh
             geometry={solidGeometry}
             position={[0, reliefBaseY, 0]}
@@ -376,7 +352,6 @@ export default function ReliefPreview3D({
             />
           </mesh>
 
-          {/* Frame: base at y=0 -> keep on ground */}
           {frameGeometry && (
             <mesh geometry={frameGeometry} position={[0, 0, 0]} castShadow receiveShadow>
               <meshPhysicalMaterial
@@ -391,7 +366,6 @@ export default function ReliefPreview3D({
           )}
         </group>
 
-        {/* Contact shadow per “appoggio fisico” */}
         <ContactShadows
           position={[0, groundY, 0]}
           scale={Math.max(260, stlWidthMm * 2.4)}
