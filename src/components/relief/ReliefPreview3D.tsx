@@ -267,14 +267,11 @@ export default function ReliefPreview3D({
           <mesh
   geometry={solidGeometry}
   position={[0, reliefBaseY, 0]}
-  rotation={
-    PREVIEW_MIRROR_Y_180
-      ? [0, Math.PI, -Math.PI / 2]
-      : [0, 0, -Math.PI / 2]
-  }
+  rotation={PREVIEW_MIRROR_Y_180 ? [0, Math.PI, 0] : [0, 0, 0]}
   castShadow
   receiveShadow
 >
+
             <meshPhysicalMaterial
               color={"#1F4E5F"}
               roughness={0.32}
