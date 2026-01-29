@@ -37,7 +37,7 @@ const SHOW_HELPERS = true;
 const PREVIEW_MIRROR_Y_180 = false;
 
 // migliora la leggibilità senza “sparare” tutto bianco
-const BG_COLOR = "#ECECEC";
+const BG_COLOR = "#f6f7fb";
 
 function decimateHeights(hm: HeightmapState, stepIn: number): HeightmapState {
   const step = Math.max(1, Math.floor(stepIn || 1));
@@ -191,7 +191,7 @@ export default function ReliefPreview3D({
           receiveShadow
         >
           <meshPhysicalMaterial
-            color="#1F4E5F
+            color={"#E1E1E1"}
             roughness={0.32}
             metalness={0.03}
             clearcoat={0.28}
