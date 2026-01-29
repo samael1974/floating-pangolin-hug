@@ -304,14 +304,15 @@ export default function ReliefPreview3D({
         />
 
         <OrbitControls
-          makeDefault
-          target={[0, Math.max(8, baseMm * 0.25), 0]}
-          enableDamping
-          dampingFactor={0.08}
-          enablePan={false}
-          minPolarAngle={0.15}
-          maxPolarAngle={Math.PI / 2.03}
-        />
+  makeDefault
+  // target dinamico centrato sulla mesh
+  target={[0, reliefTopY * 0.5, 0]}
+  enableDamping
+  dampingFactor={0.08}
+  enablePan={true}       // abilita pan per muovere il centro
+  minPolarAngle={0.15}
+  maxPolarAngle={Math.PI * 0.9}
+/>
       </Canvas>
     </div>
   );
