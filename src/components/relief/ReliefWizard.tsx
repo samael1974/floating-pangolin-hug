@@ -171,6 +171,33 @@ export default function ReliefWizard() {
 
   const canGenerate = !!file && hmStatus === "ready" && !!hmState;
 
+    // ---------------------------
+  // Step 2: Cornice + Passepartout (MVP)
+  // ---------------------------
+  const [matEnabled, setMatEnabled] = React.useState(false);
+  const [frameEnabled, setFrameEnabled] = React.useState(false);
+
+  const [matParams, setMatParams] = React.useState({
+    steps: 3 as 1 | 2 | 3 | 4 | 5 | 6,
+    totalBandsMm: 18,
+    minBandMm: 6,
+    thicknessMm: 2.4,
+    stepDropMm: 1.2,
+    matDropMm: 2.5,
+    reliefGapMm: 0.35,
+  });
+
+  const [frameParams, setFrameParams] = React.useState({
+    solidMm: 2.0,
+    frameHeightMm: 18,
+    glassMm: 2 as 2 | 3,
+    glassClearanceMm: 0.25,
+    pocketDepthMm: 3.6,
+    lipMm: 3.0,
+    pocketRadialMm: 3.0,
+  });
+
+
   // ✅ preview url
   React.useEffect(() => {
     if (!file) {
