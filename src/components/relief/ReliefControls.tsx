@@ -142,7 +142,7 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           disabled={disabled}
           value={[v.depthMm]}
           min={0}
-          max={20}
+          max={30}
           step={0.1}
           onValueChange={(arr) => set({ depthMm: clamp(arr[0] ?? 0, 0, 30) })}
         />
@@ -155,7 +155,7 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           disabled={disabled}
           value={[v.baseMm]}
           min={0}
-          max={20}
+          max={30}
           step={0.1}
           onValueChange={(arr) => set({ baseMm: clamp(arr[0] ?? 0, 0, 30) })}
         />
