@@ -264,7 +264,7 @@ export default function ReliefPreview3D({
             </mesh>
           )}
 
-         <mesh
+  
   <mesh
   geometry={solidGeometry}
   position={[0, reliefBaseY, 0]}
