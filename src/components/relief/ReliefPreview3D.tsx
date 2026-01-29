@@ -1,7 +1,12 @@
 // src/components/relief/ReliefPreview3D.tsx
-import { useMemo } from "react";
+import * as React from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, ContactShadows, Environment } from "@react-three/drei";
+import {
+  OrbitControls,
+  Grid,
+  ContactShadows,
+  Environment,
+} from "@react-three/drei";
 import * as THREE from "three";
 
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
@@ -20,10 +25,25 @@ type Props = {
   depthMm: number;
   baseMm: number;
   baseStyle: BaseStyle; // "flat" | "recessed" | "offset"
-  outputMode?: any;
+  outputMode?: any; // compat
 };
 
-function decimateHeights(hm: HeightmapState, stepIn: number) {
+// ========= TUNING / VARIABILI (modifica qui) =========
+// 1) FIX specchiatura (preview + STL): ruota 180° su Y (non scala negativa)
+const FIX_MIRROR = true;
+
+// 2) Metti “in piedi” il rilievo: ruota 90° su X (asse rosso)
+const STAND_UP = true;
+
+// 3) Se dopo i due sopra risulta “girato” rispetto alla tua immagine, prova 0 o Math.PI
+const EXTRA_Z_ROT = Math.PI;
+
+// 4) Look & luci
+const BG = "#f6f7f9";
+const SHOW_HELPERS = true;
+// =====================================================
+
+function decimateHeights(hm: HeightmapState, stepIn: number): HeightmapState {
   const step = Math.max(1, Math.floor(stepIn || 1));
   if (step === 1) return hm;
 
@@ -50,14 +70,12 @@ export default function ReliefPreview3D({
   baseMm,
   baseStyle,
 }: Props): JSX.Element {
-  const showHelpers = true;
-
-  // 1) Geometria SOLIDA identica alla pipeline STL
-  const solidGeometry = useMemo(() => {
+  const geometry = React.useMemo<THREE.BufferGeometry | null>(() => {
     if (!hmState) return null;
 
     const hm = decimateHeights(hmState, decimateStep);
 
+    // 1) Geometria SOLIDA (identica export STL)
     const { geometry } = buildSolidFromHeightmap({
       height01: hm.normF32,
       width: hm.w,
@@ -71,126 +89,153 @@ export default function ReliefPreview3D({
       minBaseMm: 0.4,
     });
 
-    // Appoggia base a Z=0 (poi ruotiamo Z->Y)
+    // 2) Trasformazioni “baked” nella geometry (così bounding box/ground sono coerenti)
+    //    - appoggia base a Z=0 (stato STL “normale”)
     geometry.computeBoundingBox();
-    const bb = geometry.boundingBox;
-    if (bb) {
-      const minZ = bb.min.z;
+    if (geometry.boundingBox) {
+      const minZ = geometry.boundingBox.min.z;
       if (Number.isFinite(minZ) && Math.abs(minZ) > 1e-6) {
         geometry.translate(0, 0, -minZ);
       }
     }
 
-    // Normali buone = shading migliore
+    //    - metti “in piedi” (Z -> Y)
+    if (STAND_UP) geometry.rotateX(-Math.PI / 2);
+
+    //    - fix specchiatura (rotazione, no scale negativa)
+    if (FIX_MIRROR) geometry.rotateY(Math.PI);
+
+    //    - eventuale rotazione extra attorno a Z per riallineare verso immagine
+    if (EXTRA_Z_ROT) geometry.rotateZ(EXTRA_Z_ROT);
+
+    // 3) Ora che è in posa finale: appoggia a terra su Y=0 (perché dopo rotateX, l’UP è Y)
+    geometry.computeBoundingBox();
+    if (geometry.boundingBox) {
+      const bb = geometry.boundingBox;
+
+      // centra X/Z
+      const center = new THREE.Vector3();
+      bb.getCenter(center);
+      geometry.translate(-center.x, 0, -center.z);
+
+      // appoggia a “terra” (Y=0)
+      geometry.translate(0, -bb.min.y, 0);
+    }
+
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
-
     return geometry;
   }, [hmState, stlWidthMm, decimateStep, depthMm, baseMm, baseStyle]);
 
-  // Bounds per camera/target migliori
-  const bounds = useMemo(() => {
-    if (!solidGeometry) return null;
-    solidGeometry.computeBoundingBox();
-    const bb = solidGeometry.boundingBox;
-    if (!bb) return null;
+  React.useEffect(() => {
+    return () => geometry?.dispose();
+  }, [geometry]);
 
-    const size = new THREE.Vector3();
-    bb.getSize(size);
+  // camera target e dist (semplice e stabile)
+  const camDist = React.useMemo(() => Math.max(220, stlWidthMm * 1.65), [stlWidthMm]);
 
-    // altezza in Z (STL), diventerà Y in scena dopo rotazione
-    const midHeight = size.z * 0.5;
-    return { size, midHeight };
-  }, [solidGeometry]);
+  if (!hmState) {
+    return (
+      <div className="flex h-full w-full items-center justify-center text-sm text-gray-500">
+        Carica un file per vedere il 3D.
+      </div>
+    );
+  }
 
-  const width = Math.max(1, stlWidthMm);
-  const camDist = Math.max(180, width * 1.55);
-  const targetY = bounds?.midHeight ?? 10;
+  if (!geometry) {
+    return (
+      <div className="flex h-full w-full items-center justify-center text-sm text-gray-500">
+        La preview 3D appare dopo la generazione della heightmap.
+      </div>
+    );
+  }
 
   return (
-    <div style={{ width: "100%", height: "100%", background: "#f6f7f9" }}>
+    <div style={{ width: "100%", height: "100%", background: BG }}>
       <Canvas
         shadows
         dpr={[1, 2]}
-        camera={{ position: [0, camDist * 0.75, camDist], fov: 42, near: 0.1, far: 10000 }}
+        camera={{ position: [camDist * 0.8, camDist * 0.55, camDist * 0.9], fov: 40, near: 0.1, far: 20000 }}
         gl={{ antialias: true, preserveDrawingBuffer: false }}
         onCreated={({ gl }) => {
-          // Rendering “più leggibile” (color space + tone mapping)
-          // Renderer.outputColorSpace default SRGBColorSpace, toneMapping e exposure sono proprietà del renderer. :contentReference[oaicite:0]{index=0}
           gl.outputColorSpace = THREE.SRGBColorSpace;
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.15;
           gl.shadowMap.enabled = true;
           gl.shadowMap.type = THREE.PCFSoftShadowMap;
+          // @ts-ignore
+          gl.physicallyCorrectLights = true;
         }}
       >
-        {/* Environment = micro-contrasto sulle superfici */}
+        {/* Environment = micro-contrasto (fa “leggere” la superficie) */}
         <Environment preset="studio" />
 
-        {/* Luci: una key + una fill + ambient leggero */}
-        <ambientLight intensity={0.18} />
+        {/* Luci “fisiche”: key + fill + rim + ambient controllato */}
+        <ambientLight intensity={0.16} />
+
+        {/* KEY (ombra principale) */}
         <directionalLight
-          position={[350, 520, 260]}
-          intensity={1.35}
+          position={[520, 820, 420]}
+          intensity={1.55}
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
-          shadow-camera-near={1}
-          shadow-camera-far={2500}
+          shadow-camera-near={5}
+          shadow-camera-far={5000}
           shadow-bias={-0.0002}
         />
-        <directionalLight position={[-280, 220, -220]} intensity={0.55} />
 
-        {/* helpers (griglia spostata leggermente in basso per evitare z-fighting) */}
-        {showHelpers && (
+        {/* FILL (schiarisce senza appiattire) */}
+        <directionalLight position={[-380, 260, 120]} intensity={0.55} />
+
+        {/* RIM (stacca il profilo) */}
+        <directionalLight position={[0, 260, -520]} intensity={0.35} />
+
+        {SHOW_HELPERS && (
           <>
             <Grid
-              position={[0, -0.15, 0]}
+              position={[0, -0.06, 0]}
               infiniteGrid
-              fadeDistance={900}
-              fadeStrength={2.8}
+              fadeDistance={1100}
+              fadeStrength={3}
               cellSize={10}
               sectionSize={50}
             />
-            <axesHelper args={[Math.max(60, stlWidthMm * 0.7)]} />
+            <axesHelper args={[Math.max(80, stlWidthMm * 0.8)]} />
           </>
         )}
 
         {/* Oggetto */}
-        {solidGeometry && (
-          <mesh
-            geometry={solidGeometry}
-            rotation={[-Math.PI / 2, 0, 0]}
-            castShadow
-            receiveShadow
-          >
-            {/* Material “leggibile”: più contrasto + risposta a Environment */}
-            <meshPhysicalMaterial
-              roughness={0.35}
-              metalness={0.05}
-              clearcoat={0.25}
-              clearcoatRoughness={0.65}
-              envMapIntensity={1.25}
-            />
-          </mesh>
-        )}
+        <mesh geometry={geometry} castShadow receiveShadow>
+          <meshPhysicalMaterial
+            color="#E26D5C"
+            roughness={0.38}
+            metalness={0.04}
+            clearcoat={0.22}
+            clearcoatRoughness={0.6}
+            envMapIntensity={1.35}
+            reflectivity={0.2}
+          />
+        </mesh>
 
-        {/* Ombra contatto: spostata un filo sotto per NON combattere con la base */}
+        {/* Ombra “di contatto” (è quella che rende “fisico”) */}
         <ContactShadows
-          position={[0, -0.12, 0]}
-          scale={Math.max(220, stlWidthMm * 2)}
-          opacity={0.33}
+          position={[0, -0.02, 0]}
+          scale={Math.max(240, stlWidthMm * 2.2)}
+          opacity={0.4}
           blur={2.8}
-          far={Math.max(240, stlWidthMm * 2)}
+          far={Math.max(320, stlWidthMm * 2.4)}
         />
 
+        {/* Controlli: target a metà altezza visiva (qui: un po’ sopra la base) */}
         <OrbitControls
           makeDefault
-          target={[0, targetY, 0]}
+          target={[0, Math.max(18, stlWidthMm * 0.08), 0]}
           enableDamping
           dampingFactor={0.08}
           enablePan={false}
-          // evita inquadrature “da sotto” che ti fanno perdere il pezzo
+          minDistance={120}
+          maxDistance={6000}
           minPolarAngle={0.15}
           maxPolarAngle={Math.PI / 2.02}
         />
