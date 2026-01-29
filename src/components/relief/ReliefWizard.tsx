@@ -946,7 +946,7 @@ export default function ReliefWizard() {
 
                     <div className="mt-2 flex flex-wrap gap-2">
                       <a
-                        href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5"
+                        href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5f1e0ce9-depth-map-generator-v2"
                         target="_blank"
                         rel="noreferrer"
                         className="rounded-md border px-3 py-1.5 text-xs font-semibold text-[#1F4E5F] hover:bg-gray-50"
