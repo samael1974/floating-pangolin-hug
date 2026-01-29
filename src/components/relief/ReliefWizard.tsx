@@ -775,14 +775,34 @@ export default function ReliefWizard() {
 
               <div className="h-[420px] lg:h-[520px]">
                 <ReliefPreview3D
-                  hmState={hmState}
-                  stlWidthMm={stlWidthMm}
-                  decimateStep={decimateStep}
-                  depthMm={params.depthMm}
-                  baseMm={params.baseMm}
-                  outputMode={params.outputMode}
-                  baseStyle={params.baseStyle}
-                />
+  hmState={hmState}
+  stlWidthMm={stlWidthMm}
+  decimateStep={decimateStep}
+  depthMm={params.depthMm}
+  baseMm={params.baseMm}
+  outputMode={params.outputMode}
+  baseStyle={params.baseStyle}
+  mat={{
+    enabled: matEnabled,
+    steps: matParams.steps,
+    totalBandsMm: matParams.totalBandsMm,
+    minBandMm: matParams.minBandMm,
+    thicknessMm: matParams.thicknessMm,
+    stepDropMm: matParams.stepDropMm,
+    matDropMm: matParams.matDropMm,
+    reliefGapMm: matParams.reliefGapMm,
+  }}
+  frame={{
+    enabled: frameEnabled,
+    solidMm: frameParams.solidMm,
+    frameHeightMm: frameParams.frameHeightMm,
+    glassMm: frameParams.glassMm,
+    glassClearanceMm: frameParams.glassClearanceMm,
+    pocketDepthMm: frameParams.pocketDepthMm,
+    lipMm: frameParams.lipMm,
+    pocketRadialMm: frameParams.pocketRadialMm,
+  }}
+/>
               </div>
             </div>
 
