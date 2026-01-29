@@ -37,7 +37,7 @@ const SHOW_HELPERS = true;
 const PREVIEW_MIRROR_Y_180 = false;
 
 // migliora la leggibilità senza “sparare” tutto bianco
-const BG_COLOR = "#1F4E5F";
+const BG_COLOR = "#f6f7fb";
 
 function decimateHeights(hm: HeightmapState, stepIn: number): HeightmapState {
   const step = Math.max(1, Math.floor(stepIn || 1));
