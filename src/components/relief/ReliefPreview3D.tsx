@@ -347,36 +347,18 @@ export default function ReliefPreview3D({
         )}
 
         <group>
-            // Passepartout geometry (builder top at y=0 -> lo posizioniamo in scena)
-  const matGeometry = useMemo(() => {
-    if (!hmState) return null;
-    if (!mat?.enabled) return null;
-
-    // buildPassepartoutRectPhi nel tuo repo vuole 2 argomenti:
-    // (phiRatio: number, params: ...)
-    const out = buildPassepartoutRectPhi(1.618, {
-      innerWmm: reliefPlan.w,
-      innerHmm: reliefPlan.h,
-      steps: mat.steps,
-      totalBandsMm: mat.totalBandsMm,
-      thicknessMm: mat.thicknessMm,
-      stepDropMm: mat.stepDropMm,
-      minBandMm: mat.minBandMm,
-    } as any);
-
-    const vertices =
-      (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
-    const indices =
-      (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
-
-    if (!vertices || !indices) {
-      console.error("buildPassepartoutRectPhi: output non valido", out);
-      return null;
-    }
-
-    return toBufferGeometry(vertices, indices);
-  }, [hmState, mat, reliefPlan.w, reliefPlan.h]);
-
+          {/* Passepartout: builder top at y=0 -> position so that top sits at matTopY */}
+          {matGeometry && (
+            <mesh geometry={matGeometry} position={[0, matTopY, 0]} castShadow receiveShadow>
+              <meshPhysicalMaterial
+                color={"#E9E3D6"}
+                roughness={0.85}
+                metalness={0.0}
+                clearcoat={0.0}
+                envMapIntensity={0.9}
+              />
+            </mesh>
+          )}
 
           {/* Relief: geometry base at y=0 -> lift base to reliefBaseY */}
           <mesh
