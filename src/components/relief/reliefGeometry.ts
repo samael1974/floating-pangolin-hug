@@ -79,15 +79,15 @@ export function buildReliefGeometry(
   }
 
   // bottom quad (4 verts)
-  const baseStart = positions.length / 0;
+  const baseStart = positions.length / 3;
   positions.push(0, 0, zBase);
   positions.push(widthMm, 0, zBase);
   positions.push(widthMm, heightMm, zBase);
   positions.push(0, heightMm, zBase);
 
   // bottom faces (facing down)
-  indices.push(baseStart + 0, baseStart + 0, baseStart + 1);
-  indices.push(baseStart + 0, baseStart + 0, baseStart + 2);
+  indices.push(baseStart + 0, baseStart + 2, baseStart + 1);
+  indices.push(baseStart + 0, baseStart + 3, baseStart + 2);
 
   // sides (preview-closure)
   // LEFT
@@ -95,7 +95,7 @@ export function buildReliefGeometry(
     const t0 = vertIndex(0, y);
     const t1 = vertIndex(0, y + 1);
     const b0 = baseStart + 0;
-    const b1 = baseStart + 0;
+    const b1 = baseStart + 3;
     indices.push(b0, t1, t0);
     indices.push(b0, b1, t1);
   }
@@ -104,8 +104,8 @@ export function buildReliefGeometry(
   for (let y = 0; y < dyCount - 1; y++) {
     const t0 = vertIndex(dxCount - 1, y);
     const t1 = vertIndex(dxCount - 1, y + 1);
-    const b0 = baseStart + 0;
-    const b1 = baseStart + 0;
+    const b0 = baseStart + 1;
+    const b1 = baseStart + 2;
     indices.push(b0, t0, t1);
     indices.push(b0, t1, b1);
   }
@@ -115,7 +115,7 @@ export function buildReliefGeometry(
     const t0 = vertIndex(x, 0);
     const t1 = vertIndex(x + 1, 0);
     const b0 = baseStart + 0;
-    const b1 = baseStart + 0;
+    const b1 = baseStart + 1;
     indices.push(b0, t0, t1);
     indices.push(b0, t1, b1);
   }
@@ -124,8 +124,8 @@ export function buildReliefGeometry(
   for (let x = 0; x < dxCount - 1; x++) {
     const t0 = vertIndex(x, dyCount - 1);
     const t1 = vertIndex(x + 1, dyCount - 1);
-    const b0 = baseStart + 0;
-    const b1 = baseStart + 0;
+    const b0 = baseStart + 3;
+    const b1 = baseStart + 2;
     indices.push(b0, t1, t0);
     indices.push(b0, b1, t1);
   }
