@@ -10,6 +10,10 @@ import type { BaseStyle } from "@/lib/relief/reliefTypes";
 import { buildPassepartoutRectPhi } from "@/lib/relief/frame/buildPassepartoutRectPhi";
 import { buildFrameRectPhi } from "@/lib/relief/frame/buildFrameRectPhi";
 import { toThreeGeometry } from "@/lib/relief/frame/toThreeGeometry";
+import { buildPassepartoutRectPhi } from "@/lib/relief/frame/buildPassepartoutRectPhi";
+import { buildFrameRectPhi } from "@/lib/relief/frame/buildFrameRectPhi";
+import { toThreeGeometry } from "@/lib/relief/frame/toThreeGeometry";
+
 
 export type HeightmapState = {
   normF32: Float32Array;
