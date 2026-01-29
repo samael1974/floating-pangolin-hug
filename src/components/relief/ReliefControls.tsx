@@ -144,7 +144,7 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           min={0}
           max={20}
           step={0.1}
-          onValueChange={(arr) => set({ depthMm: clamp(arr[0] ?? 0, 0, 20) })}
+          onValueChange={(arr) => set({ depthMm: clamp(arr[0] ?? 0, 0, 30) })}
         />
       </div>
 
@@ -157,7 +157,7 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           min={0}
           max={20}
           step={0.1}
-          onValueChange={(arr) => set({ baseMm: clamp(arr[0] ?? 0, 0, 20) })}
+          onValueChange={(arr) => set({ baseMm: clamp(arr[0] ?? 0, 0, 30) })}
         />
 
         <p className="text-xs text-slate-600">
