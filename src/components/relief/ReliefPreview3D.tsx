@@ -211,17 +211,10 @@ export default function ReliefPreview3D({
     const innerW = reliefPlan.w + 2 * matBands;
     const innerH = reliefPlan.h + 2 * matBands;
 
-    const out = buildFrameRectPhi({
-      innerWmm: innerW,
-      innerHmm: innerH,
-      solidMm: frame.solidMm,
-      frameHeightMm: frame.frameHeightMm,
-      glassMm: frame.glassMm,
-      glassClearanceMm: frame.glassClearanceMm,
-      pocketDepthMm: frame.pocketDepthMm,
-      lipMm: frame.lipMm,
-      pocketRadialMm: frame.pocketRadialMm,
-    });
+    // Frame DISATTIVATA TEMPORANEAMENTE (step successivo)
+  const frameGeometry = useMemo(() => {
+    return null;
+  }, []);
 
     const vertices =
       (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
