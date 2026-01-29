@@ -200,21 +200,43 @@ export default function ReliefPreview3D({
     return toBufferGeometry(vertices, indices);
   }, [hmState, mat, reliefPlan.w, reliefPlan.h]);
 
-  // Frame geometry (builder base at y=0 -> resta sul piano)
+    // Frame geometry (cornice intorno a relief + passepartout)
   const frameGeometry = useMemo(() => {
     if (!hmState) return null;
     if (!frame?.enabled) return null;
 
-    // Se mat è attivo, la cornice deve contenere il passepartout
-    const matBands = mat?.enabled ? Math.max(mat.totalBandsMm, mat.minBandMm * mat.steps) : 0;
+    // calcolo total passepartout (esterno al relief)
+    const matBands = mat?.enabled
+      ? Math.max(mat.totalBandsMm, mat.minBandMm * mat.steps)
+      : 0;
 
+    // inner size della cornice ingloba relief + 2 * matBands
     const innerW = reliefPlan.w + 2 * matBands;
     const innerH = reliefPlan.h + 2 * matBands;
 
-    // Frame DISATTIVATA TEMPORANEAMENTE (step successivo)
-  const frameGeometry = useMemo(() => {
-    return null;
-  }, []);
+    const out = buildFrameRectPhi({
+      innerWmm: innerW,
+      innerHmm: innerH,
+      thicknessMm: frame.solidMm,
+      heightMm: frame.frameHeightMm,
+      glassMm: frame.glassMm,
+      glassClearanceMm: frame.glassClearanceMm,
+      glueLipMm: frame.lipMm,
+    });
+
+    const vertices =
+      (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
+    const indices =
+      (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
+
+    if (!vertices || !indices) {
+      console.error("buildFrameRectPhi: output non valido", out);
+      return null;
+    }
+
+    return toBufferGeometry(vertices, indices);
+  }, [hmState, frame, mat, reliefPlan.w, reliefPlan.h]);
+
 
     const vertices =
       (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
