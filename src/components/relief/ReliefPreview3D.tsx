@@ -184,15 +184,19 @@ export default function ReliefPreview3D({
     if (!hmState) return null;
     if (!mat?.enabled) return null;
 
-    const out = buildPassepartoutRectPhi({
-      innerWmm: reliefPlan.w,
-      innerHmm: reliefPlan.h,
-      steps: mat.steps,
-      totalBandsMm: mat.totalBandsMm,
-      thicknessMm: mat.thicknessMm,
-      stepDropMm: mat.stepDropMm,
-      minBandMm: mat.minBandMm,
-    });
+    const out = buildPassepartoutRectPhi(
+  {
+    innerWmm: reliefPlan.w,
+    innerHmm: reliefPlan.h,
+    steps: mat.steps,
+    totalBandsMm: mat.totalBandsMm,
+    thicknessMm: mat.thicknessMm,
+    stepDropMm: mat.stepDropMm,
+    minBandMm: mat.minBandMm,
+  },
+  {} as any
+);
+
 
     // Supporta output come:
     // 1) { vertices, indices }
