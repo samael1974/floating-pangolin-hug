@@ -9,8 +9,6 @@ import type { BaseStyle } from "../../lib/relief/reliefTypes";
 
 import { buildPassepartoutRectPhi } from "../../lib/relief/frame/buildPassepartoutRectPhi";
 import { buildFrameRectPhi } from "../../lib/relief/frame/buildFrameRectPhi";
-import { toThreeGeometry } from "../../lib/relief/frame/toThreeGeometry";
-
 
 export type HeightmapState = {
   normF32: Float32Array;
@@ -96,6 +94,20 @@ function decimateHeights(hm: HeightmapState, stepIn: number): HeightmapState {
   return { normF32: out, w: w2, h: h2 };
 }
 
+/**
+ * Converte (vertices, indices) in BufferGeometry SENZA dipendere da toThreeGeometry
+ * (che nel tuo repo ha una firma diversa).
+ */
+function toBufferGeometry(vertices: Float32Array, indices: Uint32Array): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+  g.setIndex(new THREE.BufferAttribute(indices, 1));
+  g.computeVertexNormals();
+  g.computeBoundingBox();
+  g.computeBoundingSphere();
+  return g;
+}
+
 export default function ReliefPreview3D({
   hmState,
   stlWidthMm,
@@ -106,6 +118,10 @@ export default function ReliefPreview3D({
   frame,
   mat,
 }: Props): JSX.Element {
+  /**
+   * ✅ NON TOCCARE: qui c’è la tua logica di offset/centratura che “funziona bene”.
+   * La lascio IDENTICA: bounding box -> centra X/Z -> appoggia base a terra su Y.
+   */
   const solidGeometry = useMemo(() => {
     if (!hmState) return null;
 
@@ -124,14 +140,18 @@ export default function ReliefPreview3D({
       minBaseMm: 0.4,
     });
 
-    // bounding box
+    // 1) calcola bounding box
     geometry.computeBoundingBox();
     const bb = geometry.boundingBox;
 
-    // Center X/Z and set base on Y=0 (Y-up)
+    // 2) centra X e Z, e appoggia a terra su Y (Y-up in three.js)
     if (bb) {
       const center = new THREE.Vector3();
       bb.getCenter(center);
+
+      // -center.x => X centrato
+      // -bb.min.y => base sul "pavimento"
+      // -center.z => Z centrato
       geometry.translate(-center.x, -bb.min.y, -center.z);
       geometry.computeBoundingBox();
     }
@@ -159,7 +179,7 @@ export default function ReliefPreview3D({
     return { w, h };
   }, [hmState, stlWidthMm]);
 
-  // Passepartout geometry (top at y=0 in builder, we position it in scene)
+  // Passepartout geometry (builder top at y=0 -> lo posizioniamo in scena)
   const matGeometry = useMemo(() => {
     if (!hmState) return null;
     if (!mat?.enabled) return null;
@@ -187,16 +207,15 @@ export default function ReliefPreview3D({
       return null;
     }
 
-    return toThreeGeometry(vertices, indices);
+    return toBufferGeometry(vertices, indices);
   }, [hmState, mat, reliefPlan.w, reliefPlan.h]);
 
-  // Frame geometry (bottom at y=0 in builder)
+  // Frame geometry (builder base at y=0 -> resta sul piano)
   const frameGeometry = useMemo(() => {
     if (!hmState) return null;
     if (!frame?.enabled) return null;
 
-    // If mat is enabled, the frame "inner opening" should surround the mat outer boundary,
-    // so we increase inner size by 2*matBands. Otherwise it frames the relief directly.
+    // Se mat è attivo, la cornice deve contenere il passepartout
     const matBands = mat?.enabled ? Math.max(mat.totalBandsMm, mat.minBandMm * mat.steps) : 0;
 
     const innerW = reliefPlan.w + 2 * matBands;
@@ -224,7 +243,7 @@ export default function ReliefPreview3D({
       return null;
     }
 
-    return toThreeGeometry(vertices, indices);
+    return toBufferGeometry(vertices, indices);
   }, [hmState, frame, mat, reliefPlan.w, reliefPlan.h]);
 
   // dispose pulito
@@ -252,7 +271,6 @@ export default function ReliefPreview3D({
     );
   }
 
-
   // camera “da oggetto fisico”
   const width = Math.max(1, stlWidthMm);
   const camDist = Math.max(220, width * 1.6);
@@ -266,8 +284,7 @@ export default function ReliefPreview3D({
   const matTopY = reliefTopY - matDrop;
   const reliefBaseY = matTopY + reliefGap;
 
-  // Ground plane (for contact shadows) is kept near Y=0 because the frame base is at Y=0.
-  // This makes the whole assembly feel like a physical object on a table.
+  // Ground plane (for contact shadows) ~0: frame base is y=0
   const groundY = -0.01;
 
   return (
@@ -293,6 +310,7 @@ export default function ReliefPreview3D({
 
         {/* Luci: key + fill + ambient */}
         <ambientLight intensity={0.22} />
+
         <directionalLight
           position={[420, 680, 380]}
           intensity={1.55}
@@ -303,6 +321,7 @@ export default function ReliefPreview3D({
           shadow-camera-far={4000}
           shadow-bias={-0.00015}
         />
+
         <directionalLight position={[-380, 260, -260]} intensity={0.65} />
 
         {/* Helpers */}
