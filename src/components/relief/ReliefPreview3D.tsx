@@ -44,6 +44,11 @@ type Props = {
   depthMm: number;
   baseMm: number;
   baseStyle: BaseStyle;
+
+  // outputMode lo accettiamo anche qui
+  outputMode?: string; // o il tipo reale che usi in ReliefWizard
+
+  // cornice & mat
   frame?: FrameUI;
   mat?: MatUI;
 };
