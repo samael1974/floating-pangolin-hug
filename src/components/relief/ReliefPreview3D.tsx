@@ -179,27 +179,10 @@ export default function ReliefPreview3D({
     return { w, h };
   }, [hmState, stlWidthMm]);
 
-  // Passepartout geometry (builder top at y=0 -> lo posizioniamo in scena)
+    // Passepartout DISATTIVATO TEMPORANEAMENTE (step successivo)
   const matGeometry = useMemo(() => {
-    if (!hmState) return null;
-    if (!mat?.enabled) return null;
-
-    const out = buildFrameRectPhi(
-  {
-    innerWmm: innerW,
-    innerHmm: innerH,
-    solidMm: frame.solidMm,
-    frameHeightMm: frame.frameHeightMm,
-    glassMm: frame.glassMm,
-    glassClearanceMm: frame.glassClearanceMm,
-    pocketDepthMm: frame.pocketDepthMm,
-    lipMm: frame.lipMm,
-    pocketRadialMm: frame.pocketRadialMm,
-  },
-  {} as any
-);
-
-
+    return null;
+  }, []);
 
     // Supporta output come:
     // 1) { vertices, indices }
