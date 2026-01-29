@@ -57,7 +57,7 @@ export default function Index() {
                 className="border-[#F5A623] text-[#1F4E5F] hover:bg-white"
               >
                 <a
-                  href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5f1e0ce9-generatore-mappe-di-prodontita-depth-map-v2"
+                  href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5f1e0ce9-depth-map-generator-v2"
                   target="_blank"
                   rel="noreferrer"
                 >
