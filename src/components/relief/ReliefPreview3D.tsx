@@ -184,18 +184,21 @@ export default function ReliefPreview3D({
     if (!hmState) return null;
     if (!mat?.enabled) return null;
 
-    const out = buildPassepartoutRectPhi(
+    const out = buildFrameRectPhi(
   {
-    innerWmm: reliefPlan.w,
-    innerHmm: reliefPlan.h,
-    steps: mat.steps,
-    totalBandsMm: mat.totalBandsMm,
-    thicknessMm: mat.thicknessMm,
-    stepDropMm: mat.stepDropMm,
-    minBandMm: mat.minBandMm,
+    innerWmm: innerW,
+    innerHmm: innerH,
+    solidMm: frame.solidMm,
+    frameHeightMm: frame.frameHeightMm,
+    glassMm: frame.glassMm,
+    glassClearanceMm: frame.glassClearanceMm,
+    pocketDepthMm: frame.pocketDepthMm,
+    lipMm: frame.lipMm,
+    pocketRadialMm: frame.pocketRadialMm,
   },
   {} as any
 );
+
 
 
     // Supporta output come:
