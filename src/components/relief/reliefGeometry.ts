@@ -1,7 +1,5 @@
 // src/components/relief/reliefGeometry.ts
 import * as THREE from "three";
-import React, { useMemo, useEffect, useRef } from "react";
-
 
 type BuildGeometryOptions = {
   widthMm: number;
@@ -18,6 +16,11 @@ function clamp(n: number, min: number, max: number) {
 /**
  * Crea una BufferGeometry (mesh) da heightmap normalizzata 0..1.
  * Geometria: top surface + sides + bottom (piano) per render stabile.
+ *
+ * Coordinate "CAD-like" interne:
+ * - X: 0..widthMm
+ * - Y: 0..heightMm
+ * - Z: 0..(baseMm+depthMm)
  */
 export function buildReliefGeometry(
   normF32: Float32Array,
@@ -51,9 +54,9 @@ export function buildReliefGeometry(
     return zBase + baseMm + t * depthMm;
   }
 
-  // griglia vertici top
   const vertIndex = (x: number, y: number) => y * dxCount + x;
 
+  // top vertices
   for (let y = 0; y < dyCount; y++) {
     for (let x = 0; x < dxCount; x++) {
       const px = x * dx;
@@ -63,7 +66,7 @@ export function buildReliefGeometry(
     }
   }
 
-  // triangoli top
+  // top faces
   for (let y = 0; y < dyCount - 1; y++) {
     for (let x = 0; x < dxCount - 1; x++) {
       const a = vertIndex(x, y);
@@ -75,28 +78,24 @@ export function buildReliefGeometry(
     }
   }
 
-  // aggiungiamo bottom piano (4 vertici) + sides per chiusura visiva
+  // bottom quad (4 verts)
   const baseStart = positions.length / 3;
   positions.push(0, 0, zBase);
   positions.push(widthMm, 0, zBase);
   positions.push(widthMm, heightMm, zBase);
   positions.push(0, heightMm, zBase);
 
-  // bottom (orientato verso il basso)
+  // bottom faces (facing down)
   indices.push(baseStart + 0, baseStart + 2, baseStart + 1);
   indices.push(baseStart + 0, baseStart + 3, baseStart + 2);
 
-  // sides: collega bordi top al piano base
+  // sides (preview-closure)
   // LEFT
   for (let y = 0; y < dyCount - 1; y++) {
     const t0 = vertIndex(0, y);
     const t1 = vertIndex(0, y + 1);
     const b0 = baseStart + 0;
     const b1 = baseStart + 3;
-
-    // per evitare triangoli enormi, usiamo due triangoli tra (top edge) e (base edge)
-    // base edge è una linea: (0,0)-(0,height)
-    // mappiamo y0/y1 su base usando 2 vertici già esistenti (b0,b1): ok per preview
     indices.push(b0, t1, t0);
     indices.push(b0, b1, t1);
   }
