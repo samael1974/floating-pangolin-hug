@@ -191,7 +191,7 @@ export default function ReliefPreview3D({
           receiveShadow
         >
           <meshPhysicalMaterial
-            color={"#1F4E5F}
+            color="#1F4E5F
             roughness={0.32}
             metalness={0.03}
             clearcoat={0.28}
