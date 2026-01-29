@@ -1,20 +1,50 @@
 // src/components/relief/ReliefPreview3D.tsx
-import React, { useMemo, useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, ContactShadows, Environment, Grid } from "@react-three/drei";
+import { ContactShadows, Environment, Grid, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
 import type { BaseStyle } from "@/lib/relief/reliefTypes";
+
 import { buildPassepartoutRectPhi } from "@/lib/relief/frame/buildPassepartoutRectPhi";
 import { buildFrameRectPhi } from "@/lib/relief/frame/buildFrameRectPhi";
 import { toThreeGeometry } from "@/lib/relief/frame/toThreeGeometry";
-
 
 export type HeightmapState = {
   normF32: Float32Array;
   w: number;
   h: number;
+};
+
+type FrameUI = {
+  enabled: boolean;
+
+  // geometry
+  solidMm: number; // default 2.0 (clamp in builder)
+  frameHeightMm: number; // default 18
+
+  // glass pocket
+  glassMm: 2 | 3;
+  glassClearanceMm: number;
+  pocketDepthMm: number; // 3.4–3.8
+  lipMm: number; // >=3
+  pocketRadialMm: number;
+};
+
+type MatUI = {
+  enabled: boolean;
+
+  // phi bands
+  steps: 1 | 2 | 3 | 4 | 5 | 6;
+  totalBandsMm: number; // total width of bands
+  minBandMm: number; // clamp 5–7
+
+  // 3D
+  thicknessMm: number; // 2–3
+  stepDropMm: number; // mm per step (visual terrace)
+  matDropMm: number; // 2–3 (mat plane below relief top)
+  reliefGapMm: number; // 0.2–0.6 (relief above mat)
 };
 
 type Props = {
@@ -25,6 +55,10 @@ type Props = {
   baseMm: number;
   baseStyle: BaseStyle;
   outputMode?: any; // legacy, non usato
+
+  // Step 2 (optional)
+  frame?: FrameUI;
+  mat?: MatUI;
 };
 
 // --- VARIABILI “FACILI” (qui, in alto) ---
@@ -32,8 +66,7 @@ const SHOW_HELPERS = true;
 
 /**
  * Se il modello risulta “specchiato” rispetto all’immagine,
- * questa rotazione di 180° attorno a Y è la più corretta per una vista “frontale”
- * (non altera l’asse UP).
+ * questa rotazione di 180° attorno a Y è la più corretta per una vista “frontale”.
  *
  * Nota: questa è SOLO preview. Per rendere coerente anche lo STL,
  * va applicato lo stesso flip nella generazione/export.
@@ -69,6 +102,8 @@ export default function ReliefPreview3D({
   depthMm,
   baseMm,
   baseStyle,
+  frame,
+  mat,
 }: Props): JSX.Element {
   const solidGeometry = useMemo(() => {
     if (!hmState) return null;
@@ -88,18 +123,16 @@ export default function ReliefPreview3D({
       minBaseMm: 0.4,
     });
 
-    // 1) calcola bounding box
+    // bounding box
     geometry.computeBoundingBox();
     const bb = geometry.boundingBox;
+
+    // Center X/Z and set base on Y=0 (Y-up)
     if (bb) {
       const center = new THREE.Vector3();
       bb.getCenter(center);
-
-      // 2) centra X e Z, e appoggia a terra su Y (Y-up in three.js)
-      //    -center.x => X centrato
-      //    -bb.min.y => base sul "pavimento"
-      //    -center.z => Z centrato
       geometry.translate(-center.x, -bb.min.y, -center.z);
+      geometry.computeBoundingBox();
     }
 
     // shading migliore
@@ -108,12 +141,77 @@ export default function ReliefPreview3D({
     return geometry;
   }, [hmState, stlWidthMm, decimateStep, depthMm, baseMm, baseStyle]);
 
+  // height (Y) of relief after translate (min.y = 0)
+  const reliefTopY = useMemo(() => {
+    if (!solidGeometry) return 0;
+    solidGeometry.computeBoundingBox();
+    const bb = solidGeometry.boundingBox;
+    if (!bb) return 0;
+    return bb.max.y;
+  }, [solidGeometry]);
+
+  // derive relief plan dimensions (W x H) from stlWidthMm and hm aspect ratio
+  const reliefPlan = useMemo(() => {
+    if (!hmState) return { w: Math.max(1, stlWidthMm), h: Math.max(1, stlWidthMm) };
+    const w = Math.max(1, stlWidthMm);
+    const h = w * (hmState.h / hmState.w);
+    return { w, h };
+  }, [hmState, stlWidthMm]);
+
+  // Passepartout geometry (top at y=0 in builder, we position it in scene)
+  const matGeometry = useMemo(() => {
+    if (!hmState) return null;
+    if (!mat?.enabled) return null;
+
+    const { vertices, indices } = buildPassepartoutRectPhi({
+      innerWmm: reliefPlan.w,
+      innerHmm: reliefPlan.h,
+      steps: mat.steps,
+      totalBandsMm: mat.totalBandsMm,
+      thicknessMm: mat.thicknessMm,
+      stepDropMm: mat.stepDropMm,
+      minBandMm: mat.minBandMm,
+    });
+
+    return toThreeGeometry(vertices, indices);
+  }, [hmState, mat, reliefPlan.w, reliefPlan.h]);
+
+  // Frame geometry (bottom at y=0 in builder)
+  const frameGeometry = useMemo(() => {
+    if (!hmState) return null;
+    if (!frame?.enabled) return null;
+
+    // If mat is enabled, the frame "inner opening" should surround the mat outer boundary,
+    // so we increase inner size by 2*matBands. Otherwise it frames the relief directly.
+    const matBands =
+      mat?.enabled ? Math.max(mat.totalBandsMm, mat.minBandMm * mat.steps) : 0;
+
+    const innerW = reliefPlan.w + 2 * matBands;
+    const innerH = reliefPlan.h + 2 * matBands;
+
+    const { vertices, indices } = buildFrameRectPhi({
+      innerWmm: innerW,
+      innerHmm: innerH,
+      solidMm: frame.solidMm,
+      frameHeightMm: frame.frameHeightMm,
+      glassMm: frame.glassMm,
+      glassClearanceMm: frame.glassClearanceMm,
+      pocketDepthMm: frame.pocketDepthMm,
+      lipMm: frame.lipMm,
+      pocketRadialMm: frame.pocketRadialMm,
+    });
+
+    return toThreeGeometry(vertices, indices);
+  }, [hmState, frame, mat, reliefPlan.w, reliefPlan.h]);
+
   // dispose pulito
   useEffect(() => {
     return () => {
       solidGeometry?.dispose();
+      matGeometry?.dispose();
+      frameGeometry?.dispose();
     };
-  }, [solidGeometry]);
+  }, [solidGeometry, matGeometry, frameGeometry]);
 
   if (!hmState) {
     return (
@@ -134,6 +232,19 @@ export default function ReliefPreview3D({
   // camera “da oggetto fisico”
   const width = Math.max(1, stlWidthMm);
   const camDist = Math.max(220, width * 1.6);
+
+  // --- Layering (effetto quadro reale) ---
+  // Passepartout top plane sits BELOW relief top by matDropMm.
+  // Relief base is lifted to sit slightly ABOVE passepartout plane (gap).
+  const matDrop = mat?.enabled ? mat.matDropMm : 0;
+  const reliefGap = mat?.enabled ? mat.reliefGapMm : 0;
+
+  const matTopY = reliefTopY - matDrop;
+  const reliefBaseY = matTopY + reliefGap;
+
+  // Ground plane (for contact shadows) is kept near Y=0 because the frame base is at Y=0.
+  // This makes the whole assembly feel like a physical object on a table.
+  const groundY = -0.01;
 
   return (
     <div style={{ width: "100%", height: "100%", background: BG_COLOR }}>
@@ -158,7 +269,6 @@ export default function ReliefPreview3D({
 
         {/* Luci: key + fill + ambient */}
         <ambientLight intensity={0.22} />
-
         <directionalLight
           position={[420, 680, 380]}
           intensity={1.55}
@@ -169,14 +279,13 @@ export default function ReliefPreview3D({
           shadow-camera-far={4000}
           shadow-bias={-0.00015}
         />
-
         <directionalLight position={[-380, 260, -260]} intensity={0.65} />
 
         {/* Helpers */}
         {SHOW_HELPERS && (
           <>
             <Grid
-              position={[0, -0.02, 0]}
+              position={[0, groundY, 0]}
               infiniteGrid
               fadeDistance={1400}
               fadeStrength={2.5}
@@ -187,30 +296,60 @@ export default function ReliefPreview3D({
           </>
         )}
 
-        {/* Oggetto */}
-        <mesh
-          geometry={solidGeometry}
-          rotation={PREVIEW_MIRROR_Y_180 ? [0, Math.PI, 0] : [0, 0, 0]}
-          castShadow
-          receiveShadow
-        >
-          <meshPhysicalMaterial
-            color={"#1F4E5F"}
-            roughness={0.32}
-            metalness={0.03}
-            clearcoat={0.28}
-            clearcoatRoughness={0.62}
-            envMapIntensity={1.25}
-          />
-        </mesh>
+        <group>
+          {/* Passepartout: builder top at y=0 -> position so that top sits at matTopY */}
+          {matGeometry && (
+            <mesh geometry={matGeometry} position={[0, matTopY, 0]} castShadow receiveShadow>
+              <meshPhysicalMaterial
+                color={"#E9E3D6"}
+                roughness={0.85}
+                metalness={0.0}
+                clearcoat={0.0}
+                envMapIntensity={0.9}
+              />
+            </mesh>
+          )}
+
+          {/* Relief: geometry base at y=0 -> lift base to reliefBaseY */}
+          <mesh
+            geometry={solidGeometry}
+            position={[0, reliefBaseY, 0]}
+            rotation={PREVIEW_MIRROR_Y_180 ? [0, Math.PI, 0] : [0, 0, 0]}
+            castShadow
+            receiveShadow
+          >
+            <meshPhysicalMaterial
+              color={"#1F4E5F"}
+              roughness={0.32}
+              metalness={0.03}
+              clearcoat={0.28}
+              clearcoatRoughness={0.62}
+              envMapIntensity={1.25}
+            />
+          </mesh>
+
+          {/* Frame: base at y=0 -> keep on ground */}
+          {frameGeometry && (
+            <mesh geometry={frameGeometry} position={[0, 0, 0]} castShadow receiveShadow>
+              <meshPhysicalMaterial
+                color={"#2B2B2B"}
+                roughness={0.55}
+                metalness={0.05}
+                clearcoat={0.15}
+                clearcoatRoughness={0.75}
+                envMapIntensity={1.1}
+              />
+            </mesh>
+          )}
+        </group>
 
         {/* Contact shadow per “appoggio fisico” */}
         <ContactShadows
-          position={[0, -0.01, 0]}
-          scale={Math.max(260, stlWidthMm * 2.2)}
+          position={[0, groundY, 0]}
+          scale={Math.max(260, stlWidthMm * 2.4)}
           opacity={0.38}
           blur={2.9}
-          far={Math.max(260, stlWidthMm * 2.2)}
+          far={Math.max(260, stlWidthMm * 2.4)}
         />
 
         <OrbitControls
