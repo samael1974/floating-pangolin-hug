@@ -231,10 +231,11 @@ export function buildSolidFromHeightmap(
   const indices = new Uint32Array(triCount * 3);
   let ti = 0;
   const pushTri = (a: number, b: number, c: number) => {
-    indices[ti++] = a;
-    indices[ti++] = b;
-    indices[ti++] = c;
-  };
+  // Invertiamo l’ordine dei vertici per avere winding CCW
+  indices[ti++] = a;
+  indices[ti++] = c;
+  indices[ti++] = b;
+};
 
   // TOP surface (CCW when viewed from outside)
   for (let y = 0; y < h - 1; y++) {
