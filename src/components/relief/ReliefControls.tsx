@@ -130,6 +130,36 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
         />
       </div>
 
+      {/* Smussatura */}
+      <div className="space-y-2">
+        <Label>Smussatura: {v.smooth.toFixed(2)}</Label>
+        <Slider
+          disabled={disabled}
+          value={[v.smooth]}
+          min={0}
+          max={1}
+          step={0.01}
+          onValueChange={(arr) => set({ smooth: clamp(arr[0] ?? 0, 0, 1) })}
+        />
+      </div>
+
+      {/* Bordi arrotondati */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <Label>Bordi arrotondati</Label>
+          <Switch
+            disabled={disabled}
+            checked={v.edge === "round"}
+            onCheckedChange={(checked) => set({ edge: checked ? "round" : "sharp" })}
+          />
+        </div>
+        <p className="text-xs text-slate-600">
+          Attivo = bordi più morbidi. Disattivo = bordi più incisi (più “taglienti”).
+        </p>
+      </div>
+
+      <Separator />
+
       <Accordion type="single" collapsible>
         <AccordionItem value="advanced">
           <AccordionTrigger>Avanzate</AccordionTrigger>
@@ -187,37 +217,6 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
                 </Select>
               </div>
 
-              <Separator />
-
-              {/* Smussatura */}
-              <div className="space-y-2">
-                <Label>Smussatura: {v.smooth.toFixed(2)}</Label>
-                <Slider
-                  disabled={disabled}
-                  value={[v.smooth]}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  onValueChange={(arr) => set({ smooth: clamp(arr[0] ?? 0, 0, 1) })}
-                />
-              </div>
-
-              <Separator />
-
-              {/* Bordi arrotondati */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label>Bordi arrotondati</Label>
-                  <Switch
-                    disabled={disabled}
-                    checked={v.edge === "round"}
-                    onCheckedChange={(checked) => set({ edge: checked ? "round" : "sharp" })}
-                  />
-                </div>
-                <p className="text-xs text-slate-600">
-                  Attivo = bordi più morbidi. Disattivo = bordi più incisi (più “taglienti”).
-                </p>
-              </div>
             </div>
           </AccordionContent>
         </AccordionItem>

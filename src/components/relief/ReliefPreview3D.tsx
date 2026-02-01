@@ -141,6 +141,8 @@ export default function ReliefPreview3D({
     return { w, h };
   }, [hmState, stlWidthMm]);
 
+  const matThickness = mat?.enabled ? Math.max(1.8, mat.thicknessMm) : 0;
+
   const matGeometry = useMemo(() => {
     if (!hmState) return null;
     if (!mat?.enabled) return null;
@@ -149,14 +151,17 @@ export default function ReliefPreview3D({
       innerHmm: reliefPlan.h,
       steps: mat.steps,
       totalBandsMm: mat.totalBandsMm,
-      thicknessMm: mat.thicknessMm,
+      thicknessMm: Math.max(1.8, mat.thicknessMm),
       stepDropMm: mat.stepDropMm,
       minBandMm: mat.minBandMm,
     });
     const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
     const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
     if (!vertices || !indices) return null;
-    return toBufferGeometry(vertices, indices);
+    const geom = toBufferGeometry(vertices, indices);
+    geom.rotateX(-Math.PI / 2);
+    geom.computeBoundingBox();
+    return geom;
   }, [hmState, mat, reliefPlan.w, reliefPlan.h]);
 
   const frameGeometry = useMemo(() => {
@@ -214,10 +219,9 @@ export default function ReliefPreview3D({
 
   const width = Math.max(1, stlWidthMm);
   const camDist = Math.max(220, width * 1.6);
-  const matDrop = mat?.enabled ? mat.matDropMm : 0;
   const reliefGap = mat?.enabled ? mat.reliefGapMm : 0;
-  const matTopY = reliefTopY - matDrop;
-  const reliefBaseY = matTopY + reliefGap;
+  const matTopY = mat?.enabled ? matThickness : 0;
+  const reliefBaseY = mat?.enabled ? matTopY + reliefGap : 0;
   const groundY = -0.01;
 
   return (
@@ -278,13 +282,13 @@ export default function ReliefPreview3D({
           )}
 
   
-  <mesh
-  geometry={solidGeometry}
-  position={[0, 1, 0]}   // ✅ incrocio assi griglia
-  rotation={PREVIEW_MIRROR_Y_180 ? [0, Math.PI, 0] : [0, 0, 0]}
-  castShadow
-  receiveShadow
->
+          <mesh
+            geometry={solidGeometry}
+            position={[0, reliefBaseY, 0]}
+            rotation={PREVIEW_MIRROR_Y_180 ? [0, Math.PI, 0] : [0, 0, 0]}
+            castShadow
+            receiveShadow
+          >
 
 
             <meshPhysicalMaterial
@@ -322,7 +326,7 @@ export default function ReliefPreview3D({
         <OrbitControls
   makeDefault
   // target dinamico centrato sulla mesh
-  target={[0, reliefTopY * 0.5, 0]}
+          target={[0, reliefBaseY + reliefTopY * 0.5, 0]}
   enableDamping
   dampingFactor={0.08}
   enablePan={true}       // abilita pan per muovere il centro

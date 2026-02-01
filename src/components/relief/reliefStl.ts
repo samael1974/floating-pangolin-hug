@@ -230,3 +230,35 @@ geom.computeVertexNormals();
   const bin = geometryToBinaryStl(geom);
   downloadArrayBuffer(bin, fileName ?? "reliefforge");
 }
+
+export function downloadGeometryStlBinary(
+  geom: THREE.BufferGeometry,
+  fileName: string,
+  options: { checkClosed?: boolean; upAxis?: "y" | "z" } = {}
+) {
+  geom.computeVertexNormals();
+  geom.computeBoundingBox();
+  const bb = geom.boundingBox;
+  if (bb) {
+    const center = new THREE.Vector3();
+    bb.getCenter(center);
+    if (options.upAxis === "y") {
+      geom.translate(-center.x, -bb.min.y, -center.z);
+    } else {
+      geom.translate(-center.x, -center.y, -bb.min.z);
+    }
+  }
+  geom.computeVertexNormals();
+
+  if (options.checkClosed) {
+    const check = countOpenEdges(geom);
+    console.log("[MESH CHECK]", check);
+    if (check.openEdges > 0) console.table(check.openSample);
+    if (check.openEdges > 0) {
+      throw new Error(`Mesh non chiusa: openEdges=${check.openEdges}`);
+    }
+  }
+
+  const bin = geometryToBinaryStl(geom);
+  downloadArrayBuffer(bin, fileName);
+}

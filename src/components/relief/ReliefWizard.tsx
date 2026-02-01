@@ -1,11 +1,16 @@
 // src/components/relief/ReliefWizard.tsx
 import * as React from "react";
+import * as THREE from "three";
 
 import BrandHero from "@/components/branding/BrandHero";
 import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefControls";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
-import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
+import { downloadReliefStlBinary, downloadGeometryStlBinary } from "@/components/relief/reliefStl";
+import { buildPassepartoutRectPhi } from "@/lib/relief/frame/buildPassepartoutRectPhi";
+import { buildFrameRectPhi } from "@/lib/relief/frame/buildFrameRectPhi";
+import { buildFrameRectProfile } from "@/lib/relief/frame/buildFrameRectProfile";
+import { FRAME_PROFILES } from "@/lib/relief/frame/frameProfiles";
 import { inspectPng, pngCompatibilityMessage } from "@/lib/relief/inspectPng";
 
 // ✅ 16-bit PNG support
@@ -184,9 +189,9 @@ export default function ReliefWizard() {
     steps: 3 as 1 | 2 | 3 | 4 | 5 | 6,
     totalBandsMm: 18,
     minBandMm: 6,
-    thicknessMm: 2.4,
+    thicknessMm: 1.8,
     stepDropMm: 1.2,
-    matDropMm: 2.5,
+    matDropMm: 0,
     reliefGapMm: 0.35,
   });
 
@@ -437,6 +442,74 @@ export default function ReliefWizard() {
       console.error("STL: ERROR", e);
       alert(`Errore export STL: ${e?.message ?? String(e)}`);
     }
+  }
+
+  const buildReliefPlan = React.useCallback(() => {
+    if (!hmState) return null;
+    const w = Math.max(1, stlWidthMm);
+    const h = w * (hmState.h / hmState.w);
+    return { w, h };
+  }, [hmState, stlWidthMm]);
+
+  const toBufferGeometry = React.useCallback((vertices: Float32Array, indices: Uint32Array) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+    g.setIndex(new THREE.BufferAttribute(indices, 1));
+    g.computeVertexNormals();
+    return g;
+  }, []);
+
+  function downloadPassepartoutStl() {
+    if (!hmState) return;
+    const reliefPlan = buildReliefPlan();
+    if (!reliefPlan) return;
+    const out = buildPassepartoutRectPhi({
+      innerWmm: reliefPlan.w,
+      innerHmm: reliefPlan.h,
+      steps: matParams.steps,
+      totalBandsMm: matParams.totalBandsMm,
+      thicknessMm: Math.max(1.8, matParams.thicknessMm),
+      stepDropMm: matParams.stepDropMm,
+      minBandMm: matParams.minBandMm,
+    });
+    const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
+    const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
+    if (!vertices || !indices) return;
+    const geom = toBufferGeometry(vertices, indices);
+    geom.rotateX(-Math.PI / 2);
+    downloadGeometryStlBinary(geom, `${customName || "reliefforge"}_passepartout`, { upAxis: "y" });
+  }
+
+  function downloadFrameStl() {
+    if (!hmState) return;
+    const reliefPlan = buildReliefPlan();
+    if (!reliefPlan) return;
+    const matBands = matEnabled ? Math.max(matParams.totalBandsMm, matParams.minBandMm * matParams.steps) : 0;
+    const innerW = reliefPlan.w + 2 * matBands;
+    const innerH = reliefPlan.h + 2 * matBands;
+    const profile = FRAME_PROFILES.find((item) => item.key === frameParams.profileKey);
+    const out =
+      profile && frameParams.profileKey !== "flat"
+        ? buildFrameRectProfile({
+            innerWmm: innerW,
+            innerHmm: innerH,
+            unitMm: frameParams.baseUnitMm,
+            steps: profile.steps,
+          })
+        : buildFrameRectPhi({
+            innerWmm: innerW,
+            innerHmm: innerH,
+            thicknessMm: frameParams.solidMm,
+            heightMm: frameParams.frameHeightMm,
+            glassMm: frameParams.glassMm,
+            glassClearanceMm: frameParams.glassClearanceMm,
+            glueLipMm: frameParams.lipMm,
+          });
+    const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
+    const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
+    if (!vertices || !indices) return;
+    const geom = toBufferGeometry(vertices, indices);
+    downloadGeometryStlBinary(geom, `${customName || "reliefforge"}_cornice`, { upAxis: "y" });
   }
 
   const applyFrameHeightPreset = React.useCallback(
@@ -1010,7 +1083,7 @@ export default function ReliefWizard() {
                       </div>
                       <input
                         type="range"
-                        min={1}
+                        min={1.8}
                         max={8}
                         step={0.1}
                         value={matParams.thicknessMm}
@@ -1248,6 +1321,32 @@ export default function ReliefWizard() {
               >
                 Scarica STL
               </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={downloadPassepartoutStl}
+                  disabled={!canGenerate || !matEnabled}
+                  className={`rounded-md px-4 py-2 text-sm font-semibold ${
+                    canGenerate && matEnabled
+                      ? "border border-[#1F4E5F] text-[#1F4E5F] hover:bg-gray-50"
+                      : "cursor-not-allowed border border-gray-200 text-gray-400"
+                  }`}
+                >
+                  Scarica Passepartout STL
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadFrameStl}
+                  disabled={!canGenerate || !frameEnabled}
+                  className={`rounded-md px-4 py-2 text-sm font-semibold ${
+                    canGenerate && frameEnabled
+                      ? "border border-[#1F4E5F] text-[#1F4E5F] hover:bg-gray-50"
+                      : "cursor-not-allowed border border-gray-200 text-gray-400"
+                  }`}
+                >
+                  Scarica Cornice STL
+                </button>
+              </div>
               {showDonationPrompt && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                   <div className="font-semibold">Ti ha evitato Blender o booleane?</div>
