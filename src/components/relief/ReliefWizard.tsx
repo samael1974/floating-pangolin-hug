@@ -191,7 +191,9 @@ export default function ReliefWizard() {
   });
 
   const [frameParams, setFrameParams] = React.useState({
-    solidMm: 2.0,
+    solidMm: 3.0,
+    baseUnitMm: 3.0,
+    profileKey: "step_out" as "flat" | "step_out" | "step_in",
     frameHeightMm: 18,
     glassMm: 2 as 2 | 3,
     glassClearanceMm: 0.25,
@@ -439,11 +441,11 @@ export default function ReliefWizard() {
 
   const applyFrameHeightPreset = React.useCallback(
     (multiplier: number) => {
-      const base = Math.max(1, frameParams.solidMm);
+      const base = Math.max(1, frameParams.baseUnitMm);
       const next = Number((base * multiplier).toFixed(2));
       setFrameParams((prev) => ({ ...prev, frameHeightMm: next }));
     },
-    [frameParams.solidMm]
+    [frameParams.baseUnitMm]
   );
 
   const openInstructions = React.useCallback(() => {
@@ -1065,17 +1067,56 @@ export default function ReliefWizard() {
                   <div className="mt-4 space-y-4">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium">Larghezza base cornice (mm)</span>
-                        <span className="tabular-nums text-gray-700">{frameParams.solidMm.toFixed(1)}</span>
+                        <span className="font-medium">Profilo cornice</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { key: "flat", label: "Piatta" },
+                          { key: "step_out", label: "Gradoni esterni" },
+                          { key: "step_in", label: "Gradoni interni" },
+                        ].map((profile) => (
+                          <button
+                            key={profile.key}
+                            type="button"
+                            onClick={() =>
+                              setFrameParams((prev) => ({
+                                ...prev,
+                                profileKey: profile.key as "flat" | "step_out" | "step_in",
+                              }))
+                            }
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                              frameParams.profileKey === profile.key
+                                ? "border-[#1F4E5F] bg-[#1F4E5F]/10 text-[#1F4E5F]"
+                                : "text-gray-700 hover:bg-gray-50"
+                            }`}
+                            disabled={!file}
+                          >
+                            {profile.label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-gray-500">
+                        Ogni quadratino ha base 3 mm. Modifica l’unità per scalare il profilo.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium">Unità base (mm)</span>
+                        <span className="tabular-nums text-gray-700">{frameParams.baseUnitMm.toFixed(1)}</span>
                       </div>
                       <input
                         type="range"
-                        min={1}
-                        max={20}
-                        step={0.1}
-                        value={frameParams.solidMm}
+                        min={3}
+                        max={12}
+                        step={0.5}
+                        value={frameParams.baseUnitMm}
                         onChange={(e) =>
-                          setFrameParams((prev) => ({ ...prev, solidMm: Number(e.target.value) }))
+                          setFrameParams((prev) => ({
+                            ...prev,
+                            baseUnitMm: Number(e.target.value),
+                            solidMm: Number(e.target.value),
+                          }))
                         }
                         className="w-full"
                         disabled={!file}
@@ -1126,7 +1167,7 @@ export default function ReliefWizard() {
                         </button>
                       </div>
                       <p className="text-[11px] text-gray-500">
-                        Preset calcolati da larghezza base × φ (1.618).
+                        Preset calcolati da unità base × φ (1.618).
                       </p>
                     </div>
                   </div>
@@ -1278,6 +1319,8 @@ export default function ReliefWizard() {
   frame={{
     enabled: frameEnabled,
     solidMm: frameParams.solidMm,
+    baseUnitMm: frameParams.baseUnitMm,
+    profileKey: frameParams.profileKey,
     frameHeightMm: frameParams.frameHeightMm,
     glassMm: frameParams.glassMm,
     glassClearanceMm: frameParams.glassClearanceMm,

@@ -8,6 +8,8 @@ import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
 import type { BaseStyle } from "@/lib/relief/reliefTypes";
 import { buildPassepartoutRectPhi } from "@/lib/relief/frame/buildPassepartoutRectPhi";
 import { buildFrameRectPhi } from "@/lib/relief/frame/buildFrameRectPhi";
+import { buildFrameRectProfile } from "@/lib/relief/frame/buildFrameRectProfile";
+import { FRAME_PROFILES, type FrameProfileKey } from "@/lib/relief/frame/frameProfiles";
 
 export type HeightmapState = {
   normF32: Float32Array;
@@ -18,6 +20,8 @@ export type HeightmapState = {
 type FrameUI = {
   enabled: boolean;
   solidMm: number;
+  baseUnitMm: number;
+  profileKey: FrameProfileKey;
   frameHeightMm: number;
   glassMm: 2 | 3;
   glassClearanceMm: number;
@@ -161,15 +165,24 @@ export default function ReliefPreview3D({
     const matBands = mat?.enabled ? Math.max(mat.totalBandsMm, mat.minBandMm * mat.steps) : 0;
     const innerW = reliefPlan.w + 2 * matBands;
     const innerH = reliefPlan.h + 2 * matBands;
-    const out = buildFrameRectPhi({
-      innerWmm: innerW,
-      innerHmm: innerH,
-      thicknessMm: frame.solidMm,
-      heightMm: frame.frameHeightMm,
-      glassMm: frame.glassMm,
-      glassClearanceMm: frame.glassClearanceMm,
-      glueLipMm: frame.lipMm,
-    });
+    const profile = FRAME_PROFILES.find((item) => item.key === frame.profileKey);
+    const out =
+      profile && frame.profileKey !== "flat"
+        ? buildFrameRectProfile({
+            innerWmm: innerW,
+            innerHmm: innerH,
+            unitMm: frame.baseUnitMm,
+            steps: profile.steps,
+          })
+        : buildFrameRectPhi({
+            innerWmm: innerW,
+            innerHmm: innerH,
+            thicknessMm: frame.solidMm,
+            heightMm: frame.frameHeightMm,
+            glassMm: frame.glassMm,
+            glassClearanceMm: frame.glassClearanceMm,
+            glueLipMm: frame.lipMm,
+          });
     const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
     const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
     if (!vertices || !indices) return null;
