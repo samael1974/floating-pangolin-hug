@@ -8,6 +8,8 @@ import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
 import type { BaseStyle } from "@/lib/relief/reliefTypes";
 import { buildPassepartoutRectPhi } from "@/lib/relief/frame/buildPassepartoutRectPhi";
 import { buildFrameRectPhi } from "@/lib/relief/frame/buildFrameRectPhi";
+import { buildFrameRectProfile } from "@/lib/relief/frame/buildFrameRectProfile";
+import { FRAME_PROFILES, type FrameProfileKey } from "@/lib/relief/frame/frameProfiles";
 
 export type HeightmapState = {
   normF32: Float32Array;
@@ -18,6 +20,8 @@ export type HeightmapState = {
 type FrameUI = {
   enabled: boolean;
   solidMm: number;
+  baseUnitMm: number;
+  profileKey: FrameProfileKey;
   frameHeightMm: number;
   glassMm: 2 | 3;
   glassClearanceMm: number;
@@ -43,75 +47,7 @@ type Props = {
   decimateStep: number;
   depthMm: number;
   baseMm: number;
-  baseStyle: BaseStyle;
-
-  // outputMode lo accettiamo anche qui
-  outputMode?: string; // o il tipo reale che usi in ReliefWizard
-
-  // cornice & mat
-  frame?: FrameUI;
-  mat?: MatUI;
-};
-
-const SHOW_HELPERS = true;
-const PREVIEW_MIRROR_Y_180 = false;
-const BG_COLOR = "#f6f7fb";
-
-function decimateHeights(hm: HeightmapState, stepIn: number): HeightmapState {
-  const step = Math.max(1, Math.floor(stepIn || 1));
-  if (step === 1) return hm;
-  const w2 = Math.max(2, Math.floor(hm.w / step));
-  const h2 = Math.max(2, Math.floor(hm.h / step));
-  const out = new Float32Array(w2 * h2);
-  for (let y = 0; y < h2; y++) {
-    const sy = Math.min(hm.h - 1, y * step);
-    for (let x = 0; x < w2; x++) {
-      const sx = Math.min(hm.w - 1, x * step);
-      out[y * w2 + x] = hm.normF32[sy * hm.w + sx] ?? 0;
-    }
-  }
-  return { normF32: out, w: w2, h: h2 };
-}
-
-function toBufferGeometry(vertices: Float32Array, indices: Uint32Array): THREE.BufferGeometry {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
-  g.setIndex(new THREE.BufferAttribute(indices, 1));
-  g.computeVertexNormals();
-  g.computeBoundingBox();
-  g.computeBoundingSphere();
-  return g;
-}
-
-export default function ReliefPreview3D({
-  hmState,
-  stlWidthMm,
-  decimateStep,
-  depthMm,
-  baseMm,
-  baseStyle,
-  frame,
-  mat,
-}: Props): JSX.Element {
-  const solidGeometry = useMemo(() => {
-    if (!hmState) return null;
-
-    const hm = decimateHeights(hmState, decimateStep);
-    const { geometry } = buildSolidFromHeightmap({
-      height01: hm.normF32,
-      width: hm.w,
-      height: hm.h,
-      outWidthMm: Math.max(1, stlWidthMm),
-      depthMm: Math.max(0, depthMm),
-      baseMm: Math.max(0, baseMm),
-      baseStyle,
-      invert: false,
-      clampHeights: true,
-      minBaseMm: 0.4,
-    });
-
-    geometry.computeBoundingBox();
-    const bb = geometry.boundingBox;
+@@ -115,118 +119,131 @@ export default function ReliefPreview3D({
     if (bb) {
       const center = new THREE.Vector3();
       bb.getCenter(center);
@@ -137,6 +73,8 @@ export default function ReliefPreview3D({
     return { w, h };
   }, [hmState, stlWidthMm]);
 
+  const matThickness = mat?.enabled ? Math.max(1.8, mat.thicknessMm) : 0;
+
   const matGeometry = useMemo(() => {
     if (!hmState) return null;
     if (!mat?.enabled) return null;
@@ -146,6 +84,7 @@ export default function ReliefPreview3D({
       steps: mat.steps,
       totalBandsMm: mat.totalBandsMm,
       thicknessMm: mat.thicknessMm,
+      thicknessMm: Math.max(1.8, mat.thicknessMm),
       stepDropMm: mat.stepDropMm,
       minBandMm: mat.minBandMm,
     });
@@ -153,6 +92,10 @@ export default function ReliefPreview3D({
     const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
     if (!vertices || !indices) return null;
     return toBufferGeometry(vertices, indices);
+    const geom = toBufferGeometry(vertices, indices);
+    geom.rotateX(-Math.PI / 2);
+    geom.computeBoundingBox();
+    return geom;
   }, [hmState, mat, reliefPlan.w, reliefPlan.h]);
 
   const frameGeometry = useMemo(() => {
@@ -170,6 +113,24 @@ export default function ReliefPreview3D({
       glassClearanceMm: frame.glassClearanceMm,
       glueLipMm: frame.lipMm,
     });
+    const profile = FRAME_PROFILES.find((item) => item.key === frame.profileKey);
+    const out =
+      profile && frame.profileKey !== "flat"
+        ? buildFrameRectProfile({
+            innerWmm: innerW,
+            innerHmm: innerH,
+            unitMm: frame.baseUnitMm,
+            steps: profile.steps,
+          })
+        : buildFrameRectPhi({
+            innerWmm: innerW,
+            innerHmm: innerH,
+            thicknessMm: frame.solidMm,
+            heightMm: frame.frameHeightMm,
+            glassMm: frame.glassMm,
+            glassClearanceMm: frame.glassClearanceMm,
+            glueLipMm: frame.lipMm,
+          });
     const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
     const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
     if (!vertices || !indices) return null;
@@ -205,6 +166,8 @@ export default function ReliefPreview3D({
   const reliefGap = mat?.enabled ? mat.reliefGapMm : 0;
   const matTopY = reliefTopY - matDrop;
   const reliefBaseY = matTopY + reliefGap;
+  const matTopY = mat?.enabled ? matThickness : 0;
+  const reliefBaseY = mat?.enabled ? matTopY + reliefGap : 0;
   const groundY = -0.01;
 
   return (
@@ -230,16 +193,7 @@ export default function ReliefPreview3D({
           intensity={1.55}
           castShadow
           shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-          shadow-camera-near={1}
-          shadow-camera-far={4000}
-          shadow-bias={-0.00015}
-        />
-        <directionalLight position={[-380, 260, -260]} intensity={0.65} />
-
-        {SHOW_HELPERS && (
-          <>
-            <Grid
+@@ -243,80 +260,80 @@ export default function ReliefPreview3D({
               position={[0, groundY, 0]}
               infiniteGrid
               fadeDistance={1400}
@@ -272,6 +226,13 @@ export default function ReliefPreview3D({
   castShadow
   receiveShadow
 >
+          <mesh
+            geometry={solidGeometry}
+            position={[0, reliefBaseY, 0]}
+            rotation={PREVIEW_MIRROR_Y_180 ? [0, Math.PI, 0] : [0, 0, 0]}
+            castShadow
+            receiveShadow
+          >
 
 
             <meshPhysicalMaterial
@@ -310,6 +271,7 @@ export default function ReliefPreview3D({
   makeDefault
   // target dinamico centrato sulla mesh
   target={[0, reliefTopY * 0.5, 0]}
+          target={[0, reliefBaseY + reliefTopY * 0.5, 0]}
   enableDamping
   dampingFactor={0.08}
   enablePan={true}       // abilita pan per muovere il centro
