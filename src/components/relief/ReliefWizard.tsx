@@ -168,6 +168,8 @@ export default function ReliefWizard() {
   // ✅ STL options
   const [stlWidthMm, setStlWidthMm] = React.useState<number>(120);
   const [decimateStep, setDecimateStep] = React.useState<number>(2);
+  const [qualityPreset, setQualityPreset] = React.useState<"lite" | "standard" | "ultra" | null>(null);
+  const [showDonationPrompt, setShowDonationPrompt] = React.useState(false);
 
   const canGenerate = !!file && hmStatus === "ready" && !!hmState;
 
@@ -202,6 +204,7 @@ export default function ReliefWizard() {
   React.useEffect(() => {
     if (!file) {
       setPreviewUrl(null);
+      setShowDonationPrompt(false);
       return;
     }
     const url = URL.createObjectURL(file);
@@ -426,6 +429,7 @@ export default function ReliefWizard() {
         baseStyle: params.baseStyle,
         fileName: name,
       });
+      setShowDonationPrompt(true);
     } catch (e: any) {
       console.error("STL: ERROR", e);
       alert(`Errore export STL: ${e?.message ?? String(e)}`);
@@ -449,24 +453,15 @@ export default function ReliefWizard() {
         <BrandHero />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[420px_1fr] lg:grid-cols-[460px_1fr]">
-        {/* LEFT */}
-        <div className="space-y-6">
-          {/* Source Mode */}
-          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-white p-4 shadow">
-            <div className="min-w-[220px]">
-              <div className="text-sm font-semibold">Sorgente</div>
-              <div className="text-xs text-gray-500">
-                Usa <span className="font-medium">Immagine</span> per risultati rapidi. Usa{" "}
-                <span className="font-medium">Depth map</span> se hai già una mappa di profondità (meglio PNG 16-bit).
-              </div>
-            </div>
-
+      <div className="sticky top-0 z-20 -mx-4 mb-4 border-y border-gray-200 bg-white/90 px-4 py-3 backdrop-blur">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Sorgente</span>
             <div className="inline-flex overflow-hidden rounded-md border">
               <button
                 type="button"
                 onClick={() => setSourceMode("image")}
-                className={`px-3 py-1.5 text-sm ${
+                className={`px-3 py-1.5 text-xs font-semibold ${
                   sourceMode === "image"
                     ? "bg-[#1F4E5F] text-white"
                     : "bg-white text-[#1F4E5F] hover:bg-gray-50"
@@ -478,28 +473,193 @@ export default function ReliefWizard() {
               <button
                 type="button"
                 onClick={() => setSourceMode("depthmap")}
-                className={`px-3 py-1.5 text-sm ${
+                className={`px-3 py-1.5 text-xs font-semibold ${
                   sourceMode === "depthmap"
                     ? "bg-[#1F4E5F] text-white"
                     : "bg-white text-[#1F4E5F] hover:bg-gray-50"
                 }`}
               >
-                Depth map (8/16-bit)
+                Depth map
               </button>
             </div>
-
-            {/* ✅ Invert sempre visibile */}
-            <label className="ml-auto flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={invertDepthMap}
-                onChange={(e) => setInvertDepthMap(e.target.checked)}
-              />
-              <span>Inverti profondità</span>
-              <span className="text-xs text-gray-500">(se viene “al contrario”)</span>
-            </label>
           </div>
 
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Preset</span>
+            <div className="inline-flex overflow-hidden rounded-md border">
+              <button
+                type="button"
+                onClick={() =>
+                  setParams((p) => ({
+                    ...p,
+                    projectType: "logo_text",
+                    depthMm: 3.0,
+                    baseMm: 2.0,
+                    detail: 0.65,
+                    smooth: 0.12,
+                    edge: "sharp",
+                    outputMode: "relief",
+                    baseStyle: "flat",
+                  }))
+                }
+                className={`px-3 py-1.5 text-xs font-semibold ${
+                  params.projectType === "logo_text"
+                    ? "bg-[#1F4E5F] text-white"
+                    : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                }`}
+              >
+                Logo
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setParams((p) => ({
+                    ...p,
+                    projectType: "human_face",
+                    depthMm: 4.0,
+                    baseMm: 2.0,
+                    detail: 0.55,
+                    smooth: 0.28,
+                    edge: "round",
+                    outputMode: "relief",
+                    baseStyle: "flat",
+                  }))
+                }
+                className={`px-3 py-1.5 text-xs font-semibold ${
+                  params.projectType === "human_face"
+                    ? "bg-[#1F4E5F] text-white"
+                    : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                }`}
+              >
+                Volto
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setParams((p) => ({
+                    ...p,
+                    projectType: "nature_landscape",
+                    depthMm: 5.0,
+                    baseMm: 2.0,
+                    detail: 0.58,
+                    smooth: 0.2,
+                    edge: "round",
+                    outputMode: "relief",
+                    baseStyle: "flat",
+                  }))
+                }
+                className={`px-3 py-1.5 text-xs font-semibold ${
+                  params.projectType === "nature_landscape"
+                    ? "bg-[#1F4E5F] text-white"
+                    : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                }`}
+              >
+                Paesaggio
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Base</span>
+            <div className="inline-flex overflow-hidden rounded-md border">
+              {(["flat", "recessed", "offset"] as const).map((style) => (
+                <button
+                  key={style}
+                  type="button"
+                  onClick={() => setParams((p) => ({ ...p, baseStyle: style }))}
+                  className={`px-3 py-1.5 text-xs font-semibold capitalize ${
+                    params.baseStyle === style
+                      ? "bg-[#1F4E5F] text-white"
+                      : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                  }`}
+                >
+                  {style === "flat" ? "Flat" : style === "recessed" ? "Recessed" : "Offset"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Qualità</span>
+            <div className="inline-flex overflow-hidden rounded-md border">
+              <button
+                type="button"
+                onClick={() => {
+                  setQualityPreset("lite");
+                  setDecimateStep(4);
+                  setStlWidthMm(120);
+                  setParams((p) => ({ ...p, detail: 0.5 }));
+                }}
+                className={`px-3 py-1.5 text-xs font-semibold ${
+                  qualityPreset === "lite"
+                    ? "bg-[#1F4E5F] text-white"
+                    : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                }`}
+              >
+                Lite
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQualityPreset("standard");
+                  setDecimateStep(2);
+                  setStlWidthMm(120);
+                  setParams((p) => ({ ...p, detail: 0.6 }));
+                }}
+                className={`px-3 py-1.5 text-xs font-semibold ${
+                  qualityPreset === "standard"
+                    ? "bg-[#1F4E5F] text-white"
+                    : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                }`}
+              >
+                Std
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQualityPreset("ultra");
+                  setDecimateStep(1);
+                  setStlWidthMm(200);
+                  setParams((p) => ({ ...p, detail: 0.75 }));
+                }}
+                className={`px-3 py-1.5 text-xs font-semibold ${
+                  qualityPreset === "ultra"
+                    ? "bg-[#1F4E5F] text-white"
+                    : "bg-white text-[#1F4E5F] hover:bg-gray-50"
+                }`}
+              >
+                Ultra
+              </button>
+            </div>
+          </div>
+
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowInstructions((v) => !v)}
+              className="rounded-md border px-3 py-1.5 text-xs font-semibold text-[#1F4E5F] hover:bg-gray-50"
+            >
+              {showInstructions ? "Chiudi istruzioni" : "Istruzioni"}
+            </button>
+            <button
+              type="button"
+              onClick={downloadStl}
+              disabled={!canGenerate}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                canGenerate ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]" : "cursor-not-allowed bg-gray-200 text-gray-500"
+              }`}
+            >
+              Scarica STL
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-[420px_1fr] lg:grid-cols-[460px_1fr]">
+        {/* LEFT */}
+        <div className="space-y-6">
           {/* Upload */}
           <div className="space-y-3 rounded-lg bg-white p-4 shadow">
             <div className="flex items-center justify-between gap-3">
@@ -539,6 +699,16 @@ export default function ReliefWizard() {
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="block w-full text-sm"
             />
+
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={invertDepthMap}
+                onChange={(e) => setInvertDepthMap(e.target.checked)}
+              />
+              <span>Inverti profondità</span>
+              <span className="text-xs text-gray-500">(se viene “al contrario”)</span>
+            </label>
 
             {/* Warning compatibilità depth map */}
             {fileWarning && (
@@ -590,95 +760,116 @@ export default function ReliefWizard() {
             )}
           </div>
 
+          {/* Quick presets */}
+          <div className="space-y-3 rounded-lg bg-white p-4 shadow">
+            <div>
+              <div className="text-sm font-semibold">2) Quick Presets</div>
+              <div className="text-xs text-gray-500">
+                1 click per partire bene: qualità, dimensione e base già impostate.
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setQualityPreset("lite");
+                  setDecimateStep(4);
+                  setStlWidthMm(120);
+                  setParams((p) => ({ ...p, detail: 0.5 }));
+                }}
+                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
+                  qualityPreset === "lite" ? "border-[#1F4E5F] text-[#1F4E5F]" : "text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Lite (STL leggero)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQualityPreset("standard");
+                  setDecimateStep(2);
+                  setStlWidthMm(120);
+                  setParams((p) => ({ ...p, detail: 0.6 }));
+                }}
+                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
+                  qualityPreset === "standard" ? "border-[#1F4E5F] text-[#1F4E5F]" : "text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Standard (bilanciato)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQualityPreset("ultra");
+                  setDecimateStep(1);
+                  setStlWidthMm(200);
+                  setParams((p) => ({ ...p, detail: 0.75 }));
+                }}
+                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
+                  qualityPreset === "ultra" ? "border-[#1F4E5F] text-[#1F4E5F]" : "text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Ultra (max dettaglio)
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Size</div>
+              <div className="flex flex-wrap gap-2">
+                {[60, 120, 200].map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => setStlWidthMm(size)}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                      Math.round(stlWidthMm) === size
+                        ? "border-[#1F4E5F] bg-[#1F4E5F]/10 text-[#1F4E5F]"
+                        : "text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {size} mm
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Base</div>
+              <div className="flex flex-wrap gap-2">
+                {[0, 1, 2].map((base) => (
+                  <button
+                    key={base}
+                    type="button"
+                    onClick={() => setParams((p) => ({ ...p, baseMm: base }))}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                      Math.abs(params.baseMm - base) < 0.01
+                        ? "border-[#1F4E5F] bg-[#1F4E5F]/10 text-[#1F4E5F]"
+                        : "text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {base} mm
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-gray-500">
+                Base 0 = solo rilievo. Se vuoi uno STL chiuso, usa almeno 0.4–1 mm.
+              </p>
+            </div>
+          </div>
+
           {/* Params */}
-<div className="space-y-3 rounded-lg bg-white p-4 shadow">
-  <div>
-    <div className="text-sm font-semibold">2) Parametri bassorilievo</div>
-    <div className="text-xs text-gray-500">
-      I parametri restano attivi anche in modalità Depth map.{" "}
-      <span className="font-medium">Nota:</span> lo STL esportato è sempre{" "}
-      <span className="font-medium">chiuso (manifold)</span>, quindi serve uno{" "}
-      <span className="font-medium">spessore minimo</span>: non è possibile esportare
-      “solo superficie” con base = 0. Se vuoi un risultato molto sottile, imposta una base
-      piccola (es. <span className="font-medium">0.4–1.0 mm</span>).
-    </div>
-  </div>
-
-            {/* Preset rapidi */}
-            <div className="flex flex-wrap gap-2 pt-2">
-              <button
-                type="button"
-                disabled={!file}
-                onClick={() => {
-                  setParams((p) => ({
-                    ...p,
-                    projectType: "logo_text",
-                    depthMm: 3.0,
-                    baseMm: 2.0,
-                    detail: 0.65,
-                    smooth: 0.12,
-                    edge: "sharp",
-                    outputMode: "relief",
-                    baseStyle: "flat",
-                  }));
-                  setDecimateStep(2);
-                }}
-                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
-                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
-                }`}
-              >
-                Preset: Logo/Testo
-              </button>
-
-              <button
-                type="button"
-                disabled={!file}
-                onClick={() => {
-                  setParams((p) => ({
-                    ...p,
-                    projectType: "human_face",
-                    depthMm: 4.0,
-                    baseMm: 2.0,
-                    detail: 0.55,
-                    smooth: 0.28,
-                    edge: "round",
-                    outputMode: "relief",
-                    baseStyle: "flat",
-                  }));
-                  setDecimateStep(2);
-                }}
-                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
-                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
-                }`}
-              >
-                Preset: Volto
-              </button>
-
-              <button
-                type="button"
-                disabled={!file}
-                onClick={() => {
-                  setParams((p) => ({
-                    ...p,
-                    projectType: "nature_landscape",
-                    depthMm: 5.0,
-                    baseMm: 2.0,
-                    detail: 0.58,
-                    smooth: 0.2,
-                    edge: "round",
-                    outputMode: "relief",
-                    baseStyle: "flat",
-                  }));
-                  setDecimateStep(3);
-                }}
-                className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
-                  file ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
-                }`}
-              >
-                Preset: Paesaggio
-              </button>
-
-              <div className="self-center text-[11px] text-gray-500">1 click per partire bene, poi rifinisci sotto.</div>
+          <div className="space-y-3 rounded-lg bg-white p-4 shadow">
+            <div>
+              <div className="text-sm font-semibold">3) Parametri bassorilievo</div>
+              <div className="text-xs text-gray-500">
+                I parametri restano attivi anche in modalità Depth map.{" "}
+                <span className="font-medium">Nota:</span> lo STL esportato è sempre{" "}
+                <span className="font-medium">chiuso (manifold)</span>, quindi serve uno{" "}
+                <span className="font-medium">spessore minimo</span>: non è possibile esportare
+                “solo superficie” con base = 0. Se vuoi un risultato molto sottile, imposta una base
+                piccola (es. <span className="font-medium">0.4–1.0 mm</span>).
+              </div>
             </div>
 
             <div className="pt-2">
@@ -689,7 +880,7 @@ export default function ReliefWizard() {
           {/* STL Options */}
           <div className="space-y-4 rounded-lg bg-white p-4 shadow">
             <div>
-              <div className="text-sm font-semibold">3) Genera STL</div>
+              <div className="text-sm font-semibold">4) Genera STL</div>
               <div className="text-xs text-gray-500">STL binario chiuso (stampabile).</div>
             </div>
 
@@ -758,15 +949,22 @@ export default function ReliefWizard() {
               >
                 Scarica STL
               </button>
-
-              <a
-                href="https://www.paypal.me/federicocordioli72"
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-md border px-4 py-2 text-center text-sm hover:bg-gray-50"
-              >
-                Dona su PayPal
-              </a>
+              {showDonationPrompt && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <div className="font-semibold">Ti ha evitato Blender o booleane?</div>
+                  <div className="mt-1">
+                    Offrimi un caffè: anche 1–2€ fanno la differenza.{" "}
+                    <a
+                      href="https://www.paypal.me/federicocordioli72"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-semibold underline underline-offset-2"
+                    >
+                      Supporta su PayPal
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -922,7 +1120,7 @@ export default function ReliefWizard() {
                           <span className="font-semibold">Altezza rilievo</span>: quanto “sporge” il bassorilievo (mm).
                         </li>
                         <li>
-                          <span className="font-semibold">Spessore base</span>: imposta <span className="font-semibold">0</span> se vuoi solo il modello.
+                          <span className="font-semibold">Spessore base</span>: tienilo basso (0.4–1 mm) se vuoi un rilievo molto sottile.
                         </li>
                         <li>
                           <span className="font-semibold">Decimazione</span>: x2–x3 consigliato.
