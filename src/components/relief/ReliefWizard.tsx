@@ -173,7 +173,7 @@ export default function ReliefWizard() {
 
   const canGenerate = !!file && hmStatus === "ready" && !!hmState;
 
-    // ---------------------------
+  // ---------------------------
   // Step 2: Cornice + Passepartout (MVP)
   // ---------------------------
   const [matEnabled, setMatEnabled] = React.useState(false);
@@ -489,6 +489,7 @@ export default function ReliefWizard() {
             <div className="inline-flex overflow-hidden rounded-md border">
               <button
                 type="button"
+                disabled={!file}
                 onClick={() =>
                   setParams((p) => ({
                     ...p,
@@ -503,7 +504,9 @@ export default function ReliefWizard() {
                   }))
                 }
                 className={`px-3 py-1.5 text-xs font-semibold ${
-                  params.projectType === "logo_text"
+                  !file
+                    ? "cursor-not-allowed bg-white text-gray-400"
+                    : params.projectType === "logo_text"
                     ? "bg-[#1F4E5F] text-white"
                     : "bg-white text-[#1F4E5F] hover:bg-gray-50"
                 }`}
@@ -513,6 +516,7 @@ export default function ReliefWizard() {
 
               <button
                 type="button"
+                disabled={!file}
                 onClick={() =>
                   setParams((p) => ({
                     ...p,
@@ -527,7 +531,9 @@ export default function ReliefWizard() {
                   }))
                 }
                 className={`px-3 py-1.5 text-xs font-semibold ${
-                  params.projectType === "human_face"
+                  !file
+                    ? "cursor-not-allowed bg-white text-gray-400"
+                    : params.projectType === "human_face"
                     ? "bg-[#1F4E5F] text-white"
                     : "bg-white text-[#1F4E5F] hover:bg-gray-50"
                 }`}
@@ -537,6 +543,7 @@ export default function ReliefWizard() {
 
               <button
                 type="button"
+                disabled={!file}
                 onClick={() =>
                   setParams((p) => ({
                     ...p,
@@ -551,7 +558,9 @@ export default function ReliefWizard() {
                   }))
                 }
                 className={`px-3 py-1.5 text-xs font-semibold ${
-                  params.projectType === "nature_landscape"
+                  !file
+                    ? "cursor-not-allowed bg-white text-gray-400"
+                    : params.projectType === "nature_landscape"
                     ? "bg-[#1F4E5F] text-white"
                     : "bg-white text-[#1F4E5F] hover:bg-gray-50"
                 }`}
@@ -568,9 +577,12 @@ export default function ReliefWizard() {
                 <button
                   key={style}
                   type="button"
+                  disabled={!file}
                   onClick={() => setParams((p) => ({ ...p, baseStyle: style }))}
                   className={`px-3 py-1.5 text-xs font-semibold capitalize ${
-                    params.baseStyle === style
+                    !file
+                      ? "cursor-not-allowed bg-white text-gray-400"
+                      : params.baseStyle === style
                       ? "bg-[#1F4E5F] text-white"
                       : "bg-white text-[#1F4E5F] hover:bg-gray-50"
                   }`}
@@ -586,6 +598,7 @@ export default function ReliefWizard() {
             <div className="inline-flex overflow-hidden rounded-md border">
               <button
                 type="button"
+                disabled={!file}
                 onClick={() => {
                   setQualityPreset("lite");
                   setDecimateStep(4);
@@ -593,7 +606,9 @@ export default function ReliefWizard() {
                   setParams((p) => ({ ...p, detail: 0.5 }));
                 }}
                 className={`px-3 py-1.5 text-xs font-semibold ${
-                  qualityPreset === "lite"
+                  !file
+                    ? "cursor-not-allowed bg-white text-gray-400"
+                    : qualityPreset === "lite"
                     ? "bg-[#1F4E5F] text-white"
                     : "bg-white text-[#1F4E5F] hover:bg-gray-50"
                 }`}
@@ -602,6 +617,7 @@ export default function ReliefWizard() {
               </button>
               <button
                 type="button"
+                disabled={!file}
                 onClick={() => {
                   setQualityPreset("standard");
                   setDecimateStep(2);
@@ -609,7 +625,9 @@ export default function ReliefWizard() {
                   setParams((p) => ({ ...p, detail: 0.6 }));
                 }}
                 className={`px-3 py-1.5 text-xs font-semibold ${
-                  qualityPreset === "standard"
+                  !file
+                    ? "cursor-not-allowed bg-white text-gray-400"
+                    : qualityPreset === "standard"
                     ? "bg-[#1F4E5F] text-white"
                     : "bg-white text-[#1F4E5F] hover:bg-gray-50"
                 }`}
@@ -618,6 +636,7 @@ export default function ReliefWizard() {
               </button>
               <button
                 type="button"
+                disabled={!file}
                 onClick={() => {
                   setQualityPreset("ultra");
                   setDecimateStep(1);
@@ -625,7 +644,9 @@ export default function ReliefWizard() {
                   setParams((p) => ({ ...p, detail: 0.75 }));
                 }}
                 className={`px-3 py-1.5 text-xs font-semibold ${
-                  qualityPreset === "ultra"
+                  !file
+                    ? "cursor-not-allowed bg-white text-gray-400"
+                    : qualityPreset === "ultra"
                     ? "bg-[#1F4E5F] text-white"
                     : "bg-white text-[#1F4E5F] hover:bg-gray-50"
                 }`}
@@ -772,6 +793,7 @@ export default function ReliefWizard() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
+                disabled={!file}
                 onClick={() => {
                   setQualityPreset("lite");
                   setDecimateStep(4);
@@ -779,13 +801,18 @@ export default function ReliefWizard() {
                   setParams((p) => ({ ...p, detail: 0.5 }));
                 }}
                 className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
-                  qualityPreset === "lite" ? "border-[#1F4E5F] text-[#1F4E5F]" : "text-gray-700 hover:bg-gray-50"
+                  !file
+                    ? "cursor-not-allowed border-gray-200 text-gray-400"
+                    : qualityPreset === "lite"
+                    ? "border-[#1F4E5F] text-[#1F4E5F]"
+                    : "text-gray-700 hover:bg-gray-50"
                 }`}
               >
                 Lite (STL leggero)
               </button>
               <button
                 type="button"
+                disabled={!file}
                 onClick={() => {
                   setQualityPreset("standard");
                   setDecimateStep(2);
@@ -793,13 +820,18 @@ export default function ReliefWizard() {
                   setParams((p) => ({ ...p, detail: 0.6 }));
                 }}
                 className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
-                  qualityPreset === "standard" ? "border-[#1F4E5F] text-[#1F4E5F]" : "text-gray-700 hover:bg-gray-50"
+                  !file
+                    ? "cursor-not-allowed border-gray-200 text-gray-400"
+                    : qualityPreset === "standard"
+                    ? "border-[#1F4E5F] text-[#1F4E5F]"
+                    : "text-gray-700 hover:bg-gray-50"
                 }`}
               >
                 Standard (bilanciato)
               </button>
               <button
                 type="button"
+                disabled={!file}
                 onClick={() => {
                   setQualityPreset("ultra");
                   setDecimateStep(1);
@@ -807,7 +839,11 @@ export default function ReliefWizard() {
                   setParams((p) => ({ ...p, detail: 0.75 }));
                 }}
                 className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
-                  qualityPreset === "ultra" ? "border-[#1F4E5F] text-[#1F4E5F]" : "text-gray-700 hover:bg-gray-50"
+                  !file
+                    ? "cursor-not-allowed border-gray-200 text-gray-400"
+                    : qualityPreset === "ultra"
+                    ? "border-[#1F4E5F] text-[#1F4E5F]"
+                    : "text-gray-700 hover:bg-gray-50"
                 }`}
               >
                 Ultra (max dettaglio)
@@ -821,9 +857,12 @@ export default function ReliefWizard() {
                   <button
                     key={size}
                     type="button"
+                    disabled={!file}
                     onClick={() => setStlWidthMm(size)}
                     className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                      Math.round(stlWidthMm) === size
+                      !file
+                        ? "cursor-not-allowed border-gray-200 text-gray-400"
+                        : Math.round(stlWidthMm) === size
                         ? "border-[#1F4E5F] bg-[#1F4E5F]/10 text-[#1F4E5F]"
                         : "text-gray-700 hover:bg-gray-50"
                     }`}
@@ -841,9 +880,12 @@ export default function ReliefWizard() {
                   <button
                     key={base}
                     type="button"
+                    disabled={!file}
                     onClick={() => setParams((p) => ({ ...p, baseMm: base }))}
                     className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                      Math.abs(params.baseMm - base) < 0.01
+                      !file
+                        ? "cursor-not-allowed border-gray-200 text-gray-400"
+                        : Math.abs(params.baseMm - base) < 0.01
                         ? "border-[#1F4E5F] bg-[#1F4E5F]/10 text-[#1F4E5F]"
                         : "text-gray-700 hover:bg-gray-50"
                     }`}
