@@ -1,4 +1,3 @@
- (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/src/components/relief/ReliefWizard.tsx b/src/components/relief/ReliefWizard.tsx
 index f7b8adb83469ddf16ae3311b2fc31f257e1acf9c..f08200b7159b3b1501f07afc01645c97436a4405 100644
 --- a/src/components/relief/ReliefWizard.tsx
@@ -812,6 +811,3 @@ index f7b8adb83469ddf16ae3311b2fc31f257e1acf9c..f08200b7159b3b1501f07afc01645c97
                        <a
                          href="https://chatgpt.com/g/g-69416cfae0f881918529c92c5f1e0ce9-depth-map-generator-v2"
                          target="_blank"
- 
-EOF
-)
