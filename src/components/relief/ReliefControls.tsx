@@ -10,6 +10,12 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
 
@@ -79,62 +85,6 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Tipo progetto */}
-      <div className="space-y-2">
-        <Label>Tipo progetto</Label>
-        <Select
-          disabled={disabled}
-          value={v.projectType}
-          onValueChange={(x) => set({ projectType: x as ProjectType })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Scegli..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="logo_text">Logo / Testo (bordi netti)</SelectItem>
-            <SelectItem value="human_face">Volto umano (sfumature)</SelectItem>
-            <SelectItem value="animal">Animale (texture)</SelectItem>
-            <SelectItem value="nature_landscape">
-              Natura / Paesaggio (profondità)
-            </SelectItem>
-            <SelectItem value="decorative_pattern">
-              Pattern decorativo (ripetizione)
-            </SelectItem>
-          </SelectContent>
-        </Select>
-
-        <p className="text-xs text-slate-600">
-          Suggerimento:{" "}
-          <span className="font-medium text-slate-700">Logo/Testo</span> aumenta
-          contrasto e bordi;{" "}
-          <span className="font-medium text-slate-700">Volto</span> mantiene
-          sfumature e volumi.
-        </p>
-      </div>
-
-      <Separator />
-
-      {/* Base style */}
-      <div className="space-y-2">
-        <Label>Base</Label>
-        <Select
-          disabled={disabled}
-          value={v.baseStyle}
-          onValueChange={(x) => set({ baseStyle: x as BaseStyle })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Scegli..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="flat">Piatta</SelectItem>
-            <SelectItem value="recessed">Incassata</SelectItem>
-            <SelectItem value="offset">Offset</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <Separator />
-
       {/* Profondità */}
       <div className="space-y-2">
         <Label>Profondità rilievo (mm): {v.depthMm.toFixed(1)}</Label>
@@ -180,37 +130,98 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
         />
       </div>
 
-      {/* Smussatura */}
-      <div className="space-y-2">
-        <Label>Smussatura: {v.smooth.toFixed(2)}</Label>
-        <Slider
-          disabled={disabled}
-          value={[v.smooth]}
-          min={0}
-          max={1}
-          step={0.01}
-          onValueChange={(arr) => set({ smooth: clamp(arr[0] ?? 0, 0, 1) })}
-        />
-      </div>
+      <Accordion type="single" collapsible>
+        <AccordionItem value="advanced">
+          <AccordionTrigger>Avanzate</AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-4 pt-3">
+              {/* Tipo progetto */}
+              <div className="space-y-2">
+                <Label>Tipo progetto</Label>
+                <Select
+                  disabled={disabled}
+                  value={v.projectType}
+                  onValueChange={(x) => set({ projectType: x as ProjectType })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Scegli..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="logo_text">Logo / Testo (bordi netti)</SelectItem>
+                    <SelectItem value="human_face">Volto umano (sfumature)</SelectItem>
+                    <SelectItem value="animal">Animale (texture)</SelectItem>
+                    <SelectItem value="nature_landscape">
+                      Natura / Paesaggio (profondità)
+                    </SelectItem>
+                    <SelectItem value="decorative_pattern">
+                      Pattern decorativo (ripetizione)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
 
-      <Separator />
+                <p className="text-xs text-slate-600">
+                  Suggerimento:{" "}
+                  <span className="font-medium text-slate-700">Logo/Testo</span> aumenta contrasto e bordi;{" "}
+                  <span className="font-medium text-slate-700">Volto</span> mantiene sfumature e volumi.
+                </p>
+              </div>
 
-      {/* Bordi arrotondati */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <Label>Bordi arrotondati</Label>
-          <Switch
-            disabled={disabled}
-            checked={v.edge === "round"}
-            onCheckedChange={(checked) =>
-              set({ edge: checked ? "round" : "sharp" })
-            }
-          />
-        </div>
-        <p className="text-xs text-slate-600">
-          Attivo = bordi più morbidi. Disattivo = bordi più incisi (più “taglienti”).
-        </p>
-      </div>
+              <Separator />
+
+              {/* Base style */}
+              <div className="space-y-2">
+                <Label>Base</Label>
+                <Select
+                  disabled={disabled}
+                  value={v.baseStyle}
+                  onValueChange={(x) => set({ baseStyle: x as BaseStyle })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Scegli..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="flat">Piatta</SelectItem>
+                    <SelectItem value="recessed">Incassata</SelectItem>
+                    <SelectItem value="offset">Offset</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Separator />
+
+              {/* Smussatura */}
+              <div className="space-y-2">
+                <Label>Smussatura: {v.smooth.toFixed(2)}</Label>
+                <Slider
+                  disabled={disabled}
+                  value={[v.smooth]}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  onValueChange={(arr) => set({ smooth: clamp(arr[0] ?? 0, 0, 1) })}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Bordi arrotondati */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label>Bordi arrotondati</Label>
+                  <Switch
+                    disabled={disabled}
+                    checked={v.edge === "round"}
+                    onCheckedChange={(checked) => set({ edge: checked ? "round" : "sharp" })}
+                  />
+                </div>
+                <p className="text-xs text-slate-600">
+                  Attivo = bordi più morbidi. Disattivo = bordi più incisi (più “taglienti”).
+                </p>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 }
