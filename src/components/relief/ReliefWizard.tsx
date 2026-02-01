@@ -170,6 +170,7 @@ export default function ReliefWizard() {
   const [decimateStep, setDecimateStep] = React.useState<number>(2);
   const [qualityPreset, setQualityPreset] = React.useState<"lite" | "standard" | "ultra" | null>(null);
   const [showDonationPrompt, setShowDonationPrompt] = React.useState(false);
+  const PHI = 1.618;
 
   const canGenerate = !!file && hmStatus === "ready" && !!hmState;
 
@@ -435,6 +436,15 @@ export default function ReliefWizard() {
       alert(`Errore export STL: ${e?.message ?? String(e)}`);
     }
   }
+
+  const applyFrameHeightPreset = React.useCallback(
+    (multiplier: number) => {
+      const base = Math.max(1, frameParams.solidMm);
+      const next = Number((base * multiplier).toFixed(2));
+      setFrameParams((prev) => ({ ...prev, frameHeightMm: next }));
+    },
+    [frameParams.solidMm]
+  );
 
   const openInstructions = React.useCallback(() => {
     setShowInstructions(true);
@@ -916,6 +926,212 @@ export default function ReliefWizard() {
 
             <div className="pt-2">
               <ReliefControls value={params} onChange={setParams} disabled={!file} />
+            </div>
+          </div>
+
+          {/* Passepartout + Cornice (Avanzate) */}
+          <div className="space-y-4 rounded-lg bg-white p-4 shadow">
+            <div>
+              <div className="text-sm font-semibold">Avanzate: Passepartout & Cornice</div>
+              <div className="text-xs text-gray-500">
+                Funzioni per utenti avanzati. La cornice segue preset basati su φ ({PHI}).
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-md border border-gray-200 p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">Passepartout</div>
+                    <div className="text-xs text-gray-500">
+                      Aggiunge un margine attorno al rilievo con gradini.
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={matEnabled}
+                      onChange={(e) => setMatEnabled(e.target.checked)}
+                      disabled={!file}
+                    />
+                    Abilita
+                  </label>
+                </div>
+
+                {matEnabled && (
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium">Bande (steps)</span>
+                        <span className="tabular-nums text-gray-700">{matParams.steps}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={6}
+                        step={1}
+                        value={matParams.steps}
+                        onChange={(e) =>
+                          setMatParams((prev) => ({
+                            ...prev,
+                            steps: Number(e.target.value) as 1 | 2 | 3 | 4 | 5 | 6,
+                          }))
+                        }
+                        className="w-full"
+                        disabled={!file}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium">Margine totale (mm)</span>
+                        <span className="tabular-nums text-gray-700">{matParams.totalBandsMm.toFixed(1)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={10}
+                        max={120}
+                        step={1}
+                        value={matParams.totalBandsMm}
+                        onChange={(e) =>
+                          setMatParams((prev) => ({ ...prev, totalBandsMm: Number(e.target.value) }))
+                        }
+                        className="w-full"
+                        disabled={!file}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium">Spessore (mm)</span>
+                        <span className="tabular-nums text-gray-700">{matParams.thicknessMm.toFixed(1)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={8}
+                        step={0.1}
+                        value={matParams.thicknessMm}
+                        onChange={(e) =>
+                          setMatParams((prev) => ({ ...prev, thicknessMm: Number(e.target.value) }))
+                        }
+                        className="w-full"
+                        disabled={!file}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium">Gradino (mm)</span>
+                        <span className="tabular-nums text-gray-700">{matParams.stepDropMm.toFixed(1)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={6}
+                        step={0.1}
+                        value={matParams.stepDropMm}
+                        onChange={(e) =>
+                          setMatParams((prev) => ({ ...prev, stepDropMm: Number(e.target.value) }))
+                        }
+                        className="w-full"
+                        disabled={!file}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-md border border-gray-200 p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">Cornice</div>
+                    <div className="text-xs text-gray-500">
+                      Larghezza base impostabile + altezze preset basate su φ.
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={frameEnabled}
+                      onChange={(e) => setFrameEnabled(e.target.checked)}
+                      disabled={!file}
+                    />
+                    Abilita
+                  </label>
+                </div>
+
+                {frameEnabled && (
+                  <div className="mt-4 space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium">Larghezza base cornice (mm)</span>
+                        <span className="tabular-nums text-gray-700">{frameParams.solidMm.toFixed(1)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={20}
+                        step={0.1}
+                        value={frameParams.solidMm}
+                        onChange={(e) =>
+                          setFrameParams((prev) => ({ ...prev, solidMm: Number(e.target.value) }))
+                        }
+                        className="w-full"
+                        disabled={!file}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium">Altezza cornice (mm)</span>
+                        <span className="tabular-nums text-gray-700">{frameParams.frameHeightMm.toFixed(1)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={6}
+                        max={60}
+                        step={0.5}
+                        value={frameParams.frameHeightMm}
+                        onChange={(e) =>
+                          setFrameParams((prev) => ({ ...prev, frameHeightMm: Number(e.target.value) }))
+                        }
+                        className="w-full"
+                        disabled={!file}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => applyFrameHeightPreset(PHI)}
+                          className="rounded-full border px-3 py-1 text-xs font-semibold text-[#1F4E5F] hover:bg-gray-50"
+                          disabled={!file}
+                        >
+                          φ × base
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyFrameHeightPreset(PHI * PHI)}
+                          className="rounded-full border px-3 py-1 text-xs font-semibold text-[#1F4E5F] hover:bg-gray-50"
+                          disabled={!file}
+                        >
+                          φ² × base
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyFrameHeightPreset(PHI * PHI * PHI)}
+                          className="rounded-full border px-3 py-1 text-xs font-semibold text-[#1F4E5F] hover:bg-gray-50"
+                          disabled={!file}
+                        >
+                          φ³ × base
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-gray-500">
+                        Preset calcolati da larghezza base × φ (1.618).
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
