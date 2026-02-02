@@ -259,7 +259,7 @@ function buildMatGeometry(args: AssemblyArgs, reliefPlan: { w: number; h: number
     geom.translate(0, 0, -bb.max.z);
     geom.computeBoundingBox();
   }
-  const matTopZ = -args.mat.matDropMm - args.mat.reliefGapMm;
+  const matTopZ = -args.mat.matDropMm;
   geom.translate(0, 0, matTopZ);
   geom.computeVertexNormals();
   return geom;
@@ -305,7 +305,13 @@ function buildReliefAssemblyGeometries(args: AssemblyArgs) {
     : 0;
 
   const mat = buildMatGeometry(args, reliefPlan);
+  const reliefGap = args.mat?.enabled ? args.mat.reliefGapMm : 0;
+  const matDrop = args.mat?.enabled ? args.mat.matDropMm : 0;
+  relief.translate(0, 0, -matDrop + reliefGap);
   const frame = buildFrameGeometry(args, reliefPlan, matBands);
+  if (frame) {
+    frame.translate(0, 0, -matDrop);
+  }
 
   return { relief, mat, frame };
 }

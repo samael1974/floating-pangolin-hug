@@ -237,9 +237,9 @@ export default function ReliefPreview3D({
   const camDist = Math.max(220, width * 1.6);
   const matDrop = mat?.enabled ? mat.matDropMm : 0;
   const reliefGap = mat?.enabled ? mat.reliefGapMm : 0;
-  const reliefBaseY = 0;
-  const matTopY = mat?.enabled ? -matDrop - reliefGap : 0;
-  const reliefCenterY = reliefTopY * 0.5;
+  const matTopY = -matDrop;
+  const reliefBaseY = matTopY + reliefGap;
+  const reliefCenterY = reliefBaseY + reliefTopY * 0.5;
   const groundY = -0.01;
 
   return (
@@ -324,7 +324,7 @@ export default function ReliefPreview3D({
           </mesh>
 
           {frameGeometry && (
-            <mesh geometry={frameGeometry} position={[0, 0, 0]} castShadow receiveShadow>
+            <mesh geometry={frameGeometry} position={[0, matTopY, 0]} castShadow receiveShadow>
               <meshPhysicalMaterial
                 color={"#A3B18A"}
                 roughness={0.5}
@@ -336,7 +336,7 @@ export default function ReliefPreview3D({
             </mesh>
           )}
           {frameEdges && (
-            <lineSegments geometry={frameEdges} position={[0, 0, 0]}>
+            <lineSegments geometry={frameEdges} position={[0, matTopY, 0]}>
               <lineBasicMaterial color={EDGE_COLOR} linewidth={1} />
             </lineSegments>
           )}
