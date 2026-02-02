@@ -1,12 +1,14 @@
 // src/components/relief/ReliefWizard.tsx
 import * as React from "react";
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils";
 
 import BrandHero from "@/components/branding/BrandHero";
 import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefControls";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
-import { downloadReliefStlBinary, downloadGeometryStlBinary } from "@/components/relief/reliefStl";
+import { downloadGeometryStlBinary } from "@/components/relief/reliefStl";
+import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
 import { buildPassepartoutRectPhi } from "@/lib/relief/frame/buildPassepartoutRectPhi";
 import { buildFrameRectPhi } from "@/lib/relief/frame/buildFrameRectPhi";
 import { buildFrameRectProfile } from "@/lib/relief/frame/buildFrameRectProfile";
@@ -428,15 +430,106 @@ export default function ReliefWizard() {
       // ✅ decimazione coerente con slider (export e preview allineati)
       const hmForExport = decimateStep > 1 ? decimateHm(hmState, decimateStep) : hmState;
 
-      downloadReliefStlBinary({
-        hm: hmForExport,
-        widthMm: stlWidthMm,
+      const reliefOut = buildSolidFromHeightmap({
+        height01: hmForExport.normF32,
+        width: hmForExport.w,
+        height: hmForExport.h,
+        outWidthMm: stlWidthMm,
         depthMm: params.depthMm,
         baseMm: params.baseMm,
-        outputMode: params.outputMode,
         baseStyle: params.baseStyle,
-        fileName: name,
+        invert: false,
+        clampHeights: true,
+        minBaseMm: 0.4,
       });
+      const reliefGeom = reliefOut.geometry;
+      reliefGeom.computeBoundingBox();
+      const reliefBox = reliefGeom.boundingBox;
+      if (reliefBox) {
+        const center = new THREE.Vector3();
+        reliefBox.getCenter(center);
+        reliefGeom.translate(-center.x, -reliefBox.min.y, -center.z);
+      }
+
+      const reliefPlan = buildReliefPlan();
+      if (!reliefPlan) {
+        throw new Error("Relief plan non disponibile");
+      }
+
+      const geoms: THREE.BufferGeometry[] = [];
+      const reliefGap = matEnabled ? matParams.reliefGapMm : 0;
+      const matThickness = matEnabled ? Math.max(1.8, matParams.thicknessMm) : 0;
+      reliefGeom.translate(0, matThickness + reliefGap, 0);
+      geoms.push(reliefGeom);
+
+      if (matEnabled) {
+        const out = buildPassepartoutRectPhi({
+          innerWmm: reliefPlan.w,
+          innerHmm: reliefPlan.h,
+          steps: matParams.steps,
+          totalBandsMm: matParams.totalBandsMm,
+          thicknessMm: Math.max(1.8, matParams.thicknessMm),
+          stepDropMm: matParams.stepDropMm,
+          minBandMm: matParams.minBandMm,
+        });
+        const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
+        const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
+        if (vertices && indices) {
+          const matGeom = toBufferGeometry(vertices, indices);
+          matGeom.rotateX(-Math.PI / 2);
+          matGeom.computeBoundingBox();
+          const bb = matGeom.boundingBox;
+          if (bb) {
+            matGeom.translate(0, -bb.min.y, 0);
+          }
+          geoms.push(matGeom);
+        }
+      }
+
+      if (frameEnabled) {
+        const matBands = matEnabled ? Math.max(matParams.totalBandsMm, matParams.minBandMm * matParams.steps) : 0;
+        const innerW = reliefPlan.w + 2 * matBands;
+        const innerH = reliefPlan.h + 2 * matBands;
+        const profile = FRAME_PROFILES.find((item) => item.key === frameParams.profileKey);
+        const out =
+          profile && frameParams.profileKey !== "flat"
+            ? buildFrameRectProfile({
+                innerWmm: innerW,
+                innerHmm: innerH,
+                unitMm: frameParams.baseUnitMm,
+                steps: profile.steps,
+              })
+            : buildFrameRectPhi({
+                innerWmm: innerW,
+                innerHmm: innerH,
+                thicknessMm: frameParams.solidMm,
+                heightMm: frameParams.frameHeightMm,
+                glassMm: frameParams.glassMm,
+                glassClearanceMm: frameParams.glassClearanceMm,
+                glueLipMm: frameParams.lipMm,
+              });
+        const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
+        const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
+        if (vertices && indices) {
+          const frameGeom = toBufferGeometry(vertices, indices);
+          frameGeom.computeBoundingBox();
+          const bb = frameGeom.boundingBox;
+          if (bb) {
+            frameGeom.translate(0, -bb.min.y, 0);
+          }
+          geoms.push(frameGeom);
+        }
+      }
+
+      const merged = mergeGeometries(
+        geoms.map((g) => (g.index ? g.toNonIndexed() : g)),
+        false
+      );
+      if (!merged) {
+        throw new Error("Merge geometry fallito");
+      }
+
+      downloadGeometryStlBinary(merged, name, { checkClosed: true, upAxis: "y" });
       setShowDonationPrompt(true);
     } catch (e: any) {
       console.error("STL: ERROR", e);
@@ -458,59 +551,6 @@ export default function ReliefWizard() {
     g.computeVertexNormals();
     return g;
   }, []);
-
-  function downloadPassepartoutStl() {
-    if (!hmState) return;
-    const reliefPlan = buildReliefPlan();
-    if (!reliefPlan) return;
-    const out = buildPassepartoutRectPhi({
-      innerWmm: reliefPlan.w,
-      innerHmm: reliefPlan.h,
-      steps: matParams.steps,
-      totalBandsMm: matParams.totalBandsMm,
-      thicknessMm: Math.max(1.8, matParams.thicknessMm),
-      stepDropMm: matParams.stepDropMm,
-      minBandMm: matParams.minBandMm,
-    });
-    const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
-    const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
-    if (!vertices || !indices) return;
-    const geom = toBufferGeometry(vertices, indices);
-    geom.rotateX(-Math.PI / 2);
-    downloadGeometryStlBinary(geom, `${customName || "reliefforge"}_passepartout`, { upAxis: "y" });
-  }
-
-  function downloadFrameStl() {
-    if (!hmState) return;
-    const reliefPlan = buildReliefPlan();
-    if (!reliefPlan) return;
-    const matBands = matEnabled ? Math.max(matParams.totalBandsMm, matParams.minBandMm * matParams.steps) : 0;
-    const innerW = reliefPlan.w + 2 * matBands;
-    const innerH = reliefPlan.h + 2 * matBands;
-    const profile = FRAME_PROFILES.find((item) => item.key === frameParams.profileKey);
-    const out =
-      profile && frameParams.profileKey !== "flat"
-        ? buildFrameRectProfile({
-            innerWmm: innerW,
-            innerHmm: innerH,
-            unitMm: frameParams.baseUnitMm,
-            steps: profile.steps,
-          })
-        : buildFrameRectPhi({
-            innerWmm: innerW,
-            innerHmm: innerH,
-            thicknessMm: frameParams.solidMm,
-            heightMm: frameParams.frameHeightMm,
-            glassMm: frameParams.glassMm,
-            glassClearanceMm: frameParams.glassClearanceMm,
-            glueLipMm: frameParams.lipMm,
-          });
-    const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
-    const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
-    if (!vertices || !indices) return;
-    const geom = toBufferGeometry(vertices, indices);
-    downloadGeometryStlBinary(geom, `${customName || "reliefforge"}_cornice`, { upAxis: "y" });
-  }
 
   const applyFrameHeightPreset = React.useCallback(
     (multiplier: number) => {
@@ -1321,31 +1361,8 @@ export default function ReliefWizard() {
               >
                 Scarica STL
               </button>
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={downloadPassepartoutStl}
-                  disabled={!canGenerate || !matEnabled}
-                  className={`rounded-md px-4 py-2 text-sm font-semibold ${
-                    canGenerate && matEnabled
-                      ? "border border-[#1F4E5F] text-[#1F4E5F] hover:bg-gray-50"
-                      : "cursor-not-allowed border border-gray-200 text-gray-400"
-                  }`}
-                >
-                  Scarica Passepartout STL
-                </button>
-                <button
-                  type="button"
-                  onClick={downloadFrameStl}
-                  disabled={!canGenerate || !frameEnabled}
-                  className={`rounded-md px-4 py-2 text-sm font-semibold ${
-                    canGenerate && frameEnabled
-                      ? "border border-[#1F4E5F] text-[#1F4E5F] hover:bg-gray-50"
-                      : "cursor-not-allowed border border-gray-200 text-gray-400"
-                  }`}
-                >
-                  Scarica Cornice STL
-                </button>
+              <div className="text-xs text-gray-500">
+                Lo STL include automaticamente passepartout e cornice quando abilitate.
               </div>
               {showDonationPrompt && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
