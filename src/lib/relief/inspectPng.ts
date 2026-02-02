@@ -1,12 +1,9 @@
-export function inspectPng(pngData: ArrayBuffer): { valid: boolean; message?: string } {
-  // Implement your PNG inspection logic here
-  return { valid: true, message: "PNG is valid." }; // Placeholder implementation
+export function inspectPng(_pngData: ArrayBuffer): { valid: boolean; message?: string } {
+  // TODO: implement PNG inspection logic. For now treat PNG as valid.
+  return { valid: true };
 }
 
 export function pngCompatibilityMessage(info: { valid: boolean; message?: string }): string {
-  if (info.valid) {
-    return info.message || "This is a compatibility message for PNG files.";
-  } else {
-    return "Invalid PNG file.";
-  }
+  if (info.valid) return "";
+  return info.message || "Invalid PNG file.";
 }

@@ -38,6 +38,35 @@ function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
+function applyGammaF32(src: Float32Array, gamma: number): Float32Array {
+  if (!Number.isFinite(gamma) || gamma <= 0 || gamma === 1) return src;
+  const inv = 1 / gamma;
+  const dst = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) {
+    dst[i] = Math.pow(clamp(src[i], 0, 1), inv);
+  }
+  return dst;
+}
+
+function clampPercentileF32(src: Float32Array, percentile: number): Float32Array {
+  if (!Number.isFinite(percentile) || percentile <= 0) return src;
+  const p = clamp(percentile, 0, 0.2);
+  if (p <= 0) return src;
+
+  const sorted = Array.from(src).sort((a, b) => a - b);
+  const loIndex = Math.floor(sorted.length * p);
+  const hiIndex = Math.max(loIndex + 1, Math.floor(sorted.length * (1 - p)) - 1);
+  const lo = sorted[loIndex] ?? 0;
+  const hi = sorted[hiIndex] ?? 1;
+
+  const dst = new Float32Array(src.length);
+  const denom = Math.max(1e-9, hi - lo);
+  for (let i = 0; i < src.length; i++) {
+    dst[i] = clamp((src[i] - lo) / denom, 0, 1);
+  }
+  return dst;
+}
+
 /* =========================================================
    FLOAT PIPELINE (0..1) — BASE SERIA PER STL PULITO
    ========================================================= */
@@ -174,7 +203,13 @@ export function buildHeightmapFromImageData(
   if (options.invert) f = invertF32(f);
 
   const mm = minMaxF32(f);
-  const fn = options.normalize ? normalizeF32(f, mm.lo, mm.hi) : f;
+  let fn = options.normalize ? normalizeF32(f, mm.lo, mm.hi) : f;
+  if (options.percentileClip) {
+    fn = clampPercentileF32(fn, options.percentileClip);
+  }
+  if (options.gamma) {
+    fn = applyGammaF32(fn, options.gamma);
+  }
 
   const grayU8 = floatToGrayU8(fn);
 

@@ -244,10 +244,7 @@ export default function ReliefWizard() {
             const msg = pngCompatibilityMessage(info);
             if (msg) {
               if (!cancelled) {
-                setFileWarning(
-                  `Questo file non è una depth map compatibile (probabile 32-bit/float o RGB).\n` +
-                    `Soluzioni: 1) Converti in PNG Grayscale 16-bit, oppure 2) passa a “Modalità Immagine”.`
-                );
+                setFileWarning(msg);
                 setHmState(null);
                 setHmStatus("error");
               }
@@ -272,9 +269,13 @@ export default function ReliefWizard() {
           let hm: HeightmapState;
 
           if (isPng) {
-            const buf = new Uint8Array(await file.arrayBuffer());
-            const dec = decodeDepthmapPng(buf);
-            hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
+            try {
+              const buf = new Uint8Array(await file.arrayBuffer());
+              const dec = decodeDepthmapPng(buf);
+              hm = { normF32: dec.normF32, w: dec.w, h: dec.h };
+            } catch {
+              hm = await decodeDepthMapToHmStateCanvas(file, maxSize);
+            }
           } else {
             hm = await decodeDepthMapToHmStateCanvas(file, maxSize);
           }
@@ -312,7 +313,8 @@ export default function ReliefWizard() {
 
         const hmAny = buildHeightmapFromImageData(imgData, params, {
           normalize: true,
-          percentileClip: 0.02,
+          percentileClip: 0.04,
+          gamma: 1.15,
         }) as unknown as HeightmapBuildOutput;
 
         const outW = Number((hmAny as any)?.w ?? (hmAny as any)?.width ?? w);
@@ -790,6 +792,9 @@ export default function ReliefWizard() {
                   <p>
                     JPG/JPEG/PNG/WEBP. Per Depth map:{" "}
                     <span className="font-medium">PNG 16-bit in scala di grigi</span> consigliato.
+                  </p>
+                  <p className="mt-1">
+                    <span className="font-medium">Utilizza una depth map di qualità per un risultato migliore.</span>
                   </p>
                   <p className="mt-1">
                     <button
