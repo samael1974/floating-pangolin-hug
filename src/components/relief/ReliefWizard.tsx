@@ -5,7 +5,12 @@ import BrandHero from "@/components/branding/BrandHero";
 import ReliefControls, { type ReliefParams } from "@/components/relief/ReliefControls";
 import ReliefPreview3D from "@/components/relief/ReliefPreview3D";
 import { buildHeightmapFromImageData } from "@/components/relief/reliefHeightmap";
-import { downloadReliefStlBinary } from "@/components/relief/reliefStl";
+import {
+  downloadAssemblyStlBinary,
+  downloadFrameStlBinary,
+  downloadMatStlBinary,
+  downloadReliefStlBinary,
+} from "@/components/relief/reliefStl";
 import { inspectPng, pngCompatibilityMessage } from "@/lib/relief/inspectPng";
 
 // ✅ 16-bit PNG support
@@ -169,14 +174,17 @@ export default function ReliefWizard() {
   const [stlWidthMm, setStlWidthMm] = React.useState<number>(120);
   const [decimateStep, setDecimateStep] = React.useState<number>(2);
   const [showSupportPrompt, setShowSupportPrompt] = React.useState(false);
+  const [imageDownscale, setImageDownscale] = React.useState(1);
+  const [imageGamma, setImageGamma] = React.useState(1.15);
+  const [imagePercentile, setImagePercentile] = React.useState(0.04);
 
   const canGenerate = !!file && hmStatus === "ready" && !!hmState;
 
     // ---------------------------
   // Step 2: Cornice + Passepartout (MVP)
   // ---------------------------
-  const [matEnabled, setMatEnabled] = React.useState(false);
-  const [frameEnabled, setFrameEnabled] = React.useState(false);
+  const [matEnabled, setMatEnabled] = React.useState(true);
+  const [frameEnabled, setFrameEnabled] = React.useState(true);
 
   const [matParams, setMatParams] = React.useState({
     steps: 3 as 1 | 2 | 3 | 4 | 5 | 6,
@@ -184,8 +192,8 @@ export default function ReliefWizard() {
     minBandMm: 6,
     thicknessMm: 2.4,
     stepDropMm: 1.2,
-    matDropMm: 2.5,
-    reliefGapMm: 0.35,
+    matDropMm: 0,
+    reliefGapMm: 0,
   });
 
   const [frameParams, setFrameParams] = React.useState({
@@ -313,8 +321,9 @@ export default function ReliefWizard() {
 
         const hmAny = buildHeightmapFromImageData(imgData, params, {
           normalize: true,
-          percentileClip: 0.04,
-          gamma: 1.15,
+          percentileClip: imagePercentile,
+          gamma: imageGamma,
+          downscaleFactor: imageDownscale,
         }) as unknown as HeightmapBuildOutput;
 
         const outW = Number((hmAny as any)?.w ?? (hmAny as any)?.width ?? w);
@@ -369,6 +378,9 @@ export default function ReliefWizard() {
     params.edge,
     params.baseStyle,
     params.outputMode,
+    imageDownscale,
+    imageGamma,
+    imagePercentile,
   ]);
 
   // ✅ draw canvas: quando apro il tab "Depth map"
@@ -407,6 +419,41 @@ export default function ReliefWizard() {
     return { effW, effH, triangles, mb, isHeavy, suggestedDecimate };
   }
 
+  function buildAssemblyArgs(fileName?: string) {
+    if (!hmState) {
+      throw new Error("Heightmap non pronta: hmState è null");
+    }
+    const hmForExport = decimateStep > 1 ? decimateHm(hmState, decimateStep) : hmState;
+    return {
+      hm: hmForExport,
+      widthMm: stlWidthMm,
+      depthMm: params.depthMm,
+      baseMm: params.baseMm,
+      outputMode: params.outputMode,
+      baseStyle: params.baseStyle,
+      fileName,
+      mat: {
+        enabled: matEnabled,
+        steps: matParams.steps,
+        totalBandsMm: matParams.totalBandsMm,
+        minBandMm: matParams.minBandMm,
+        thicknessMm: matParams.thicknessMm,
+        stepDropMm: matParams.stepDropMm,
+        matDropMm: matParams.matDropMm,
+        reliefGapMm: matParams.reliefGapMm,
+      },
+      frame: {
+        enabled: frameEnabled,
+        solidMm: frameParams.solidMm,
+        frameHeightMm: frameParams.frameHeightMm,
+        glassMm: frameParams.glassMm,
+        glassClearanceMm: frameParams.glassClearanceMm,
+        pocketDepthMm: frameParams.pocketDepthMm,
+        lipMm: frameParams.lipMm,
+      },
+    };
+  }
+
   function downloadStl() {
     try {
       if (!hmState) {
@@ -417,22 +464,44 @@ export default function ReliefWizard() {
 
       const name = safeFileName(customName);
 
-      // ✅ decimazione coerente con slider (export e preview allineati)
-      const hmForExport = decimateStep > 1 ? decimateHm(hmState, decimateStep) : hmState;
-
-      downloadReliefStlBinary({
-        hm: hmForExport,
-        widthMm: stlWidthMm,
-        depthMm: params.depthMm,
-        baseMm: params.baseMm,
-        outputMode: params.outputMode,
-        baseStyle: params.baseStyle,
-        fileName: name,
-      });
+      downloadReliefStlBinary(buildAssemblyArgs(name));
       setShowSupportPrompt(true);
     } catch (e: any) {
       console.error("STL: ERROR", e);
       alert(`Errore export STL: ${e?.message ?? String(e)}`);
+    }
+  }
+
+  function downloadMatStl() {
+    try {
+      const name = safeFileName(`${customName || "reliefforge"}-passepartout`);
+      downloadMatStlBinary(buildAssemblyArgs(name));
+      setShowSupportPrompt(true);
+    } catch (e: any) {
+      console.error("STL MAT: ERROR", e);
+      alert(`Errore export passepartout: ${e?.message ?? String(e)}`);
+    }
+  }
+
+  function downloadFrameStl() {
+    try {
+      const name = safeFileName(`${customName || "reliefforge"}-cornice`);
+      downloadFrameStlBinary(buildAssemblyArgs(name));
+      setShowSupportPrompt(true);
+    } catch (e: any) {
+      console.error("STL FRAME: ERROR", e);
+      alert(`Errore export cornice: ${e?.message ?? String(e)}`);
+    }
+  }
+
+  function downloadAssemblyStl() {
+    try {
+      const name = safeFileName(`${customName || "reliefforge"}-assemblaggio`);
+      downloadAssemblyStlBinary(buildAssemblyArgs(name));
+      setShowSupportPrompt(true);
+    } catch (e: any) {
+      console.error("STL ASSEMBLY: ERROR", e);
+      alert(`Errore export assemblaggio: ${e?.message ?? String(e)}`);
     }
   }
 
@@ -690,7 +759,7 @@ export default function ReliefWizard() {
                 canGenerate ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]" : "cursor-not-allowed bg-gray-200 text-gray-500"
               }`}
             >
-              Scarica STL
+              Scarica STL (Rilievo)
             </button>
           </div>
         </div>
@@ -825,6 +894,9 @@ export default function ReliefWizard() {
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="block w-full text-sm"
             />
+            <div className="text-[11px] text-gray-500">
+              Supporta PNG <span className="font-semibold">16/32-bit</span> e immagini standard (JPG/WEBP).
+            </div>
 
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input
@@ -884,6 +956,62 @@ export default function ReliefWizard() {
                 </div>
               </div>
             )}
+
+            {sourceMode === "image" && (
+              <div className="rounded-md border bg-gray-50 p-3 text-xs text-gray-700">
+                <div className="font-semibold text-gray-900">Depth map avanzata (da immagine)</div>
+                <div className="mt-1 text-gray-500">
+                  Regola contrasto e risoluzione per ottenere uno STL più stampabile.
+                </div>
+
+                <div className="mt-3 space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-700">Riduzione risoluzione</label>
+                    <select
+                      value={imageDownscale}
+                      onChange={(e) => setImageDownscale(Number(e.target.value))}
+                      className="w-full rounded-md border px-2 py-1 text-xs"
+                    >
+                      <option value={1}>Nessuna (più dettaglio)</option>
+                      <option value={2}>x2 (meno triangoli)</option>
+                      <option value={4}>x4 (molto leggero)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium">Contrasto (gamma)</span>
+                      <span className="tabular-nums text-gray-600">{imageGamma.toFixed(2)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.6}
+                      max={1.8}
+                      step={0.05}
+                      value={imageGamma}
+                      onChange={(e) => setImageGamma(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium">Clip percentile</span>
+                      <span className="tabular-nums text-gray-600">{imagePercentile.toFixed(2)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={0.1}
+                      step={0.01}
+                      value={imagePercentile}
+                      onChange={(e) => setImagePercentile(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Params */}
@@ -900,13 +1028,211 @@ export default function ReliefWizard() {
               </div>
             </div>
 
-            <div className="pt-2">
-              <ReliefControls value={params} onChange={setParams} disabled={!file} />
+          <div className="pt-2">
+            <ReliefControls value={params} onChange={setParams} disabled={!file} />
+          </div>
+        </div>
+
+        <div className="space-y-4 rounded-lg bg-white p-4 shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold">Cornice & Passepartout</div>
+              <div className="text-xs text-gray-500">
+                Allinea tutti gli elementi sullo stesso piano di base per la stampa.
+              </div>
             </div>
           </div>
 
-          {/* STL Options */}
-          <div className="space-y-4 rounded-lg bg-white p-4 shadow">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-3 rounded-md border p-3">
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={matEnabled}
+                  onChange={(e) => setMatEnabled(e.target.checked)}
+                />
+                Passepartout attivo
+              </label>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium">Bande (steps)</span>
+                  <span className="tabular-nums text-gray-700">{matParams.steps}</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={6}
+                  step={1}
+                  value={matParams.steps}
+                  onChange={(e) =>
+                    setMatParams((p) => ({
+                      ...p,
+                      steps: Number(e.target.value) as 1 | 2 | 3 | 4 | 5 | 6,
+                    }))
+                  }
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium">Margine totale (mm)</span>
+                  <span className="tabular-nums text-gray-700">{matParams.totalBandsMm.toFixed(1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={9}
+                  max={90}
+                  step={0.5}
+                  value={matParams.totalBandsMm}
+                  onChange={(e) =>
+                    setMatParams((p) => ({ ...p, totalBandsMm: Number(e.target.value) }))
+                  }
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium">Spessore (mm)</span>
+                  <span className="tabular-nums text-gray-700">{matParams.thicknessMm.toFixed(1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={8}
+                  step={0.1}
+                  value={matParams.thicknessMm}
+                  onChange={(e) =>
+                    setMatParams((p) => ({ ...p, thicknessMm: Number(e.target.value) }))
+                  }
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium">Affondo sotto base (mm)</span>
+                  <span className="tabular-nums text-gray-700">{matParams.matDropMm.toFixed(1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={6}
+                  step={0.1}
+                  value={matParams.matDropMm}
+                  onChange={(e) =>
+                    setMatParams((p) => ({ ...p, matDropMm: Number(e.target.value) }))
+                  }
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium">Gradino top (mm)</span>
+                  <span className="tabular-nums text-gray-700">{matParams.stepDropMm.toFixed(1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  value={matParams.stepDropMm}
+                  onChange={(e) =>
+                    setMatParams((p) => ({ ...p, stepDropMm: Number(e.target.value) }))
+                  }
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-md border p-3">
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={frameEnabled}
+                  onChange={(e) => setFrameEnabled(e.target.checked)}
+                />
+                Cornice attiva
+              </label>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium">Spessore cornice (mm)</span>
+                  <span className="tabular-nums text-gray-700">{frameParams.solidMm.toFixed(1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={2}
+                  max={20}
+                  step={0.5}
+                  value={frameParams.solidMm}
+                  onChange={(e) =>
+                    setFrameParams((p) => ({ ...p, solidMm: Number(e.target.value) }))
+                  }
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium">Altezza cornice (mm)</span>
+                  <span className="tabular-nums text-gray-700">{frameParams.frameHeightMm.toFixed(1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={6}
+                  max={40}
+                  step={0.5}
+                  value={frameParams.frameHeightMm}
+                  onChange={(e) =>
+                    setFrameParams((p) => ({ ...p, frameHeightMm: Number(e.target.value) }))
+                  }
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium">Profondità scanso vetro (mm)</span>
+                  <span className="tabular-nums text-gray-700">{frameParams.pocketDepthMm.toFixed(1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={frameParams.glassMm + 0.4}
+                  max={Math.max(frameParams.glassMm + 1, frameParams.frameHeightMm)}
+                  step={0.1}
+                  value={frameParams.pocketDepthMm}
+                  onChange={(e) =>
+                    setFrameParams((p) => ({ ...p, pocketDepthMm: Number(e.target.value) }))
+                  }
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium">Spalla vetro (mm)</span>
+                  <span className="tabular-nums text-gray-700">{frameParams.lipMm.toFixed(1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0.5}
+                  max={frameParams.solidMm}
+                  step={0.1}
+                  value={frameParams.lipMm}
+                  onChange={(e) => setFrameParams((p) => ({ ...p, lipMm: Number(e.target.value) }))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* STL Options */}
+        <div className="space-y-4 rounded-lg bg-white p-4 shadow">
             <div>
               <div className="text-sm font-semibold">3) Genera STL</div>
               <div className="text-xs text-gray-500">STL binario chiuso (stampabile).</div>
@@ -975,8 +1301,45 @@ export default function ReliefWizard() {
                   canGenerate ? "bg-[#E26D5C] text-white hover:bg-[#d85f50]" : "cursor-not-allowed bg-gray-200 text-gray-500"
                 }`}
               >
-                Scarica STL
+                Scarica STL (Rilievo)
               </button>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={downloadMatStl}
+                  disabled={!canGenerate || !matEnabled}
+                  className={`rounded-md border px-3 py-2 text-xs font-semibold ${
+                    canGenerate && matEnabled ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed border-gray-200 text-gray-400"
+                  }`}
+                >
+                  Passepartout
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadFrameStl}
+                  disabled={!canGenerate || !frameEnabled}
+                  className={`rounded-md border px-3 py-2 text-xs font-semibold ${
+                    canGenerate && frameEnabled ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed border-gray-200 text-gray-400"
+                  }`}
+                >
+                  Cornice
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadAssemblyStl}
+                  disabled={!canGenerate}
+                  className={`rounded-md border px-3 py-2 text-xs font-semibold ${
+                    canGenerate ? "text-[#1F4E5F] hover:bg-gray-50" : "cursor-not-allowed border-gray-200 text-gray-400"
+                  }`}
+                >
+                  Assemblaggio unico STL
+                </button>
+              </div>
+
+              <div className="text-xs text-gray-500">
+                Suggerimento: importa i 3 STL nello slicer per allinearli o usa l&apos;assemblaggio per un file unico.
+              </div>
 
               <a
                 href="https://www.paypal.me/federicocordioli72"
@@ -1139,7 +1502,7 @@ export default function ReliefWizard() {
                       <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
                         <div className="font-semibold">Depth map: formato consigliato</div>
                         <div className="mt-1">
-                          PNG <span className="font-semibold">grayscale</span> <span className="font-semibold">16-bit</span>. Evita 32-bit/float/HDR o PNG RGB.
+                          PNG <span className="font-semibold">grayscale</span> <span className="font-semibold">16/32-bit</span>. Evita PNG RGB/HDR se possibile.
                         </div>
                       </div>
                     </div>
@@ -1170,7 +1533,7 @@ export default function ReliefWizard() {
                   <div className="mt-3 rounded-md border bg-white p-3">
                     <div className="font-semibold text-gray-900">3) Scarica lo STL</div>
                     <div className="mt-1">
-                      Premi <span className="font-semibold">Scarica STL</span>: otterrai uno STL <span className="font-semibold">chiuso (manifold)</span>.
+                      Premi <span className="font-semibold">Scarica STL (Rilievo)</span>: otterrai uno STL <span className="font-semibold">chiuso (manifold)</span>.
                     </div>
 
                     <div className="mt-2 flex flex-wrap gap-2">

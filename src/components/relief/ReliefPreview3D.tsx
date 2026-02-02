@@ -56,6 +56,7 @@ type Props = {
 const SHOW_HELPERS = true;
 const PREVIEW_MIRROR_Y_180 = false;
 const BG_COLOR = "#f6f7fb";
+const EDGE_COLOR = "#3b3b3b";
 
 function decimateHeights(hm: HeightmapState, stepIn: number): HeightmapState {
   const step = Math.max(1, Math.floor(stepIn || 1));
@@ -110,6 +111,7 @@ export default function ReliefPreview3D({
       minBaseMm: 0.4,
     });
 
+    geometry.rotateX(-Math.PI / 2);
     geometry.computeBoundingBox();
     const bb = geometry.boundingBox;
     if (bb) {
@@ -152,8 +154,23 @@ export default function ReliefPreview3D({
     const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
     const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
     if (!vertices || !indices) return null;
-    return toBufferGeometry(vertices, indices);
+    const geometry = toBufferGeometry(vertices, indices);
+    geometry.rotateX(-Math.PI / 2);
+    geometry.computeBoundingBox();
+    const bb = geometry.boundingBox;
+    if (bb) {
+      geometry.translate(0, -bb.max.y, 0);
+      geometry.computeBoundingBox();
+    }
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    return geometry;
   }, [hmState, mat, reliefPlan.w, reliefPlan.h]);
+
+  const matEdges = useMemo(() => {
+    if (!matGeometry) return null;
+    return new THREE.EdgesGeometry(matGeometry, 35);
+  }, [matGeometry]);
 
   const frameGeometry = useMemo(() => {
     if (!hmState) return null;
@@ -174,16 +191,32 @@ export default function ReliefPreview3D({
     const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
     const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
     if (!vertices || !indices) return null;
-    return toBufferGeometry(vertices, indices);
+    const geometry = toBufferGeometry(vertices, indices);
+    geometry.computeBoundingBox();
+    const bb = geometry.boundingBox;
+    if (bb) {
+      geometry.translate(0, -bb.min.y, 0);
+      geometry.computeBoundingBox();
+    }
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    return geometry;
   }, [hmState, frame, mat, reliefPlan.w, reliefPlan.h]);
+
+  const frameEdges = useMemo(() => {
+    if (!frameGeometry) return null;
+    return new THREE.EdgesGeometry(frameGeometry, 35);
+  }, [frameGeometry]);
 
   useEffect(() => {
     return () => {
       solidGeometry?.dispose();
       matGeometry?.dispose();
       frameGeometry?.dispose();
+      matEdges?.dispose();
+      frameEdges?.dispose();
     };
-  }, [solidGeometry, matGeometry, frameGeometry]);
+  }, [solidGeometry, matGeometry, frameGeometry, matEdges, frameEdges]);
 
   if (!hmState) {
     return (
@@ -204,8 +237,9 @@ export default function ReliefPreview3D({
   const camDist = Math.max(220, width * 1.6);
   const matDrop = mat?.enabled ? mat.matDropMm : 0;
   const reliefGap = mat?.enabled ? mat.reliefGapMm : 0;
-  const matTopY = reliefTopY - matDrop;
-  const reliefBaseY = matTopY + reliefGap;
+  const reliefBaseY = 0;
+  const matTopY = mat?.enabled ? -matDrop - reliefGap : 0;
+  const reliefCenterY = reliefTopY * 0.5;
   const groundY = -0.01;
 
   return (
@@ -256,25 +290,29 @@ export default function ReliefPreview3D({
           {matGeometry && (
             <mesh geometry={matGeometry} position={[0, matTopY, 0]} castShadow receiveShadow>
               <meshPhysicalMaterial
-                color={"#E9E3D6"}
-                roughness={0.85}
-                metalness={0.0}
-                clearcoat={0.0}
-                envMapIntensity={0.9}
+                color={"#F3EBD9"}
+                roughness={0.9}
+                metalness={0.02}
+                clearcoat={0.1}
+                envMapIntensity={1.1}
+                transparent
+                opacity={0.9}
               />
             </mesh>
           )}
+          {matEdges && (
+            <lineSegments geometry={matEdges} position={[0, matTopY, 0]}>
+              <lineBasicMaterial color={EDGE_COLOR} linewidth={1} />
+            </lineSegments>
+          )}
 
-  
-  <mesh
-  geometry={solidGeometry}
-  position={[0, 1, 0]}   // ✅ incrocio assi griglia
-  rotation={PREVIEW_MIRROR_Y_180 ? [0, Math.PI, 0] : [0, 0, 0]}
-  castShadow
-  receiveShadow
->
-
-
+          <mesh
+            geometry={solidGeometry}
+            position={[0, reliefBaseY, 0]}
+            rotation={PREVIEW_MIRROR_Y_180 ? [0, Math.PI, 0] : [0, 0, 0]}
+            castShadow
+            receiveShadow
+          >
             <meshPhysicalMaterial
               color={"#1F4E5F"}
               roughness={0.32}
@@ -288,14 +326,19 @@ export default function ReliefPreview3D({
           {frameGeometry && (
             <mesh geometry={frameGeometry} position={[0, 0, 0]} castShadow receiveShadow>
               <meshPhysicalMaterial
-                color={"#2B2B2B"}
-                roughness={0.55}
-                metalness={0.05}
-                clearcoat={0.15}
-                clearcoatRoughness={0.75}
-                envMapIntensity={1.1}
+                color={"#3B2F2F"}
+                roughness={0.5}
+                metalness={0.08}
+                clearcoat={0.2}
+                clearcoatRoughness={0.6}
+                envMapIntensity={1.2}
               />
             </mesh>
+          )}
+          {frameEdges && (
+            <lineSegments geometry={frameEdges} position={[0, 0, 0]}>
+              <lineBasicMaterial color={EDGE_COLOR} linewidth={1} />
+            </lineSegments>
           )}
         </group>
 
@@ -308,15 +351,14 @@ export default function ReliefPreview3D({
         />
 
         <OrbitControls
-  makeDefault
-  // target dinamico centrato sulla mesh
-  target={[0, reliefTopY * 0.5, 0]}
-  enableDamping
-  dampingFactor={0.08}
-  enablePan={true}       // abilita pan per muovere il centro
-  minPolarAngle={0.15}
-  maxPolarAngle={Math.PI * 0.9}
-/>
+          makeDefault
+          target={[0, reliefCenterY, 0]}
+          enableDamping
+          dampingFactor={0.08}
+          enablePan={true}
+          minPolarAngle={0.15}
+          maxPolarAngle={Math.PI * 0.9}
+        />
       </Canvas>
     </div>
   );

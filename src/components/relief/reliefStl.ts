@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
+import { buildFrameRectPhi } from "@/lib/relief/frame/buildFrameRectPhi";
+import { buildPassepartoutRectPhi } from "@/lib/relief/frame/buildPassepartoutRectPhi";
 import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
 
 export type HeightmapState = {
@@ -14,8 +16,34 @@ type DownloadArgs = {
   depthMm: number;
   baseMm: number;
   outputMode: OutputMode; // (per ora non usato dal builder: tenuto per compatibilità UI)
-  baseStyle: BaseStyle;   // ✅ coincide con il builder
+  baseStyle: BaseStyle; // ✅ coincide con il builder
   fileName?: string;
+};
+
+export type MatExportParams = {
+  enabled: boolean;
+  steps: 1 | 2 | 3 | 4 | 5 | 6;
+  totalBandsMm: number;
+  minBandMm: number;
+  thicknessMm: number;
+  stepDropMm: number;
+  matDropMm: number;
+  reliefGapMm: number;
+};
+
+export type FrameExportParams = {
+  enabled: boolean;
+  solidMm: number;
+  frameHeightMm: number;
+  glassMm: 2 | 3;
+  glassClearanceMm: number;
+  pocketDepthMm: number;
+  lipMm: number;
+};
+
+type AssemblyArgs = DownloadArgs & {
+  mat?: MatExportParams;
+  frame?: FrameExportParams;
 };
 
 /** STL binary writer (little-endian) */
@@ -87,6 +115,44 @@ function geometryToBinaryStl(geom: THREE.BufferGeometry): ArrayBuffer {
   return buffer;
 }
 
+function toBufferGeometry(vertices: Float32Array, indices: Uint32Array): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+  g.setIndex(new THREE.BufferAttribute(indices, 1));
+  g.computeVertexNormals();
+  g.computeBoundingBox();
+  g.computeBoundingSphere();
+  return g;
+}
+
+function normalizeGeometryToZBase(geom: THREE.BufferGeometry) {
+  geom.computeBoundingBox();
+  const bb = geom.boundingBox;
+  if (!bb) return;
+  const center = new THREE.Vector3();
+  bb.getCenter(center);
+  geom.translate(-center.x, -center.y, -bb.min.z);
+  geom.computeBoundingBox();
+}
+
+function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const positions: number[] = [];
+  for (const geom of geometries) {
+    const g = geom.index ? geom.toNonIndexed() : geom;
+    const pos = g.getAttribute("position") as THREE.BufferAttribute | undefined;
+    if (!pos) continue;
+    for (let i = 0; i < pos.count; i++) {
+      positions.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+    }
+  }
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
+  merged.computeVertexNormals();
+  merged.computeBoundingBox();
+  merged.computeBoundingSphere();
+  return merged;
+}
+
 // ✅ conteggio bordi aperti (debug mesh)
 function countOpenEdges(geom: THREE.BufferGeometry) {
   const g = geom.index ? geom.toNonIndexed() : geom;
@@ -154,6 +220,96 @@ function countOpenEdges(geom: THREE.BufferGeometry) {
   return { triCount, totalEdges: edgeCount.size, openEdges, openSample: open };
 }
 
+function buildReliefGeometry(args: DownloadArgs) {
+  const { hm, widthMm, depthMm, baseMm, baseStyle } = args;
+  const out = buildSolidFromHeightmap({
+    height01: hm.normF32,
+    width: hm.w,
+    height: hm.h,
+    outWidthMm: widthMm,
+    depthMm,
+    baseMm,
+    baseStyle,
+  });
+  const geom = out.geometry;
+  geom.rotateZ(Math.PI);
+  normalizeGeometryToZBase(geom);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+function buildMatGeometry(args: AssemblyArgs, reliefPlan: { w: number; h: number }) {
+  if (!args.mat?.enabled) return null;
+  const out = buildPassepartoutRectPhi({
+    innerWmm: reliefPlan.w,
+    innerHmm: reliefPlan.h,
+    steps: args.mat.steps,
+    totalBandsMm: args.mat.totalBandsMm,
+    thicknessMm: args.mat.thicknessMm,
+    stepDropMm: args.mat.stepDropMm,
+    minBandMm: args.mat.minBandMm,
+  });
+  const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
+  const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
+  if (!vertices || !indices) return null;
+  const geom = toBufferGeometry(vertices, indices);
+  geom.computeBoundingBox();
+  const bb = geom.boundingBox;
+  if (bb) {
+    geom.translate(0, 0, -bb.max.z);
+    geom.computeBoundingBox();
+  }
+  const matTopZ = -args.mat.matDropMm - args.mat.reliefGapMm;
+  geom.translate(0, 0, matTopZ);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+function buildFrameGeometry(args: AssemblyArgs, reliefPlan: { w: number; h: number }, matBands: number) {
+  if (!args.frame?.enabled) return null;
+  const innerW = reliefPlan.w + 2 * matBands;
+  const innerH = reliefPlan.h + 2 * matBands;
+  const out = buildFrameRectPhi({
+    innerWmm: innerW,
+    innerHmm: innerH,
+    thicknessMm: args.frame.solidMm,
+    heightMm: args.frame.frameHeightMm,
+    glassMm: args.frame.glassMm,
+    glassClearanceMm: args.frame.glassClearanceMm,
+    glueLipMm: args.frame.lipMm,
+    pocketDepthMm: args.frame.pocketDepthMm,
+  });
+  const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
+  const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);
+  if (!vertices || !indices) return null;
+  const geom = toBufferGeometry(vertices, indices);
+  geom.rotateX(-Math.PI / 2);
+  geom.computeBoundingBox();
+  const bb = geom.boundingBox;
+  if (bb) {
+    geom.translate(0, 0, -bb.min.z);
+    geom.computeBoundingBox();
+  }
+  geom.computeVertexNormals();
+  return geom;
+}
+
+function buildReliefAssemblyGeometries(args: AssemblyArgs) {
+  const relief = buildReliefGeometry(args);
+  const reliefW = Math.max(1, args.widthMm);
+  const reliefH = reliefW * (args.hm.h / args.hm.w);
+  const reliefPlan = { w: reliefW, h: reliefH };
+
+  const matBands = args.mat?.enabled
+    ? Math.max(args.mat.totalBandsMm, args.mat.minBandMm * args.mat.steps)
+    : 0;
+
+  const mat = buildMatGeometry(args, reliefPlan);
+  const frame = buildFrameGeometry(args, reliefPlan, matBands);
+
+  return { relief, mat, frame };
+}
+
 function downloadArrayBuffer(buffer: ArrayBuffer, fileName: string) {
   const blob = new Blob([buffer], { type: "application/vnd.ms-pki.stl" });
   const url = URL.createObjectURL(blob);
@@ -182,30 +338,14 @@ export function downloadReliefStlBinary(args: DownloadArgs) {
   if (!hm) throw new Error("STL: missing heightmap (hm)");
   if (!(hm.normF32 instanceof Float32Array)) throw new Error("STL: hm.normF32 missing/invalid");
 
-  const out = buildSolidFromHeightmap({
-  height01: hm.normF32,
-  width: hm.w,
-  height: hm.h,
-  outWidthMm: widthMm,
-  depthMm,
-  baseMm,
-  baseStyle,
-});
-const geom = out.geometry;
-geom.rotateZ(Math.PI);
-geom.computeVertexNormals();
-
-
-
-  // opzionale ma utile: centra e appoggia Z a 0 (come preview)
-  geom.computeBoundingBox();
-  const bb = geom.boundingBox;
-  if (bb) {
-    const center = new THREE.Vector3();
-    bb.getCenter(center);
-    geom.translate(-center.x, -center.y, -bb.min.z);
-  }
-  geom.computeVertexNormals();
+  const geom = buildReliefGeometry({
+    hm,
+    widthMm,
+    depthMm,
+    baseMm,
+    outputMode: _outputMode,
+    baseStyle,
+  });
 
   // sanity vertices finite
   const pos = geom.getAttribute("position") as THREE.BufferAttribute | undefined;
@@ -229,4 +369,44 @@ geom.computeVertexNormals();
 
   const bin = geometryToBinaryStl(geom);
   downloadArrayBuffer(bin, fileName ?? "reliefforge");
+}
+
+export function downloadMatStlBinary(args: AssemblyArgs) {
+  const { mat } = args;
+  if (!mat?.enabled) throw new Error("STL: mat disabled");
+  const { mat: matGeom } = buildReliefAssemblyGeometries(args);
+  if (!matGeom) throw new Error("STL: mat geometry missing");
+  const check = countOpenEdges(matGeom);
+  if (check.openEdges > 0) {
+    throw new Error(`Passepartout non chiuso: openEdges=${check.openEdges}`);
+  }
+  const bin = geometryToBinaryStl(matGeom);
+  downloadArrayBuffer(bin, args.fileName ?? "reliefforge-passepartout");
+}
+
+export function downloadFrameStlBinary(args: AssemblyArgs) {
+  const { frame } = args;
+  if (!frame?.enabled) throw new Error("STL: frame disabled");
+  const { frame: frameGeom } = buildReliefAssemblyGeometries(args);
+  if (!frameGeom) throw new Error("STL: frame geometry missing");
+  const check = countOpenEdges(frameGeom);
+  if (check.openEdges > 0) {
+    throw new Error(`Cornice non chiusa: openEdges=${check.openEdges}`);
+  }
+  const bin = geometryToBinaryStl(frameGeom);
+  downloadArrayBuffer(bin, args.fileName ?? "reliefforge-cornice");
+}
+
+export function downloadAssemblyStlBinary(args: AssemblyArgs) {
+  const { relief, mat, frame } = buildReliefAssemblyGeometries(args);
+  const geometries = [relief];
+  if (mat) geometries.push(mat);
+  if (frame) geometries.push(frame);
+  const merged = mergeGeometries(geometries);
+  const check = countOpenEdges(merged);
+  if (check.openEdges > 0) {
+    throw new Error(`Assemblaggio non chiuso: openEdges=${check.openEdges}`);
+  }
+  const bin = geometryToBinaryStl(merged);
+  downloadArrayBuffer(bin, args.fileName ?? "reliefforge-assemblaggio");
 }
