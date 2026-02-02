@@ -272,7 +272,7 @@ export default function ReliefPreview3D({
           {matGeometry && (
             <mesh geometry={matGeometry} position={[0, matTopY, 0]} castShadow receiveShadow>
               <meshPhysicalMaterial
-                color={"#E9E3D6"}
+                color={"#ECECEC"}
                 roughness={0.85}
                 metalness={0.0}
                 clearcoat={0.0}
@@ -304,7 +304,7 @@ export default function ReliefPreview3D({
           {frameGeometry && (
             <mesh geometry={frameGeometry} position={[0, 0, 0]} castShadow receiveShadow>
               <meshPhysicalMaterial
-                color={"#2B2B2B"}
+                color={"#A3B18A"}
                 roughness={0.55}
                 metalness={0.05}
                 clearcoat={0.15}
