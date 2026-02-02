@@ -29,6 +29,9 @@ export type HeightmapOptions = {
    * (Compat) Keep for callers. For now it's accepted to avoid TS errors.
    */
   gamma?: number;
+
+  /** Downscale factor (integer >= 1) to reduce triangles. */
+  downscaleFactor?: number;
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -36,6 +39,71 @@ function clamp(n: number, min: number, max: number) {
 }
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
+}
+
+function downscaleF32Average(
+  src: Float32Array,
+  w: number,
+  h: number,
+  factor: number
+): { data: Float32Array; w: number; h: number } {
+  const f = Math.max(1, Math.floor(factor));
+  if (f <= 1) return { data: src, w, h };
+
+  const w2 = Math.max(2, Math.floor(w / f));
+  const h2 = Math.max(2, Math.floor(h / f));
+  const out = new Float32Array(w2 * h2);
+
+  for (let y = 0; y < h2; y++) {
+    for (let x = 0; x < w2; x++) {
+      let sum = 0;
+      let count = 0;
+      const x0 = x * f;
+      const y0 = y * f;
+      for (let yy = 0; yy < f; yy++) {
+        const sy = y0 + yy;
+        if (sy >= h) continue;
+        for (let xx = 0; xx < f; xx++) {
+          const sx = x0 + xx;
+          if (sx >= w) continue;
+          sum += src[sy * w + sx];
+          count++;
+        }
+      }
+      out[y * w2 + x] = count > 0 ? sum / count : 0;
+    }
+  }
+
+  return { data: out, w: w2, h: h2 };
+}
+
+function applyGammaF32(src: Float32Array, gamma: number): Float32Array {
+  if (!Number.isFinite(gamma) || gamma <= 0 || gamma === 1) return src;
+  const inv = 1 / gamma;
+  const dst = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) {
+    dst[i] = Math.pow(clamp(src[i], 0, 1), inv);
+  }
+  return dst;
+}
+
+function clampPercentileF32(src: Float32Array, percentile: number): Float32Array {
+  if (!Number.isFinite(percentile) || percentile <= 0) return src;
+  const p = clamp(percentile, 0, 0.2);
+  if (p <= 0) return src;
+
+  const sorted = Array.from(src).sort((a, b) => a - b);
+  const loIndex = Math.floor(sorted.length * p);
+  const hiIndex = Math.max(loIndex + 1, Math.floor(sorted.length * (1 - p)) - 1);
+  const lo = sorted[loIndex] ?? 0;
+  const hi = sorted[hiIndex] ?? 1;
+
+  const dst = new Float32Array(src.length);
+  const denom = Math.max(1e-9, hi - lo);
+  for (let i = 0; i < src.length; i++) {
+    dst[i] = clamp((src[i] - lo) / denom, 0, 1);
+  }
+  return dst;
 }
 
 /* =========================================================
@@ -160,10 +228,16 @@ export function buildHeightmapFromImageData(
   params: Pick<ReliefParams, "smooth" | "detail" | "edge">,
   options: HeightmapOptions = {}
 ): HeightmapResult {
-  const w = imageData.width;
-  const h = imageData.height;
+  let w = imageData.width;
+  let h = imageData.height;
 
   let f = rgbaToGrayF32(imageData);
+  if (options.downscaleFactor && options.downscaleFactor > 1) {
+    const down = downscaleF32Average(f, w, h, options.downscaleFactor);
+    f = down.data;
+    w = down.w;
+    h = down.h;
+  }
 
   const blurRadius = Math.round(lerp(0, 3, clamp(params.smooth, 0, 1)));
   if (blurRadius > 0) f = boxBlurF32(f, w, h, blurRadius);
@@ -174,7 +248,13 @@ export function buildHeightmapFromImageData(
   if (options.invert) f = invertF32(f);
 
   const mm = minMaxF32(f);
-  const fn = options.normalize ? normalizeF32(f, mm.lo, mm.hi) : f;
+  let fn = options.normalize ? normalizeF32(f, mm.lo, mm.hi) : f;
+  if (options.percentileClip) {
+    fn = clampPercentileF32(fn, options.percentileClip);
+  }
+  if (options.gamma) {
+    fn = applyGammaF32(fn, options.gamma);
+  }
 
   const grayU8 = floatToGrayU8(fn);
 
