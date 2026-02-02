@@ -169,6 +169,7 @@ export default function ReliefPreview3D({
       glassMm: frame.glassMm,
       glassClearanceMm: frame.glassClearanceMm,
       glueLipMm: frame.lipMm,
+      pocketDepthMm: frame.pocketDepthMm,
     });
     const vertices = (out as any)?.vertices ?? ((out as any)?.[0] as Float32Array | undefined);
     const indices = (out as any)?.indices ?? ((out as any)?.[1] as Uint32Array | undefined);

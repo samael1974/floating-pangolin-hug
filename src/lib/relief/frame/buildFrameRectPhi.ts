@@ -1,4 +1,6 @@
 // src/lib/relief/frame/buildFrameRectPhi.ts
+const PHI_DEFAULT = 1.61803398875;
+
 export type FrameRectSimpleParams = {
   innerWmm: number;
   innerHmm: number;
@@ -7,6 +9,8 @@ export type FrameRectSimpleParams = {
   glassMm: 2 | 3;           // spessore vetro
   glassClearanceMm: number; // clearance per il vetro
   glueLipMm: number;        // spalla/bordo interno dove incollare vetro
+  pocketDepthMm?: number;   // profondità scanso vetro
+  phiRatio?: number;
 };
 
 export type MeshOut = {
@@ -17,6 +21,7 @@ export type MeshOut = {
 export function buildFrameRectPhi(
   params: FrameRectSimpleParams
 ): MeshOut {
+  const phi = Number.isFinite(params.phiRatio) ? Number(params.phiRatio) : PHI_DEFAULT;
   const w = Math.max(1, params.innerWmm);
   const h = Math.max(1, params.innerHmm);
 
@@ -25,13 +30,24 @@ export function buildFrameRectPhi(
 
   const glass = params.glassMm;
   const clearance = Math.max(0, params.glassClearanceMm);
-  const lip = Math.max(0, params.glueLipMm);
+  const lip = clamp(Math.max(0, params.glueLipMm), 0, thickness / phi);
+  const pocketDepthRaw = Number(params.pocketDepthMm ?? glass + 0.6);
+  const pocketDepth = clamp(pocketDepthRaw, glass + 0.4, height / phi);
 
-  // Outer dims
+  const y0 = 0;
+  const yH = height;
+  const yPocket = yH - pocketDepth;
+
   const outerW = w + 2 * thickness;
   const outerH = h + 2 * thickness;
 
-  // All vertices and indices
+  const pocketW = clamp(w + 2 * (lip + clearance), w + 0.4, outerW - 0.4);
+  const pocketH = clamp(h + 2 * (lip + clearance), h + 0.4, outerH - 0.4);
+
+  const rectOuter = { hx: outerW / 2, hy: outerH / 2 };
+  const rectPocket = { hx: pocketW / 2, hy: pocketH / 2 };
+  const rectInner = { hx: w / 2, hy: h / 2 };
+
   const V: number[] = [];
   const I: number[] = [];
 
@@ -44,75 +60,105 @@ export function buildFrameRectPhi(
     I.push(a, b, c);
   };
 
-  // Build top plate (like a rectangular hollow box)
-  // Top face y = height
-
-  const z0 = 0;
-  const y0 = 0;
-  const yH = height;
-
-  // Outer rectangle at top
-  const oTL = addV(-outerW/2, yH, -outerH/2);
-  const oTR = addV(+outerW/2, yH, -outerH/2);
-  const oBR = addV(+outerW/2, yH, +outerH/2);
-  const oBL = addV(-outerW/2, yH, +outerH/2);
-
-  // Inner hole at top
-  const iTL = addV(-w/2, yH, -h/2);
-  const iTR = addV(+w/2, yH, -h/2);
-  const iBR = addV(+w/2, yH, +h/2);
-  const iBL = addV(-w/2, yH, +h/2);
-
-  // Top face quads
-  tri(oTL, oTR, iTR); tri(oTL, iTR, iTL);
-  tri(oTR, oBR, iBR); tri(oTR, iBR, iTR);
-  tri(oBR, oBL, iBL); tri(oBR, iBL, iBR);
-  tri(oBL, oTL, iTL); tri(oBL, iTL, iBL);
-
-  // Walls: outer sides (height)
-  const addRectWall = (
-    x0: number, z0a: number,
-    x1: number, z1: number,
-    yB: number, yT: number
-  ) => {
-    const a0 = addV(x0, yB, z0a);
-    const b0 = addV(x1, yB, z1);
-    const b1 = addV(x1, yT, z1);
-    const a1 = addV(x0, yT, z0a);
-    tri(a0, b0, b1); tri(a0, b1, a1);
+  const addRingFace = (inner: Rect, outer: Rect, y: number, up: boolean) => {
+    const o = rectCorners(outer);
+    const inn = rectCorners(inner);
+    addQuad(o.tl, o.tr, inn.tr, inn.tl, y, up, addV, tri);
+    addQuad(o.tr, o.br, inn.br, inn.tr, y, up, addV, tri);
+    addQuad(o.br, o.bl, inn.bl, inn.br, y, up, addV, tri);
+    addQuad(o.bl, o.tl, inn.tl, inn.bl, y, up, addV, tri);
   };
 
-  // outer four walls
-  addRectWall(-outerW/2, -outerH/2, +outerW/2, -outerH/2, y0, yH);
-  addRectWall(+outerW/2, -outerH/2, +outerW/2, +outerH/2, y0, yH);
-  addRectWall(+outerW/2, +outerH/2, -outerW/2, +outerH/2, y0, yH);
-  addRectWall(-outerW/2, +outerH/2, -outerW/2, -outerH/2, y0, yH);
+  const addRectWall = (r: Rect, yB: number, yT: number, outward: boolean) => {
+    const c = rectCorners(r);
+    const sides: Array<[Pt2, Pt2]> = [
+      [c.tl, c.tr],
+      [c.tr, c.br],
+      [c.br, c.bl],
+      [c.bl, c.tl],
+    ];
 
-  // inner hole walls
-  addRectWall(-w/2, -h/2, +w/2, -h/2, y0, yH);
-  addRectWall(+w/2, -h/2, +w/2, +h/2, y0, yH);
-  addRectWall(+w/2, +h/2, -w/2, +h/2, y0, yH);
-  addRectWall(-w/2, +h/2, -w/2, -h/2, y0, yH);
+    for (const [p0, p1] of sides) {
+      const a0 = addV(p0.x, yB, p0.y);
+      const b0 = addV(p1.x, yB, p1.y);
+      const b1 = addV(p1.x, yT, p1.y);
+      const a1 = addV(p0.x, yT, p0.y);
 
-  // add bottom face just like top but at y=0
-  // bottom face exists only on outer->inner
-  const b_oTL = addV(-outerW/2, y0, -outerH/2);
-  const b_oTR = addV(+outerW/2, y0, -outerH/2);
-  const b_oBR = addV(+outerW/2, y0, +outerH/2);
-  const b_oBL = addV(-outerW/2, y0, +outerH/2);
+      if (outward) {
+        tri(a0, b0, b1);
+        tri(a0, b1, a1);
+      } else {
+        tri(a0, b1, b0);
+        tri(a0, a1, b1);
+      }
+    }
+  };
 
-  const b_iTL = addV(-w/2, y0, -h/2);
-  const b_iTR = addV(+w/2, y0, -h/2);
-  const b_iBR = addV(+w/2, y0, +h/2);
-  const b_iBL = addV(-w/2, y0, +h/2);
+  // Top face and pocket ledge
+  addRingFace(rectPocket, rectOuter, yH, true);
+  if (pocketDepth > 0.1) {
+    addRingFace(rectInner, rectPocket, yPocket, true);
+  }
 
-  tri(b_oTL, b_iTR, b_oTR); tri(b_oTL, b_iTL, b_iTR);
-  tri(b_oTR, b_iBR, b_oBR); tri(b_oTR, b_iTR, b_iBR);
-  tri(b_oBR, b_iBL, b_oBL); tri(b_oBR, b_iBR, b_iBL);
-  tri(b_oBL, b_iTL, b_iBL); tri(b_oBL, b_oTL, b_iTL);
+  // Outer walls
+  addRectWall(rectOuter, y0, yH, true);
+
+  // Pocket inner wall
+  if (pocketDepth > 0.1) {
+    addRectWall(rectPocket, yPocket, yH, false);
+  }
+
+  // Inner opening walls
+  addRectWall(rectInner, y0, Math.max(yPocket, y0), false);
+
+  // Bottom face
+  addRingFace(rectInner, rectOuter, y0, false);
 
   return {
     vertices: new Float32Array(V),
     indices: new Uint32Array(I),
   };
+}
+
+type Rect = { hx: number; hy: number };
+type Pt2 = { x: number; y: number };
+
+function rectCorners(r: Rect) {
+  const hx = r.hx;
+  const hy = r.hy;
+  return {
+    tl: { x: -hx, y: +hy },
+    tr: { x: +hx, y: +hy },
+    br: { x: +hx, y: -hy },
+    bl: { x: -hx, y: -hy },
+  };
+}
+
+function addQuad(
+  p0: Pt2,
+  p1: Pt2,
+  p2: Pt2,
+  p3: Pt2,
+  y: number,
+  up: boolean,
+  addV: (x: number, y: number, z: number) => number,
+  tri: (a: number, b: number, c: number) => void
+) {
+  const a = addV(p0.x, y, p0.y);
+  const b = addV(p1.x, y, p1.y);
+  const c = addV(p2.x, y, p2.y);
+  const d = addV(p3.x, y, p3.y);
+
+  if (up) {
+    tri(a, b, c);
+    tri(a, c, d);
+  } else {
+    tri(a, c, b);
+    tri(a, d, c);
+  }
+}
+
+function clamp(v: number, lo: number, hi: number) {
+  if (!Number.isFinite(v)) return lo;
+  return v < lo ? lo : v > hi ? hi : v;
 }
