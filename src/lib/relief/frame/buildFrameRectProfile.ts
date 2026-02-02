@@ -116,12 +116,12 @@ export function buildFrameRectProfile(params: FrameRectProfileParams): MeshOut {
   let currentInnerH = innerH;
   let currentY = 0;
 
-  steps.forEach((step, index) => {
+  steps.forEach((step) => {
     const width = Math.max(0, step.widthUnits) * unit;
     const height = Math.max(0.1, step.heightUnits) * unit;
     const outerW = currentInnerW + 2 * width;
     const outerH = currentInnerH + 2 * width;
-    addRingRect(outerW, outerH, currentInnerW, currentInnerH, currentY, currentY + height, index === 0);
+    addRingRect(outerW, outerH, currentInnerW, currentInnerH, currentY, currentY + height, true);
     currentInnerW = outerW;
     currentInnerH = outerH;
     currentY += height;

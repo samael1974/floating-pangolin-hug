@@ -232,6 +232,13 @@ export default function ReliefWizard() {
     if (hmStatus === "ready") setPreviewTab("stl");
   }, [hmStatus]);
 
+  React.useEffect(() => {
+    if (params.baseStyle !== "flat") {
+      setMatEnabled(false);
+      setFrameEnabled(false);
+    }
+  }, [params.baseStyle]);
+
   // ✅ pipeline heightmap (image / depthmap 8-16bit)
   React.useEffect(() => {
     let cancelled = false;
@@ -1067,11 +1074,16 @@ export default function ReliefWizard() {
                       type="checkbox"
                       checked={matEnabled}
                       onChange={(e) => setMatEnabled(e.target.checked)}
-                      disabled={!file}
+                      disabled={!file || params.baseStyle !== "flat"}
                     />
                     Abilita
                   </label>
                 </div>
+                {params.baseStyle !== "flat" && (
+                  <div className="mt-2 text-xs text-amber-700">
+                    Disponibile solo con base piatta.
+                  </div>
+                )}
 
                 {matEnabled && (
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -1170,11 +1182,16 @@ export default function ReliefWizard() {
                       type="checkbox"
                       checked={frameEnabled}
                       onChange={(e) => setFrameEnabled(e.target.checked)}
-                      disabled={!file}
+                      disabled={!file || params.baseStyle !== "flat"}
                     />
                     Abilita
                   </label>
                 </div>
+                {params.baseStyle !== "flat" && (
+                  <div className="mt-2 text-xs text-amber-700">
+                    Disponibile solo con base piatta.
+                  </div>
+                )}
 
                 {frameEnabled && (
                   <div className="mt-4 space-y-4">
