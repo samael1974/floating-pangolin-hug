@@ -10,12 +10,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 
 import type { OutputMode, BaseStyle } from "@/lib/reliefTypes";
 
@@ -41,7 +35,25 @@ export type ReliefParams = {
 
   // tenuti nei params per compatibilità (UI fisso):
   outputMode: OutputMode;
-@@ -57,106 +63,50 @@ const DEFAULTS: ReliefParams = {
+
+  baseStyle: BaseStyle;
+
+  // ✅ manteniamo per compatibilità, ma NON è più esposto in UI
+  cutoutEnabled?: boolean;
+};
+
+type Props = {
+  value: ReliefParams;
+  onChange: (next: ReliefParams) => void;
+  disabled?: boolean;
+};
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+const DEFAULTS: ReliefParams = {
+  projectType: "logo_text",
   depthMm: 2,
   baseMm: 1,
   detail: 0.5,
@@ -148,7 +160,14 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
           onValueChange={(arr) => set({ baseMm: clamp(arr[0] ?? 0, 0, 30) })}
         />
 
-@@ -171,46 +121,106 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
+        <p className="text-xs text-slate-600">
+          Se imposti <span className="font-medium text-slate-700">0</span>, ottieni solo il rilievo (senza basetta).
+        </p>
+      </div>
+
+      <Separator />
+
+      {/* Dettaglio */}
       <div className="space-y-2">
         <Label>Dettaglio: {v.detail.toFixed(2)}</Label>
         <Slider
@@ -186,77 +205,12 @@ export default function ReliefControls({ value, onChange, disabled }: Props) {
             onCheckedChange={(checked) =>
               set({ edge: checked ? "round" : "sharp" })
             }
-            onCheckedChange={(checked) => set({ edge: checked ? "round" : "sharp" })}
           />
         </div>
         <p className="text-xs text-slate-600">
           Attivo = bordi più morbidi. Disattivo = bordi più incisi (più “taglienti”).
         </p>
       </div>
-
-      <Separator />
-
-      <Accordion type="single" collapsible>
-        <AccordionItem value="advanced">
-          <AccordionTrigger>Avanzate</AccordionTrigger>
-          <AccordionContent>
-            <div className="space-y-4 pt-3">
-              {/* Tipo progetto */}
-              <div className="space-y-2">
-                <Label>Tipo progetto</Label>
-                <Select
-                  disabled={disabled}
-                  value={v.projectType}
-                  onValueChange={(x) => set({ projectType: x as ProjectType })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Scegli..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="logo_text">Logo / Testo (bordi netti)</SelectItem>
-                    <SelectItem value="human_face">Volto umano (sfumature)</SelectItem>
-                    <SelectItem value="animal">Animale (texture)</SelectItem>
-                    <SelectItem value="nature_landscape">
-                      Natura / Paesaggio (profondità)
-                    </SelectItem>
-                    <SelectItem value="decorative_pattern">
-                      Pattern decorativo (ripetizione)
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <p className="text-xs text-slate-600">
-                  Suggerimento:{" "}
-                  <span className="font-medium text-slate-700">Logo/Testo</span> aumenta contrasto e bordi;{" "}
-                  <span className="font-medium text-slate-700">Volto</span> mantiene sfumature e volumi.
-                </p>
-              </div>
-
-              <Separator />
-
-              {/* Base style */}
-              <div className="space-y-2">
-                <Label>Base</Label>
-                <Select
-                  disabled={disabled}
-                  value={v.baseStyle}
-                  onValueChange={(x) => set({ baseStyle: x as BaseStyle })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Scegli..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="flat">Piatta</SelectItem>
-                    <SelectItem value="recessed">Incassata</SelectItem>
-                    <SelectItem value="offset">Offset</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
     </div>
   );
 }

@@ -214,3 +214,31 @@ export function drawHeightmapToCanvas(
   }
   ctx.putImageData(out, 0, 0);
 }
+
+/* =========================================================
+   POST-PROCESS su heightmap GIÀ normalizzata [0..1].
+   Riusa la stessa logica smooth/detail/edge della pipeline immagine,
+   così gli slider Dettaglio/Smussatura agiscono anche sulle depth map caricate.
+   Non muta l'array sorgente (può essere in cache).
+   ========================================================= */
+export function postProcessHeightmapF32(
+  src: Float32Array,
+  w: number,
+  h: number,
+  params: Pick<ReliefParams, "smooth" | "detail" | "edge">,
+  options: { normalize?: boolean } = {}
+): Float32Array {
+  let f = src.slice();
+
+  const blurRadius = Math.round(lerp(0, 3, clamp(params.smooth, 0, 1)));
+  if (blurRadius > 0) f = boxBlurF32(f, w, h, blurRadius);
+
+  f = enhanceDetailF32(f, w, h, clamp(params.detail, 0, 1));
+  f = applyEdgeModeF32(f, params.edge);
+
+  if (options.normalize) {
+    const mm = minMaxF32(f);
+    f = normalizeF32(f, mm.lo, mm.hi);
+  }
+  return f;
+}

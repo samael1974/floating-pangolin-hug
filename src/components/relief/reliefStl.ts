@@ -1,5 +1,9 @@
 import * as THREE from "three";
 import { buildSolidFromHeightmap } from "@/lib/relief/buildSolidFromHeightmap";
+import { buildPassepartoutRectPhi, passepartoutOuterBandsMm } from "@/lib/relief/frame/buildPassepartoutRectPhi";
+import { buildFrameRectPhi } from "@/lib/relief/frame/buildFrameRectPhi";
+import { Evaluator, Brush, ADDITION, SUBTRACTION } from "three-bvh-csg";
+import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { OutputMode, BaseStyle } from "@/lib/relief/reliefTypes";
 
 export type HeightmapState = {
@@ -166,6 +170,245 @@ function downloadArrayBuffer(buffer: ArrayBuffer, fileName: string) {
   a.remove();
 
   URL.revokeObjectURL(url);
+}
+
+// ---- Assieme rilievo + cornice + passepartout (STL multi-corpo) ----
+
+function toGeom(out: { vertices: Float32Array; indices: Uint32Array }): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(out.vertices, 3));
+  g.setIndex(new THREE.BufferAttribute(out.indices, 1));
+  return g;
+}
+
+function mergeGeoms(geoms: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const non = geoms.map((g) => (g.index ? g.toNonIndexed() : g));
+  let total = 0;
+  for (const g of non) total += (g.getAttribute("position") as THREE.BufferAttribute).array.length;
+  const merged = new Float32Array(total);
+  let off = 0;
+  for (const g of non) {
+    const arr = (g.getAttribute("position") as THREE.BufferAttribute).array as Float32Array;
+    merged.set(arr, off);
+    off += arr.length;
+  }
+  const m = new THREE.BufferGeometry();
+  m.setAttribute("position", new THREE.BufferAttribute(merged, 3));
+  return m;
+}
+
+/** Prepara una geometria per il CSG: non-indicizzata, con normal + uv (attributi coerenti tra brush). */
+function prepCsg(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const out = g.index ? g.toNonIndexed() : g.clone();
+  if (!out.getAttribute("normal")) out.computeVertexNormals();
+  if (!out.getAttribute("uv")) {
+    const n = (out.getAttribute("position") as THREE.BufferAttribute).count;
+    out.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+  }
+  return out;
+}
+
+/** Unione booleana (CSG) di più geometrie in un unico guscio pulito e stampabile. */
+function csgUnion(geoms: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const evaluator = new Evaluator();
+  evaluator.useGroups = false;
+  let result = new Brush(prepCsg(geoms[0]));
+  result.updateMatrixWorld();
+  for (let i = 1; i < geoms.length; i++) {
+    const b = new Brush(prepCsg(geoms[i]));
+    b.updateMatrixWorld();
+    result = evaluator.evaluate(result, b, ADDITION);
+    result.updateMatrixWorld();
+  }
+  return result.geometry;
+}
+
+/** Sottrazione booleana (CSG): scava `cutter` da `base`. */
+function csgSubtract(base: THREE.BufferGeometry, cutter: THREE.BufferGeometry): THREE.BufferGeometry {
+  const evaluator = new Evaluator();
+  evaluator.useGroups = false;
+  const a = new Brush(prepCsg(base));
+  a.updateMatrixWorld();
+  const b = new Brush(prepCsg(cutter));
+  b.updateMatrixWorld();
+  const r = evaluator.evaluate(a, b, SUBTRACTION);
+  return r.geometry;
+}
+
+// --- Manifold: motore CSG robusto (WASM). Fonde anche il rilievo ad alta densità in un solido chiuso. ---
+let _manifoldWasm: any = null;
+async function getManifold(): Promise<any> {
+  if (_manifoldWasm) return _manifoldWasm;
+  // Vite non trova il .wasm da solo: gli passiamo l'URL esplicito con locateFile.
+  const [mod, wasmUrlMod] = await Promise.all([
+    import("manifold-3d"),
+    import("manifold-3d/manifold.wasm?url"),
+  ]);
+  const Module: any = (mod as any).default;
+  const wasmUrl: string = (wasmUrlMod as any).default;
+  const wasm = await Module({ locateFile: () => wasmUrl });
+  wasm.setup();
+  _manifoldWasm = wasm;
+  return wasm;
+}
+
+function geomToManifold(wasm: any, geom: THREE.BufferGeometry): any {
+  // Manifold richiede vertici SALDATI (ogni bordo condiviso da 2 triangoli). Le geometrie THREE
+  // hanno vertici duplicati ai bordi → vanno saldati PER POSIZIONE (ignorando normali/uv).
+  const src = geom.index ? geom.toNonIndexed() : geom;
+  const posOnly = new THREE.BufferGeometry();
+  posOnly.setAttribute("position", (src.getAttribute("position") as THREE.BufferAttribute).clone());
+  const welded = mergeVertices(posOnly); // salda per posizione → topologia manifold
+  const vertProperties = new Float32Array((welded.getAttribute("position") as THREE.BufferAttribute).array as ArrayLike<number>);
+  const triVerts = new Uint32Array(welded.index!.array as ArrayLike<number>);
+  const mesh = new wasm.Mesh({ numProp: 3, vertProperties, triVerts });
+  return new wasm.Manifold(mesh);
+}
+
+function manifoldToGeom(man: any): THREE.BufferGeometry {
+  const mesh = man.getMesh();
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(mesh.vertProperties), 3));
+  g.setIndex(new THREE.BufferAttribute(new Uint32Array(mesh.triVerts), 1));
+  g.computeVertexNormals();
+  return g;
+}
+
+export type FrameCfg = {
+  solidMm: number; frameHeightMm: number; glassMm: 2 | 3; glassClearanceMm: number; lipMm: number;
+};
+export type MatCfg = {
+  steps: 1 | 2 | 3 | 4 | 5 | 6; totalBandsMm: number; minBandMm: number; thicknessMm: number; stepDropMm: number;
+};
+
+/** Esporta UN STL che contiene rilievo + (passepartout) + (cornice),
+ *  con le STESSE trasformazioni dell'anteprima 3D. STL multi-corpo: i corpi
+ *  sono chiusi singolarmente; niente check monolitico che bloccherebbe l'export. */
+export async function downloadReliefAssemblyStl(
+  args: DownloadArgs & {
+    frame?: FrameCfg | null; mat?: MatCfg | null; reliefZmm?: number; matZmm?: number;
+    glassLip?: { enabled: boolean; lipWmm: number; lipThkmm: number } | null;
+  }
+) {
+  const { hm, widthMm, depthMm, baseMm, baseStyle, fileName, frame, mat, reliefZmm = 0, matZmm = 0, glassLip } = args;
+  if (!hm?.normF32) throw new Error("STL: heightmap mancante");
+
+  // 1) Rilievo (stesso costruttore/orientamento dell'anteprima)
+  const reliefOut = buildSolidFromHeightmap({
+    height01: hm.normF32, width: hm.w, height: hm.h,
+    outWidthMm: widthMm, depthMm, baseMm, baseStyle,
+  });
+  const relief = reliefOut.geometry;
+  relief.computeBoundingBox();
+  const bb0 = relief.boundingBox!;
+  const c0 = new THREE.Vector3(); bb0.getCenter(c0);
+  relief.translate(-c0.x, -bb0.min.y, -c0.z);
+  relief.translate(0, 1, 0);
+  relief.computeBoundingBox();
+  const reliefTopY = relief.boundingBox!.max.y; // ~ H + 1
+  const reliefCenterY = (reliefTopY - 1) / 2 + 1;
+  const reliefFrontZ = relief.boundingBox!.max.z;
+  const reliefBackZ = relief.boundingBox!.min.z;
+  // offset di profondità del rilievo (come la posizione mesh in anteprima)
+  relief.translate(0, 0, reliefZmm);
+
+  const planW = widthMm;
+  const planH = widthMm * (hm.h / hm.w);
+  const OV = 3.0; // compenetrazione (mm) — deve combaciare con ASSEMBLY_OVERLAP dell'anteprima
+
+  const geoms: THREE.BufferGeometry[] = [relief];
+
+  // 2) Passepartout = PIANO DI FONDO SOLIDO dietro al rilievo.
+  //    Il fronte del piano compenetra TUTTO il retro del rilievo → fusione robusta garantita.
+  let matBands = 0;
+  if (mat) {
+    matBands = passepartoutOuterBandsMm({ steps: mat.steps, totalBandsMm: mat.totalBandsMm, minBandMm: mat.minBandMm });
+    const plateW = planW + 2 * matBands;
+    const plateH = planH + 2 * matBands;
+    const plateThk = Math.max(3, mat.thicknessMm);
+    const plateFrontZ = reliefBackZ + reliefZmm + OV + matZmm; // OV mm dentro al retro del rilievo
+    const m = new THREE.BoxGeometry(plateW, plateH, plateThk);
+    m.translate(0, reliefCenterY, plateFrontZ - plateThk / 2);
+    geoms.push(m);
+  }
+
+  // 3) Cornice (ruotata come in anteprima)
+  if (frame) {
+    const f = toGeom(
+      buildFrameRectPhi({
+        innerWmm: planW + 2 * matBands - 2 * OV, innerHmm: planH + 2 * matBands - 2 * OV,
+        thicknessMm: frame.solidMm, heightMm: frame.frameHeightMm,
+        glassMm: frame.glassMm, glassClearanceMm: frame.glassClearanceMm, glueLipMm: frame.lipMm,
+      })
+    );
+    f.rotateX(-Math.PI / 2);
+    f.translate(0, reliefCenterY, reliefFrontZ);
+    geoms.push(f);
+  }
+
+  // (Il canale del vetro a baionetta è una SOTTRAZIONE CSG dopo l'unione — vedi sotto.)
+
+  let merged: THREE.BufferGeometry;
+  try {
+    const wasm = await getManifold();
+
+    // Rilievo = unica parte da geometria THREE (validata come manifold dopo saldatura vertici).
+    let acc;
+    try {
+      acc = geomToManifold(wasm, relief);
+    } catch (eRel) {
+      console.error("[STL] il RILIEVO non è manifold valido:", eRel);
+      throw eRel;
+    }
+
+    // Passepartout = piano di fondo solido (cubo manifold), esteso 2mm dietro al rilievo
+    // (no facce coincidenti) e compenetrante OV mm il retro → fusione robusta.
+    if (mat) {
+      const plateW = planW + 2 * matBands;
+      const plateH = planH + 2 * matBands;
+      const plateFrontZ = reliefBackZ + reliefZmm + OV + matZmm;
+      const plateBackZ = reliefBackZ + reliefZmm - 2;
+      const plate = wasm.Manifold.cube([plateW, plateH, plateFrontZ - plateBackZ], true)
+        .translate([0, reliefCenterY, (plateFrontZ + plateBackZ) / 2]);
+      acc = acc.add(plate);
+    }
+
+    // Cornice = cubo esterno meno cubo interno (manifold), avvolge il piano.
+    if (frame) {
+      const frInnerW = planW + 2 * matBands - 2 * OV;
+      const frInnerH = planH + 2 * matBands - 2 * OV;
+      const frH = frame.frameHeightMm;
+      const outer = wasm.Manifold.cube([frInnerW + 2 * frame.solidMm, frInnerH + 2 * frame.solidMm, frH], true);
+      const inner = wasm.Manifold.cube([frInnerW, frInnerH, frH + 2], true);
+      const frameM = outer.subtract(inner).translate([0, reliefCenterY, reliefFrontZ - frH / 2]);
+      acc = acc.add(frameM);
+    }
+
+    // Canale del vetro a baionetta: alloggiamento sui lati interni della cornice, APERTO IN ALTO.
+    if (frame && glassLip?.enabled) {
+      const frameInnerW = planW + 2 * matBands - 2 * OV;
+      const frameInnerH = planH + 2 * matBands - 2 * OV;
+      const grooveDepth = Math.min(Math.max(0.8, glassLip.lipWmm), Math.max(1, frame.solidMm - 1.0));
+      const slotThk = Math.max(1, glassLip.lipThkmm);
+      const frontWall = 1.5;
+      const boxBottom = reliefCenterY - frameInnerH / 2 - grooveDepth;
+      const boxTop = reliefCenterY + frameInnerH / 2 + frame.solidMm + 20;
+      const sx = frameInnerW + 2 * grooveDepth;
+      const cutter = wasm.Manifold.cube([sx, boxTop - boxBottom, slotThk], true).translate([
+        0,
+        (boxTop + boxBottom) / 2,
+        reliefFrontZ - frontWall - slotThk / 2,
+      ]);
+      acc = acc.subtract(cutter);
+    }
+
+    merged = manifoldToGeom(acc);
+  } catch (e) {
+    console.warn("[STL] manifold fallita, uso merge semplice:", e);
+    merged = mergeGeoms(geoms);
+  }
+  const bin = geometryToBinaryStl(merged);
+  downloadArrayBuffer(bin, fileName ?? "reliefforge-cornice");
 }
 
 export function downloadReliefStlBinary(args: DownloadArgs) {
