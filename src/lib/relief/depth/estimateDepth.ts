@@ -110,6 +110,71 @@ export async function warmupDepthModel(opts: EstimateDepthOptions = {}): Promise
   await loadPipeline(opts);
 }
 
+/** Copia/converte un buffer numerico in Float32Array. */
+function toFloat32(d: ArrayLike<number>): Float32Array {
+  if (d instanceof Float32Array) return d;
+  const out = new Float32Array(d.length);
+  for (let i = 0; i < d.length; i++) out[i] = d[i];
+  return out;
+}
+
+/** Normalizza min..max -> [0..1] (con eventuale inversione). */
+function normalize01(src: Float32Array, invert: boolean): Float32Array {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let i = 0; i < src.length; i++) {
+    const v = src[i];
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
+  }
+  const span = Math.max(1e-9, hi - lo);
+  const out = new Float32Array(src.length);
+  if (invert) {
+    for (let i = 0; i < src.length; i++) out[i] = 1 - (src[i] - lo) / span;
+  } else {
+    for (let i = 0; i < src.length; i++) out[i] = (src[i] - lo) / span;
+  }
+  return out;
+}
+
+/** Upsampling bilineare mantenendo la precisione float (no quantizzazione). */
+function bilinearResample(
+  src: Float32Array,
+  sw: number,
+  sh: number,
+  dw: number,
+  dh: number
+): Float32Array {
+  if (sw === dw && sh === dh) return src.slice();
+  const out = new Float32Array(dw * dh);
+  const sx = sw / dw;
+  const sy = sh / dh;
+  for (let y = 0; y < dh; y++) {
+    let fy = (y + 0.5) * sy - 0.5;
+    if (fy < 0) fy = 0;
+    else if (fy > sh - 1) fy = sh - 1;
+    const y0 = Math.floor(fy);
+    const y1 = Math.min(sh - 1, y0 + 1);
+    const wy = fy - y0;
+    for (let x = 0; x < dw; x++) {
+      let fx = (x + 0.5) * sx - 0.5;
+      if (fx < 0) fx = 0;
+      else if (fx > sw - 1) fx = sw - 1;
+      const x0 = Math.floor(fx);
+      const x1 = Math.min(sw - 1, x0 + 1);
+      const wx = fx - x0;
+      const a = src[y0 * sw + x0];
+      const b = src[y0 * sw + x1];
+      const c = src[y1 * sw + x0];
+      const d = src[y1 * sw + x1];
+      const top = a + (b - a) * wx;
+      const bot = c + (d - c) * wx;
+      out[y * dw + x] = top + (bot - top) * wy;
+    }
+  }
+  return out;
+}
+
 export async function estimateDepth(
   src: DepthSource,
   opts: EstimateDepthOptions = {}
@@ -117,20 +182,41 @@ export async function estimateDepth(
   const { pipe, device } = await loadPipeline(opts);
   const image = await toRawImage(src);
 
-  // La pipeline ritorna { depth: RawImage (grayscale, stessa dimensione input), predicted_depth: Tensor }
+  // La pipeline ritorna { depth: RawImage (uint8 grayscale), predicted_depth: Tensor (float) }.
   const out: any = await (pipe as any)(image);
+
+  const targetW = image.width;
+  const targetH = image.height;
+  const invert = opts.invert ?? false;
+
+  // PERCORSO PREFERITO: usa il tensore float `predicted_depth` invece della
+  // RawImage `depth` quantizzata a 8-bit. Evita il terrazzamento (banding a 256
+  // livelli) sulle superfici lisce. Upsampling bilineare in float fino alla
+  // risoluzione d'ingresso, poi normalizzazione min..max -> [0..1].
+  const pd: any = out?.predicted_depth;
+  if (pd && pd.data && pd.dims && pd.dims.length >= 2) {
+    const dims = Array.from(pd.dims as ArrayLike<number>).map(Number);
+    const mw = dims[dims.length - 1];
+    const mh = dims[dims.length - 2];
+    const src32 = toFloat32(pd.data as ArrayLike<number>);
+    if (mw > 0 && mh > 0 && src32.length >= mw * mh) {
+      const up = bilinearResample(src32, mw, mh, targetW, targetH);
+      const norm = normalize01(up, invert);
+      return { normF32: norm, w: targetW, h: targetH, device };
+    }
+  }
+
+  // FALLBACK: vecchio percorso a 8-bit, se `predicted_depth` non è disponibile.
   const depthImg: RawImage = out.depth;
   const w = depthImg.width;
   const h = depthImg.height;
   const data = depthImg.data as Uint8Array | Uint8ClampedArray; // channels === 1
-
   const f = new Float32Array(w * h);
-  if (opts.invert) {
+  if (invert) {
     for (let i = 0; i < f.length; i++) f[i] = 1 - data[i] / 255;
   } else {
     for (let i = 0; i < f.length; i++) f[i] = data[i] / 255;
   }
-
   return { normF32: f, w, h, device };
 }
 
