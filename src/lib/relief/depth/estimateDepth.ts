@@ -12,7 +12,13 @@
 import { pipeline, RawImage, env } from "@huggingface/transformers";
 
 // I pesi vengono scaricati da Hugging Face e messi in cache dal browser.
-const MODEL_ID = "onnx-community/depth-anything-v2-small";
+// "small" = veloce, leggero (~50-100 MB). "base" = qualità più alta, più nitido,
+// ma più pesante da scaricare (~190 MB fp16). Entrambi Apache-2.0.
+const MODELS = {
+  small: "onnx-community/depth-anything-v2-small",
+  base: "onnx-community/depth-anything-v2-base",
+} as const;
+export type DepthModel = keyof typeof MODELS; // "small" | "base"
 
 export type DepthSource = string | HTMLCanvasElement | ImageData | HTMLImageElement;
 
@@ -23,6 +29,8 @@ export interface EstimateDepthOptions {
   onProgress?: (info: { status: string; progress?: number; file?: string }) => void;
   /** Forza il device. Default: prova "webgpu", poi "wasm". */
   device?: "webgpu" | "wasm";
+  /** Modello: "small" (veloce) o "base" (qualità alta). Default "small". */
+  model?: DepthModel;
 }
 
 export interface DepthResult {
@@ -34,53 +42,60 @@ export interface DepthResult {
 
 type DepthPipeline = Awaited<ReturnType<typeof pipeline>>;
 
-let cached: { pipe: DepthPipeline; device: "webgpu" | "wasm" } | null = null;
-let loading: Promise<{ pipe: DepthPipeline; device: "webgpu" | "wasm" }> | null = null;
+type LoadedPipe = { pipe: DepthPipeline; device: "webgpu" | "wasm" };
+
+// Cache separata PER MODELLO: cambiare qualità non ricarica l'altro modello.
+const cache: Partial<Record<DepthModel, LoadedPipe>> = {};
+const loadingMap: Partial<Record<DepthModel, Promise<LoadedPipe>>> = {};
 
 function webgpuAvailable(): boolean {
   return typeof navigator !== "undefined" && "gpu" in navigator;
 }
 
-async function loadPipeline(
-  opts: EstimateDepthOptions
-): Promise<{ pipe: DepthPipeline; device: "webgpu" | "wasm" }> {
-  if (cached) return cached;
-  if (loading) return loading;
+async function loadPipeline(opts: EstimateDepthOptions): Promise<LoadedPipe> {
+  const model: DepthModel = opts.model ?? "small";
+  const modelId = MODELS[model];
+
+  if (cache[model]) return cache[model]!;
+  if (loadingMap[model]) return loadingMap[model]!;
 
   const wantGpu = (opts.device ?? (webgpuAvailable() ? "webgpu" : "wasm")) === "webgpu";
 
-  loading = (async () => {
-    const progress = (p: any) =>
-      opts.onProgress?.({ status: p.status, progress: p.progress, file: p.file });
+  const p = (async (): Promise<LoadedPipe> => {
+    const progress = (pr: any) =>
+      opts.onProgress?.({ status: pr.status, progress: pr.progress, file: pr.file });
 
     try {
       if (wantGpu && webgpuAvailable()) {
-        const pipe = await pipeline("depth-estimation", MODEL_ID, {
+        const pipe = await pipeline("depth-estimation", modelId, {
           device: "webgpu",
           dtype: "fp16",
           progress_callback: progress,
         });
-        cached = { pipe, device: "webgpu" };
-        return cached;
+        const r: LoadedPipe = { pipe, device: "webgpu" };
+        cache[model] = r;
+        return r;
       }
     } catch (e) {
       // se WebGPU fallisce (driver/browser) si ripiega su WASM
       console.warn("[estimateDepth] WebGPU non disponibile, fallback WASM:", e);
     }
 
-    const pipe = await pipeline("depth-estimation", MODEL_ID, {
+    const pipe = await pipeline("depth-estimation", modelId, {
       device: "wasm",
       dtype: "q8",
       progress_callback: progress,
     });
-    cached = { pipe, device: "wasm" };
-    return cached;
+    const r: LoadedPipe = { pipe, device: "wasm" };
+    cache[model] = r;
+    return r;
   })();
 
+  loadingMap[model] = p;
   try {
-    return await loading;
+    return await p;
   } finally {
-    loading = null;
+    loadingMap[model] = undefined;
   }
 }
 

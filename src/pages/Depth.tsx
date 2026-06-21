@@ -83,6 +83,7 @@ export default function Depth() {
   const [contrastPct, setContrastPct] = useState(4);
   const [invert, setInvert] = useState(false);
   const [view, setView] = useState<"fuso" | "depth">("fuso");
+  const [quality, setQuality] = useState<"small" | "base">("small");
 
   const params: Params = { detailMicro, detailSigma, skinDenoise, volumeGamma, localAmount, localSigma, contrastPct, invert, view };
 
@@ -124,7 +125,7 @@ export default function Depth() {
       const octx = oc.getContext("2d", { willReadFrequently: true })!;
       octx.drawImage(img, 0, 0, pw, ph);
       const id = octx.getImageData(0, 0, pw, ph);
-      const dep = await estimateDepth(id, { onProgress: (p) => setMsg("Modello: " + p.status) });
+      const dep = await estimateDepth(id, { model: quality, onProgress: (p) => setMsg("Modello: " + p.status) });
       const lc = document.createElement("canvas"); lc.width = dep.w; lc.height = dep.h;
       const lctx = lc.getContext("2d", { willReadFrequently: true })!;
       lctx.drawImage(img, 0, 0, dep.w, dep.h);
@@ -136,7 +137,7 @@ export default function Depth() {
     } catch (err: any) { setMsg("Errore: " + (err?.message || err)); }
     finally { setBusy(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draw]);
+  }, [draw, quality]);
 
   useEffect(() => { runRef.current = run; }, [run]);
 
@@ -176,6 +177,21 @@ export default function Depth() {
       <div className="mb-3 rounded-lg border bg-white p-3">
         <div className="flex flex-wrap items-center gap-3">
           <input type="file" accept="image/*" onChange={onFile} />
+          <div className="inline-flex items-center gap-2">
+            <span className="text-sm text-slate-600">Qualità:</span>
+            <div className="inline-flex overflow-hidden rounded-md border border-slate-300">
+              <button
+                type="button"
+                onClick={() => { setQuality("small"); setMsg("Qualità: Veloce. Premi Genera per applicare."); }}
+                className={"px-2.5 py-1 text-xs font-semibold " + (quality === "small" ? "bg-[#2f6f7e] text-white" : "bg-white text-slate-700")}
+              >Veloce</button>
+              <button
+                type="button"
+                onClick={() => { setQuality("base"); setMsg("Qualità: Alta (modello Base). Premi Genera — al primo uso scarica ~190 MB."); }}
+                className={"px-2.5 py-1 text-xs font-semibold " + (quality === "base" ? "bg-[#2f6f7e] text-white" : "bg-white text-slate-700")}
+              >Alta</button>
+            </div>
+          </div>
           <button onClick={run} disabled={busy} className="rounded-md bg-[#E26D5C] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Genera</button>
           <button onClick={download16} disabled={!hmap} className="rounded-md bg-[#2f6f7e] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Scarica PNG 16-bit</button>
           <button onClick={download8} disabled={!hmap} className="rounded-md border px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">PNG 8-bit</button>
